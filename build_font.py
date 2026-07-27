@@ -44,7 +44,7 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.011"
+VERSION_NUMBER = "1.012"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -79,6 +79,72 @@ MANGA_PUNCTUATION_SEQUENCES = (
     "!!",
     "??",
 )
+
+MANGA_DAKUTEN_BASES = tuple(
+    int(value, 16)
+    for value in """
+3042 3041 3044 3043 3045 3048 3047 304A
+3049 3095 3096 1B132 3063 306A 306B 306C
+306D 306E 307E 307F 3080 3081 3082 3084
+3083 3086 3085 3088 3087 3089 308A 308B
+308C 308D 308F 308E 3090 3091 3092 3093
+309F 30A2 30A1 30A4 30A3 30A5 30A8 30A7
+30AA 30A9 30F5 30F6 1B155 30C3 30CA 30CB
+30CC 30CD 30CE 30DE 30DF 30E0 30E1 30E2
+30E4 30E3 30E6 30E5 30E8 30E7 30E9 30EA
+30EB 30EC 30ED 30EE 30F3
+""".split()
+)
+MANGA_HANDAKUTEN_BASES = tuple(
+    int(value, 16)
+    for value in """
+304B 304D 304F 3051 3053 30AB 30AD 30AF
+30B1 30B3 30BB 30C4 30C8 31F7 3042 3041
+3044 3043 3046 3045 3048 3047 304A 3049
+3095 3096 1B132 3055 3057 3059 305B 305D
+305F 3061 3064 3063 3066 3068 306A 306B
+306C 306D 306E 307E 307F 3080 3081 3082
+3084 3083 3086 3085 3088 3087 3089 308A
+308B 308C 308D 308F 308E 3090 3091 3092
+3093 309F 30A2 30A1 30A4 30A3 30A6 30A5
+30A8 30A7 30AA 30A9 30F5 30F6 1B155 30B5
+30B7 30B9 30BD 30BF 30C1 30C3 30C6 30CA
+30CB 30CC 30CD 30CE 30DE 30DF 30E0 30E1
+30E2 30E4 30E3 30E6 30E5 30E8 30E7 30E9
+30EA 30EB 30EC 30ED 30EF 30EE 30F0 30F1
+30F2 30F3
+""".split()
+)
+MANGA_MARK_PAIRS = tuple(
+    [(base, 0x3099) for base in MANGA_DAKUTEN_BASES]
+    + [(base, 0x309A) for base in MANGA_HANDAKUTEN_BASES]
+)
+MANGA_VERTICAL_DAKUTEN_BASES = tuple(
+    int(value, 16)
+    for value in """
+3041 3043 3045 3047 3049 3095 3096 1B132
+3063 3083 3085 3087 308E 30A1 30A3 30A5
+30A7 30A9 30F5 30F6 1B155 30C3 30E3 30E5
+30E7 30EE
+""".split()
+)
+MANGA_VERTICAL_HANDAKUTEN_BASES = tuple(
+    int(value, 16)
+    for value in """
+31F7 3041 3043 3045 3047 3049 3095 3096
+1B132 3063 3083 3085 3087 308E 30A1 30A3
+30A5 30A7 30A9 30F5 30F6 1B155 30C3 30E3
+30E5 30E7 30EE
+""".split()
+)
+MANGA_VERTICAL_MARK_PAIRS = frozenset(
+    [(base, 0x3099) for base in MANGA_VERTICAL_DAKUTEN_BASES]
+    + [
+        (base, 0x309A)
+        for base in MANGA_VERTICAL_HANDAKUTEN_BASES
+    ]
+)
+MANGA_MISSING_SMALL_KANA = (0x1B132, 0x1B155)
 
 
 def parse_args() -> argparse.Namespace:
@@ -166,6 +232,77 @@ def find_vertical_glyph(font: TTFont, base_name: str) -> str:
             if mapping and base_name in mapping:
                 return mapping[base_name]
     raise ValueError(f"The source font has no vertical substitution for {base_name}")
+
+
+def feature_ligatures(
+    font: TTFont, feature_tag: str
+) -> dict[tuple[str, ...], str]:
+    lookup_indices: list[int] = []
+    for record in font["GSUB"].table.FeatureList.FeatureRecord:
+        if record.FeatureTag == feature_tag:
+            lookup_indices.extend(record.Feature.LookupListIndex)
+
+    substitutions: dict[tuple[str, ...], str] = {}
+    for index in dict.fromkeys(lookup_indices):
+        lookup = font["GSUB"].table.LookupList.Lookup[index]
+        for subtable in lookup.SubTable:
+            if lookup.LookupType == 7:
+                subtable = subtable.ExtSubTable
+            ligatures = getattr(subtable, "ligatures", None)
+            if ligatures is None:
+                continue
+            for first, records in ligatures.items():
+                for ligature in records:
+                    substitutions[
+                        (first, *ligature.Component)
+                    ] = ligature.LigGlyph
+    return substitutions
+
+
+def add_unicode_mapping(font: TTFont, codepoint: int, name: str) -> None:
+    mapped = False
+    for table in font["cmap"].tables:
+        if not table.isUnicode():
+            continue
+        if codepoint > 0xFFFF and table.format not in {12, 13}:
+            continue
+        table.cmap[codepoint] = name
+        mapped = True
+    if not mapped:
+        raise ValueError(f"No cmap subtable supports U+{codepoint:04X}")
+
+
+def centered_scaled_path(
+    outline: pathops.Path,
+    scale: float,
+    target_x: float,
+    target_y: float,
+) -> pathops.Path:
+    x_min, y_min, x_max, y_max = outline.bounds
+    center_x = (x_min + x_max) / 2
+    center_y = (y_min + y_max) / 2
+    return transform_path(
+        outline,
+        Transform(
+            scale,
+            0,
+            0,
+            scale,
+            target_x - scale * center_x,
+            target_y - scale * center_y,
+        ),
+    )
+
+
+def compose_mark_glyph(
+    base: pathops.Path, mark: pathops.Path
+) -> pathops.Path:
+    combined = pathops.Path()
+    combined.addPath(base)
+    combined.addPath(
+        transform_path(mark, Transform(1, 0, 0, 1, 1000, 0))
+    )
+    return combined
 
 
 def allocate_cid_names(font: TTFont, count: int) -> list[str]:
@@ -727,6 +864,8 @@ def feature_source(
     wave: tuple[str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
     punctuation: tuple[str, str, list[tuple[str, str]]],
+    kana_marks: list[tuple[str, str, str]],
+    kana_vertical_maps: list[tuple[str, str]],
 ) -> str:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -839,9 +978,20 @@ def feature_source(
         + manga_wave_vertical_maps
     )
 
+    kana_vertical_rules = "".join(
+        f"  sub {horizontal} by {vertical};\n"
+        for horizontal, vertical in kana_vertical_maps
+    )
+    vert_rules.append(kana_vertical_rules)
+    vrt2_rules.append(kana_vertical_rules)
+
     exclamation, question, ligatures = punctuation
     ccmp_rules = punctuation_ligature_rules(
         exclamation, question, ligatures
+    )
+    ccmp_rules += "".join(
+        f"  sub {base} {mark} by {output};\n"
+        for base, mark, output in kana_marks
     )
 
     return (
@@ -1026,11 +1176,26 @@ def build(
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
     required_codepoints.extend(
-        [0x21, 0x3F, 0x301C, 0x3030, 0xFF01, 0xFF1F, 0xFF5E]
+        [
+            0x21,
+            0x3F,
+            0x301C,
+            0x3030,
+            0x3099,
+            0x309A,
+            0xFF01,
+            0xFF1F,
+            0xFF5E,
+        ]
+    )
+    required_codepoints.extend(
+        base
+        for base, _ in MANGA_MARK_PAIRS
+        if base not in MANGA_MISSING_SMALL_KANA
     )
     missing = [
         f"U+{codepoint:04X}"
-        for codepoint in required_codepoints
+        for codepoint in dict.fromkeys(required_codepoints)
         if codepoint not in cmap
     ]
     if missing:
@@ -1038,12 +1203,37 @@ def build(
     if cmap[0x301C] != cmap[0xFF5E]:
         raise ValueError("U+301C and U+FF5E must share a source glyph")
 
+    if len(MANGA_MARK_PAIRS) != 191:
+        raise AssertionError("Expected 191 Manga1 kana mark sequences")
+    if len(MANGA_VERTICAL_MARK_PAIRS) != 53:
+        raise AssertionError("Expected 53 vertical Manga1 kana mark sequences")
+    source_ccmp_ligatures = feature_ligatures(font, "ccmp")
+    native_mark_outputs: dict[tuple[int, int], str] = {}
+    for base, mark in MANGA_MARK_PAIRS:
+        if base not in cmap:
+            continue
+        output = source_ccmp_ligatures.get((cmap[base], cmap[mark]))
+        if output is not None:
+            native_mark_outputs[(base, mark)] = output
+    generated_mark_pairs = [
+        pair for pair in MANGA_MARK_PAIRS if pair not in native_mark_outputs
+    ]
+    generated_vertical_mark_pairs = [
+        pair
+        for pair in MANGA_MARK_PAIRS
+        if pair in MANGA_VERTICAL_MARK_PAIRS
+        and pair not in native_mark_outputs
+    ]
+
     allocated_names = allocate_cid_names(
         font,
         NEW_GLYPH_COUNT * len(linear_codepoints)
         + WAVE_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
-        + len(MANGA_PUNCTUATION_SEQUENCES),
+        + len(MANGA_PUNCTUATION_SEQUENCES)
+        + 2 * len(MANGA_MISSING_SMALL_KANA)
+        + len(generated_mark_pairs)
+        + len(generated_vertical_mark_pairs),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
     for index, (prefix, codepoint) in enumerate(linear_codepoints):
@@ -1140,6 +1330,131 @@ def build(
         ),
     )
 
+    kana_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
+    small_kana_names = allocated_names[
+        kana_start : kana_start + 2 * len(MANGA_MISSING_SMALL_KANA)
+    ]
+    small_hiragana = centered_scaled_path(
+        glyph_path(font, cmap[0x3053]), 0.775, 500, 253
+    )
+    small_katakana = centered_scaled_path(
+        glyph_path(font, cmap[0x30B3]), 0.775, 500, 253
+    )
+    small_hiragana_vertical = centered_scaled_path(
+        glyph_path(
+            font, find_vertical_glyph(font, cmap[0x3053])
+        ),
+        0.78,
+        654,
+        397,
+    )
+    small_katakana_vertical = centered_scaled_path(
+        glyph_path(
+            font, find_vertical_glyph(font, cmap[0x30B3])
+        ),
+        0.78,
+        654,
+        397,
+    )
+    append_cff_glyphs(
+        font,
+        [
+            small_hiragana,
+            small_katakana,
+            small_hiragana_vertical,
+            small_katakana_vertical,
+        ],
+        small_kana_names,
+        cmap[0x3053],
+        880,
+        add_stem_hints=False,
+    )
+    missing_small_glyphs = {
+        0x1B132: (small_kana_names[0], small_kana_names[2]),
+        0x1B155: (small_kana_names[1], small_kana_names[3]),
+    }
+    kana_vertical_maps = [
+        glyphs for glyphs in missing_small_glyphs.values()
+    ]
+    for codepoint, (horizontal, _) in missing_small_glyphs.items():
+        add_unicode_mapping(font, codepoint, horizontal)
+        cmap[codepoint] = horizontal
+
+    mark_horizontal_start = kana_start + len(small_kana_names)
+    generated_mark_names = allocated_names[
+        mark_horizontal_start
+        : mark_horizontal_start + len(generated_mark_pairs)
+    ]
+    generated_mark_outputs = dict(
+        zip(generated_mark_pairs, generated_mark_names, strict=True)
+    )
+    mark_paths = {
+        codepoint: glyph_path(font, cmap[codepoint])
+        for codepoint in (0x3099, 0x309A)
+    }
+    horizontal_mark_paths = [
+        compose_mark_glyph(
+            glyph_path(font, cmap[base]), mark_paths[mark]
+        )
+        for base, mark in generated_mark_pairs
+    ]
+    append_cff_glyphs(
+        font,
+        horizontal_mark_paths,
+        generated_mark_names,
+        cmap[0x3042],
+        880,
+        add_stem_hints=False,
+    )
+
+    mark_vertical_start = mark_horizontal_start + len(
+        generated_mark_pairs
+    )
+    generated_vertical_mark_names = allocated_names[
+        mark_vertical_start
+        : mark_vertical_start + len(generated_vertical_mark_pairs)
+    ]
+    vertical_mark_paths = []
+    for base, mark in generated_vertical_mark_pairs:
+        if base in missing_small_glyphs:
+            vertical_base = missing_small_glyphs[base][1]
+        else:
+            vertical_base = find_vertical_glyph(font, cmap[base])
+        vertical_mark_paths.append(
+            compose_mark_glyph(
+                glyph_path(font, vertical_base), mark_paths[mark]
+            )
+        )
+    append_cff_glyphs(
+        font,
+        vertical_mark_paths,
+        generated_vertical_mark_names,
+        cmap[0x3042],
+        880,
+        add_stem_hints=False,
+    )
+    kana_vertical_maps.extend(
+        zip(
+            (
+                generated_mark_outputs[pair]
+                for pair in generated_vertical_mark_pairs
+            ),
+            generated_vertical_mark_names,
+            strict=True,
+        )
+    )
+    for pair, horizontal in native_mark_outputs.items():
+        if pair in MANGA_VERTICAL_MARK_PAIRS:
+            kana_vertical_maps.append(
+                (horizontal, find_vertical_glyph(font, horizontal))
+            )
+
+    mark_outputs = native_mark_outputs | generated_mark_outputs
+    kana_marks = [
+        (cmap[base], cmap[mark], mark_outputs[(base, mark)])
+        for base, mark in MANGA_MARK_PAIRS
+    ]
+
     copyright_notices = [
         notice
         for notice in (
@@ -1161,7 +1476,14 @@ def build(
 
     merge_features(
         font,
-        feature_source(extensions, wave, manga_wave, punctuation),
+        feature_source(
+            extensions,
+            wave,
+            manga_wave,
+            punctuation,
+            kana_marks,
+            kana_vertical_maps,
+        ),
     )
     rename_font(font, copyright_notice, font_notice)
 
