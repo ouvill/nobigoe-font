@@ -216,7 +216,7 @@ catalogWritingMode.addEventListener("click", () => {
 
 async function loadCatalog() {
   try {
-    const response = await fetch("marks-data.json?v=1.017");
+    const response = await fetch("marks-data.json?v=1.018");
     if (!response.ok) {
       throw new Error(`Glyph catalog: HTTP ${response.status}`);
     }
@@ -231,7 +231,7 @@ async function loadCatalog() {
 
 async function revealFont() {
   try {
-    await document.fonts.load("64px Nobigoe", "ー〜〰あ゙！！？？");
+    await document.fonts.load("64px Nobigoe", "ー〜〰あ゙♡゙♥゙！！？？");
     await document.fonts.ready;
   } finally {
     root.classList.remove("fonts-loading");

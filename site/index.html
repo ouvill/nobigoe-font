@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="漫画の声をどこまでも伸ばせる明朝体、のびごえ明朝の紹介サイト。">
   <title>のびごえ明朝 — 声を、どこまでも。</title>
-  <link rel="stylesheet" href="styles.css?v=1.017">
-  <script src="script.js?v=1.017" defer></script>
+  <link rel="stylesheet" href="styles.css?v=1.018">
+  <script src="script.js?v=1.018" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -22,7 +22,7 @@
       <a href="#marks-list">濁点一覧</a>
       <a href="#spec">仕様</a>
     </nav>
-    <a class="download-link" href="assets/NobigoeMincho-Regular.woff2?v=1.017" download>
+    <a class="download-link" href="assets/NobigoeMincho-Regular.woff2?v=1.018" download>
       Webfontを入手
     </a>
   </header>
@@ -177,6 +177,7 @@
           <button type="button" data-sample="しーーーーん……\nざわ〰〰〰〰〰\nあ゙……あの……">静寂</button>
           <button type="button" data-sample="！？　？！　！！？？\nあ゙　な゙　ま゚　𛄲゙\nー　〜　〰　―">字形一覧</button>
           <button type="button" data-sample="&#xE082;　&#xE0B0;　&#xE09A;　&#xE08C;　&#xE099;　&#xE0CE;">こぶり外字</button>
+          <button type="button" data-sample="♡゙　♥゙　&#xE0DC;　&#xE0DD;">ハート濁点</button>
         </div>
       </div>
     </section>
@@ -187,14 +188,15 @@
         <h2 id="marks-title">濁りも、<br>かすれも、<br>声になる。</h2>
         <p>
           普通のかなに結合濁点・半濁点を続けるだけ。
-          191通りのManga1シーケンスを、一つの安定した字形として描きます。
-          うち88字形は、源暎こぶり明朝の私用領域U+E082–U+E0D9でも入力できます。
+          191通りのManga1シーケンスと2通りのハート濁点を、一つの安定した字形として描きます。
+          うち90字形は、源暎こぶり明朝の私用領域コードでも入力できます。
         </p>
       </div>
       <div class="marks-specimen" aria-label="濁点と半濁点の字形見本">
         <span>あ゙</span><span>ぁ゙</span><span>な゙</span><span>ん゙</span>
         <span>か゚</span><span>さ゚</span><span>ま゚</span><span>セ゚</span>
         <span>𛄲゙</span><span>𛅕゚</span><span>ㇷ゚</span><span>ツ゚</span>
+        <span>♡゙</span><span>♥゙</span>
       </div>
     </section>
 
@@ -202,7 +204,7 @@
       <div class="catalog-heading">
         <div>
           <p class="section-number">04 / GLYPH CATALOG</p>
-          <h2 id="catalog-title">濁点・半濁点、<br>全191字形。</h2>
+          <h2 id="catalog-title">濁点・半濁点、<br>全193字形。</h2>
         </div>
         <p>記号と文字種で絞り込めます。「外」印は源暎こぶり明朝の外字コードでも入力できる字形です。縦組を選ぶと、Manga1が専用字形を規定する小書き仮名の配置も確認できます。</p>
       </div>
@@ -219,6 +221,7 @@
           <button class="is-active" type="button" data-mark-script="all" aria-pressed="true">すべて</button>
           <button type="button" data-mark-script="hiragana" aria-pressed="false">ひらがな</button>
           <button type="button" data-mark-script="katakana" aria-pressed="false">カタカナ</button>
+          <button type="button" data-mark-script="symbol" aria-pressed="false">記号</button>
         </div>
         <button class="catalog-writing-mode" id="catalog-writing-mode" type="button" aria-pressed="false">
           縦組で見る
@@ -226,10 +229,10 @@
       </div>
 
       <p class="catalog-result" aria-live="polite">
-        <strong id="catalog-count">191</strong>
+        <strong id="catalog-count">193</strong>
         <span>字形を表示</span>
       </p>
-      <div class="catalog-grid" id="catalog-grid" role="list" aria-label="濁点・半濁点付き仮名一覧"></div>
+      <div class="catalog-grid" id="catalog-grid" role="list" aria-label="濁点・半濁点付き仮名と記号一覧"></div>
       <noscript><p class="catalog-noscript">一覧を表示するにはJavaScriptを有効にしてください。</p></noscript>
     </section>
 
@@ -245,7 +248,7 @@
         <div><dt>Style</dt><dd>Regular / OpenType CFF</dd></div>
         <div><dt>Features</dt><dd>ccmp, calt, vert, vrt2</dd></div>
         <div><dt>Writing</dt><dd>横組・縦組</dd></div>
-        <div><dt>Version</dt><dd>1.017</dd></div>
+        <div><dt>Version</dt><dd>1.018</dd></div>
         <div><dt>License</dt><dd>SIL Open Font License 1.1</dd></div>
       </dl>
 
@@ -264,7 +267,7 @@
     <div class="footer-links">
       <a href="#top">ページ上部へ</a>
       <a href="../README.md">README</a>
-      <a href="assets/NobigoeMincho-Regular.woff2?v=1.017" download>Webfontを入手</a>
+      <a href="assets/NobigoeMincho-Regular.woff2?v=1.018" download>Webfontを入手</a>
     </div>
     <p class="footer-credit">An independent type experiment. Not an official Adobe, Google, Noto, or Shippori Mincho project.</p>
   </footer>

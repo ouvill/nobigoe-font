@@ -47,7 +47,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.017"
+VERSION_NUMBER = "1.018"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -151,6 +151,13 @@ KOBURI_PUA_MARK_PAIRS = tuple(
 30A9 30F5 30F6 30C3 30E3 30E5 30E7 30EE
 """.split()
     ]
+)
+KOBURI_HEART_MARK_PAIRS = ((0x2661, 0x3099), (0x2665, 0x3099))
+KOBURI_HEART_BASE_PUA = (0xE064, 0xE065)
+KOBURI_HEART_OUTPUT_PUA = (0xE0DC, 0xE0DD)
+HEART_DAKUTEN_MARK_TRANSFORMS = (
+    Transform(0.96, 0, 0, 0.96, 971, 61),
+    Transform(0.96, 0, 0, 0.96, 1002, 32),
 )
 MANGA_VERTICAL_DAKUTEN_BASES = tuple(
     int(value, 16)
@@ -420,6 +427,21 @@ def compose_mark_glyph(
     combined = pathops.Path()
     combined.addPath(base)
     combined.addPath(transform_path(mark, mark_transform))
+    return combined
+
+
+def compose_heart_dakuten_glyph(
+    base: pathops.Path, mark: pathops.Path
+) -> pathops.Path:
+    mark_contours = list(mark.contours)
+    if len(mark_contours) != len(HEART_DAKUTEN_MARK_TRANSFORMS):
+        raise ValueError("Expected a two-contour combining dakuten glyph")
+    combined = pathops.Path()
+    combined.addPath(base)
+    for contour, transform in zip(
+        mark_contours, HEART_DAKUTEN_MARK_TRANSFORMS, strict=True
+    ):
+        combined.addPath(transform_path(contour, transform))
     return combined
 
 
@@ -1346,6 +1368,9 @@ def build(
         for base, _ in MANGA_MARK_PAIRS
         if base not in MANGA_MISSING_SMALL_KANA
     )
+    required_codepoints.extend(
+        base for base, _ in KOBURI_HEART_MARK_PAIRS
+    )
     missing = [
         f"U+{codepoint:04X}"
         for codepoint in dict.fromkeys(required_codepoints)
@@ -1364,6 +1389,8 @@ def build(
         raise AssertionError("Expected 88 Koburi Mincho PUA mappings")
     if not set(KOBURI_PUA_MARK_PAIRS) <= set(MANGA_MARK_PAIRS):
         raise AssertionError("Koburi Mincho PUA mappings must use Manga1 sequences")
+    if len(KOBURI_HEART_MARK_PAIRS) != 2:
+        raise AssertionError("Expected two Koburi Mincho heart mappings")
     mark_position_overrides = load_mark_position_overrides()
     source_ccmp_ligatures = feature_ligatures(font, "ccmp")
     native_mark_outputs: dict[tuple[int, int], str] = {}
@@ -1386,7 +1413,8 @@ def build(
         + len(MANGA_PUNCTUATION_SEQUENCES)
         + 2 * len(MANGA_MISSING_SMALL_KANA)
         + len(generated_mark_pairs)
-        + len(generated_vertical_mark_pairs),
+        + len(generated_vertical_mark_pairs)
+        + len(KOBURI_HEART_MARK_PAIRS),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
     for index, (prefix, codepoint) in enumerate(linear_codepoints):
@@ -1610,6 +1638,36 @@ def build(
             (horizontal, find_vertical_glyph(font, horizontal))
         )
 
+    heart_start = mark_vertical_start + len(generated_vertical_mark_pairs)
+    heart_names = allocated_names[
+        heart_start : heart_start + len(KOBURI_HEART_MARK_PAIRS)
+    ]
+    heart_paths = [
+        compose_heart_dakuten_glyph(
+            glyph_path(font, cmap[base]),
+            mark_paths[mark],
+        )
+        for base, mark in KOBURI_HEART_MARK_PAIRS
+    ]
+    append_cff_glyphs(
+        font,
+        heart_paths,
+        heart_names,
+        cmap[0x2661],
+        880,
+        add_stem_hints=False,
+    )
+    for codepoint, (base, _) in zip(
+        KOBURI_HEART_BASE_PUA,
+        KOBURI_HEART_MARK_PAIRS,
+        strict=True,
+    ):
+        add_unicode_mapping(font, codepoint, cmap[base])
+    for codepoint, output in zip(
+        KOBURI_HEART_OUTPUT_PUA, heart_names, strict=True
+    ):
+        add_unicode_mapping(font, codepoint, output)
+
     mark_outputs = native_mark_outputs | generated_mark_outputs
     for offset, pair in enumerate(KOBURI_PUA_MARK_PAIRS):
         add_unicode_mapping(
@@ -1621,6 +1679,12 @@ def build(
         (cmap[base], cmap[mark], mark_outputs[(base, mark)])
         for base, mark in MANGA_MARK_PAIRS
     ]
+    kana_marks.extend(
+        (cmap[base], cmap[mark], output)
+        for (base, mark), output in zip(
+            KOBURI_HEART_MARK_PAIRS, heart_names, strict=True
+        )
+    )
 
     copyright_notices = [
         notice
