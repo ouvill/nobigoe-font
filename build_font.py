@@ -199,19 +199,7 @@ def make_sine_wave_tile(
     normal_phase_velocity = 3 * math.pi / advance
     taper_length = advance / 4
 
-    source_x_min, _, source_x_max, _ = source.bounds
-    left_min, left_max = stroke_band(
-        source, "horizontal", source_x_min + 2
-    )
-    right_min, right_max = stroke_band(
-        source, "horizontal", source_x_max - 2
-    )
-    source_left_center = (left_min + left_max) / 2
-    source_right_center = (right_min + right_max) / 2
-    phase_ratio = (
-        source_left_center - source_right_center
-    ) / (2 * amplitude)
-    phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
+    phase_offset = 0.0
 
 
     def smoothstep(progress: float) -> float:
