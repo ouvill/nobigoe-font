@@ -44,9 +44,9 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.010"
+VERSION_NUMBER = "1.011"
 WAVE_GLYPH_COUNT = 10
-MANGA_WAVE_GLYPH_COUNT = 5
+MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
@@ -460,6 +460,13 @@ def make_manga_wave_parts(
         "half_waves": 4,
         "taper_fraction": 1 / 6,
     }
+    horizontal_isolated = make_sine_wave_tile(
+        source,
+        advance,
+        taper_start=True,
+        taper_end=True,
+        **parameters,
+    )
     horizontal_start = make_sine_wave_tile(
         source, advance, taper_start=True, **parameters
     )
@@ -483,6 +490,7 @@ def make_manga_wave_parts(
     vertical = tuple(
         transform_path(outline, vertical_rotation)
         for outline in (
+            horizontal_isolated,
             horizontal_start,
             horizontal_middle,
             horizontal_end,
@@ -490,12 +498,14 @@ def make_manga_wave_parts(
     )
     added = (
         horizontal_start,
+        horizontal_middle,
         horizontal_end,
         vertical[0],
         vertical[1],
         vertical[2],
+        vertical[3],
     )
-    return horizontal_middle, added
+    return horizontal_isolated, added
 
 
 def make_punctuation_ligature(
@@ -710,21 +720,6 @@ def alternating_wave_rules(
 """
 
 
-def manga_wave_rules(
-    prefix: str, base: str, start: str, end: str
-) -> str:
-    glyphs = f"{base} {start} {end}"
-    return f"""
-  lookup {prefix}_start {{
-    ignore sub {start} [{glyphs}]';
-    sub {base}' [{glyphs}] by {start};
-  }} {prefix}_start;
-  lookup {prefix}_end {{
-    sub [{glyphs}] {base}' by {end};
-  }} {prefix}_end;
-  sub [{glyphs}] {start}' by {base};
-  sub {end}' [{glyphs}] by {base};
-"""
 
 
 def feature_source(
@@ -801,22 +796,26 @@ def feature_source(
     manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
     (
         manga_wave_start,
+        manga_wave_middle,
         manga_wave_end,
+        manga_wave_vertical_isolated,
         manga_wave_vertical_start,
         manga_wave_vertical_middle,
         manga_wave_vertical_end,
     ) = manga_wave_names
     calt_rules.append(
-        manga_wave_rules(
-            manga_wave_prefix,
+        contextual_extension_rules(
+            f"{manga_wave_prefix}_h",
             manga_wave_base,
             manga_wave_start,
+            manga_wave_middle,
             manga_wave_end,
         )
     )
     manga_wave_vertical_maps = (
-        f"  sub {manga_wave_base} by {manga_wave_vertical_middle};\n"
+        f"  sub {manga_wave_base} by {manga_wave_vertical_isolated};\n"
         f"  sub {manga_wave_start} by {manga_wave_vertical_start};\n"
+        f"  sub {manga_wave_middle} by {manga_wave_vertical_middle};\n"
         f"  sub {manga_wave_end} by {manga_wave_vertical_end};\n"
     )
     vert_rules.append(
@@ -1086,7 +1085,7 @@ def build(
     manga_wave_names = allocated_names[
         manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     ]
-    manga_wave_middle, manga_wave_parts = make_manga_wave_parts(
+    manga_wave_isolated, manga_wave_parts = make_manga_wave_parts(
         glyph_path(font, wave_base),
         1000,
         manga_wave_vertical_origin,
@@ -1094,7 +1093,7 @@ def build(
     replace_cff_glyph(
         font,
         manga_wave_base,
-        manga_wave_middle,
+        manga_wave_isolated,
         manga_wave_vertical_origin,
     )
     append_cff_glyphs(
