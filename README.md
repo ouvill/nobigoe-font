@@ -41,9 +41,9 @@ Noto Serif JPをベースに、漫画向けの伸長記号と感嘆符・疑問�
 | 用途 | フォント | バージョン |
 |---|---|---:|
 | 本文、長音、ダッシュ、波線 | [Noto Serif JP Regular](https://github.com/notofonts/noto-cjk) | 2.003 |
-| Manga1感嘆符・疑問符合字の記号輪郭 | [Shippori Mincho Regular（しっぽり明朝）](https://github.com/fontdasu/ShipporiMincho) | 3.110 |
+| Manga1感嘆符・疑問符合字の記号輪郭 | [Shippori Mincho OTF Regular（しっぽり明朝）](https://fontdasu.com/shippori-mincho/) | 3.300 |
 
-取得元、固定コミット、SHA-256、著作権表示は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) に記載しています。
+取得元、バージョン、SHA-256、著作権表示は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) に記載しています。
 
 ## ビルド
 
@@ -63,7 +63,7 @@ python3 -m venv .venv
 
 ### 自動取得して生成
 
-引数を省略すると、固定コミットからNoto Serif JP Regularとしっぽり明朝Regularを一時ディレクトリへダウンロードして生成します。元フォントのバイナリはリポジトリへ保存しません。
+引数を省略すると、固定コミットからNoto Serif JP Regularを、FONTDASU公式配布ページからしっぽり明朝OTF版のアーカイブを一時ディレクトリへダウンロードして生成します。両方のSHA-256を検証し、想定した配布物と異なる場合は停止します。元フォントのバイナリはリポジトリへ保存しません。
 
 ```sh
 .venv/bin/python build_font.py
@@ -80,11 +80,13 @@ dist/NotoSerifJPChoon-Regular.otf
 ```sh
 .venv/bin/python build_font.py \
   --source /path/to/NotoSerifJP-Regular.otf \
-  --punctuation-source /path/to/ShipporiMincho-Regular.ttf \
+  --punctuation-source /path/to/ShipporiMincho-OTF-Regular.otf \
   --output dist/NotoSerifJPChoon-Regular.otf
 ```
 
 `--source` または `--punctuation-source` の片方だけを指定した場合、指定しなかったフォントだけを自動取得します。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。
+
+しっぽり明朝はOTF版とTTF版のどちらも `--punctuation-source` に指定できます。本プロジェクトの生成先はOpenType/CFFなので、同じ3次ベジェ曲線を保持できるOTF版を推奨し、既定の自動取得でもOTF版を使用します。TTF版ではTrueTypeの2次ベジェ曲線をCFFの3次ベジェ曲線へ変換します。
 
 ## OpenType機能
 

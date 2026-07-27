@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import math
 import tempfile
 import urllib.request
+import zipfile
 from pathlib import Path
 
 import pathops
@@ -23,16 +25,26 @@ NOTO_SOURCE_URL = (
     "https://raw.githubusercontent.com/notofonts/noto-cjk/"
     f"{NOTO_COMMIT}/Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf"
 )
-SHIPPORI_COMMIT = "63431fee6c2cfea772325d6251d2935b7cfa7c6d"
-SHIPPORI_SOURCE_URL = (
-    "https://raw.githubusercontent.com/fontdasu/ShipporiMincho/"
-    f"{SHIPPORI_COMMIT}/fonts/ttf/ShipporiMincho-Regular.ttf"
+NOTO_SOURCE_SHA256 = (
+    "2c9a12dbd4f2408c4610c7ee84a108b62d7236c3775baed618c64d9cb44b2f04"
+)
+SHIPPORI_ARCHIVE_URL = "https://fontdasu.com/download/shippori3.zip"
+SHIPPORI_ARCHIVE_SHA256 = (
+    "dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e"
+)
+SHIPPORI_OTF_MEMBER = "ShipporiMincho-OTF-Regular.otf"
+SHIPPORI_OTF_SHA256 = (
+    "f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804"
+)
+SHIPPORI_COPYRIGHT = (
+    "Copyright (c) 2021, The Shippori Mincho Project Authors "
+    "(https://github.com/fontdasu/ShipporiMincho)"
 )
 DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.005"
+VERSION_NUMBER = "1.006"
 WAVE_GLYPH_COUNT = 10
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
@@ -87,8 +99,8 @@ def parse_args() -> argparse.Namespace:
         "--punctuation-source",
         type=Path,
         help=(
-            "Shippori Mincho Regular TTF used for Manga1 "
-            "exclamation/question ligatures"
+            "Shippori Mincho Regular OTF/TTF used for Manga1 "
+            "exclamation/question ligatures (OTF is recommended)"
         ),
     )
     parser.add_argument(
@@ -96,6 +108,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args()
+
+
+def verify_sha256(path: Path, expected: str) -> None:
+    hasher = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
+    if digest != expected:
+        raise ValueError(
+            f"SHA-256 mismatch for {path}: {digest} != {expected}"
+        )
 
 
 def rectangle(x_min: float, y_min: float, x_max: float, y_max: float) -> pathops.Path:
@@ -948,7 +972,7 @@ def build(
         notice
         for notice in (
             font["name"].getDebugName(0),
-            punctuation_font["name"].getDebugName(0),
+            SHIPPORI_COPYRIGHT,
         )
         if notice
     ]
@@ -957,7 +981,7 @@ def build(
         notice
         for notice in (
             font["CFF "].cff.topDictIndex[0].Notice,
-            punctuation_font["name"].getDebugName(0),
+            SHIPPORI_COPYRIGHT,
         )
         if notice
     ]
@@ -985,15 +1009,29 @@ def main() -> None:
             )
             print(f"Downloading {NOTO_SOURCE_URL}")
             urllib.request.urlretrieve(NOTO_SOURCE_URL, source_path)
+            verify_sha256(source_path, NOTO_SOURCE_SHA256)
 
         punctuation_source_path = args.punctuation_source
         if punctuation_source_path is None:
-            punctuation_source_path = (
-                temporary_directory / "ShipporiMincho-Regular.ttf"
+            punctuation_archive_path = (
+                temporary_directory / "shippori3.zip"
             )
-            print(f"Downloading {SHIPPORI_SOURCE_URL}")
+            punctuation_source_path = (
+                temporary_directory / SHIPPORI_OTF_MEMBER
+            )
+            print(f"Downloading {SHIPPORI_ARCHIVE_URL}")
             urllib.request.urlretrieve(
-                SHIPPORI_SOURCE_URL, punctuation_source_path
+                SHIPPORI_ARCHIVE_URL, punctuation_archive_path
+            )
+            verify_sha256(
+                punctuation_archive_path, SHIPPORI_ARCHIVE_SHA256
+            )
+            with zipfile.ZipFile(punctuation_archive_path) as archive:
+                punctuation_source_path.write_bytes(
+                    archive.read(SHIPPORI_OTF_MEMBER)
+                )
+            verify_sha256(
+                punctuation_source_path, SHIPPORI_OTF_SHA256
             )
 
         build(

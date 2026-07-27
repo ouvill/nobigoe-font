@@ -27,18 +27,19 @@ Noto Serif JP Regularを生成フォントのベースとして使用してい�
 ## Shippori Mincho Regular（しっぽり明朝）
 
 - Project: [Shippori Mincho](https://github.com/fontdasu/ShipporiMincho)
-- Source file: `fonts/ttf/ShipporiMincho-Regular.ttf`
-- Version: `3.110`
-- Commit: [`63431fee6c2cfea772325d6251d2935b7cfa7c6d`](https://github.com/fontdasu/ShipporiMincho/commit/63431fee6c2cfea772325d6251d2935b7cfa7c6d)
-- Download: <https://raw.githubusercontent.com/fontdasu/ShipporiMincho/63431fee6c2cfea772325d6251d2935b7cfa7c6d/fonts/ttf/ShipporiMincho-Regular.ttf>
-- SHA-256: `743f95a923387d9c5d0709b08e98adf706f871bfa7ccaa21ebdf5526ba080476`
-- Copyright: `Copyright 2021 The Shippori Mincho Project Authors (https://github.com/fontdasu/ShipporiMincho)`
-- License: SIL Open Font License 1.1
-- License text: <https://raw.githubusercontent.com/fontdasu/ShipporiMincho/63431fee6c2cfea772325d6251d2935b7cfa7c6d/OFL.txt>
+- Official distribution: [しっぽり明朝](https://fontdasu.com/shippori-mincho/)
+- Archive: `shippori3.zip`
+- Source file in archive: `ShipporiMincho-OTF-Regular.otf`
+- Version: `3.300`
+- Download: <https://fontdasu.com/download/shippori3.zip>
+- Archive SHA-256: `dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e`
+- OTF SHA-256: `f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804`
+- Copyright in bundled OFL: `Copyright (c) 2021, The Shippori Mincho Project Authors (https://github.com/fontdasu/ShipporiMincho)`
+- License: SIL Open Font License 1.1（アーカイブ内の `OFL.txt`）
 
 ### 使用箇所と改変
 
-しっぽり明朝Regularに収録された既存合字 `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。2記号の組み合わせには該当する既存合字の輪郭を直接使用し、3記号以上では `‼`、`⁇`、`⁉` の構成輪郭を抽出して全角1文字幅へ再配置します。輪郭をTrueTypeからOpenType/CFFへ変換する際に曲線表現が変換されます。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
+しっぽり明朝Regularに収録された既存合字 `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。2記号の組み合わせには該当する既存合字のCFF輪郭を直接使用し、3記号以上では `‼`、`⁇`、`⁉` の構成輪郭を抽出して全角1文字幅へ再配置します。OTF版から直接流用する2記号合字では曲線形状を変更しません。利用者がTTF版を指定した場合に限り、TrueTypeの2次ベジェ曲線をOpenType/CFFの3次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
 
 ## Adobe-Manga1-0
 
