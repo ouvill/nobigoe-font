@@ -47,7 +47,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.015"
+VERSION_NUMBER = "1.016"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -438,6 +438,25 @@ def make_horizontal_parts(
     start = pathops.op(left_cap, start_bar, pathops.PathOp.UNION)
     end = pathops.op(end_bar, right_cap, pathops.PathOp.UNION)
     return start, middle, end
+
+
+def flatten_horizontal_centerline(
+    outline: pathops.Path, advance: int
+) -> pathops.Path:
+    sample_start = advance * 0.3
+    sample_end = advance * 0.7
+    start_low, start_high = stroke_band(
+        outline, "horizontal", sample_start
+    )
+    end_low, end_high = stroke_band(outline, "horizontal", sample_end)
+    start_center = (start_low + start_high) / 2
+    end_center = (end_low + end_high) / 2
+    slope = (end_center - start_center) / (sample_end - sample_start)
+    seam = advance / 2
+    return transform_path(
+        outline,
+        Transform(1, -slope, 0, 1, 0, slope * seam),
+    )
 
 
 def make_vertical_parts(
@@ -888,14 +907,23 @@ def replace_cff_glyph(
 
 
 def add_linear_extension(
-    font: TTFont, base: str, names: list[str]
+    font: TTFont,
+    base: str,
+    names: list[str],
+    *,
+    flatten_horizontal: bool = False,
 ) -> tuple[str, list[str]]:
     vertical = find_vertical_glyph(font, base)
     advance = font["hmtx"].metrics[base][0]
     if advance != 1000:
         raise ValueError(f"Expected a 1000-unit full-width glyph, got {advance}")
 
-    horizontal_parts = make_horizontal_parts(glyph_path(font, base), advance)
+    horizontal_outline = glyph_path(font, base)
+    if flatten_horizontal:
+        horizontal_outline = flatten_horizontal_centerline(
+            horizontal_outline, advance
+        )
+    horizontal_parts = make_horizontal_parts(horizontal_outline, advance)
     _, _, _, vertical_y_max = bounds(font, vertical)
     vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
     vertical_parts = make_vertical_parts(
@@ -1331,7 +1359,12 @@ def build(
         base = cmap[codepoint]
         start = index * NEW_GLYPH_COUNT
         names = allocated_names[start : start + NEW_GLYPH_COUNT]
-        vertical, names = add_linear_extension(font, base, names)
+        vertical, names = add_linear_extension(
+            font,
+            base,
+            names,
+            flatten_horizontal=codepoint == 0x30FC,
+        )
         extensions.append((prefix, base, vertical, names))
 
     wave_base = cmap[0x301C]
