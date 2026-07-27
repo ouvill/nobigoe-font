@@ -44,10 +44,9 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.008"
+VERSION_NUMBER = "1.009"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 5
-MANGA_WAVE_STROKE_WIDTH = 50
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
@@ -258,7 +257,6 @@ def make_sine_wave_tile(
     half_waves: float = 3,
     sample_peak_position: float | None = None,
     sample_trough_position: float | None = None,
-    stroke_width: float | None = None,
 ) -> pathops.Path:
     if sample_peak_position is None:
         sample_peak_position = advance / 4
@@ -278,8 +276,6 @@ def make_sine_wave_tile(
         (sample_peak_max - sample_peak_min)
         + (sample_trough_max - sample_trough_min)
     ) / 2
-    if stroke_width is not None:
-        thickness = stroke_width
     half_stroke = thickness / 2
     direction = -1 if inverted else 1
     normal_phase_velocity = half_waves * math.pi / advance
@@ -494,9 +490,6 @@ def make_manga_wave_parts(
 ) -> tuple[pathops.Path, tuple[pathops.Path, ...]]:
     parameters = {
         "half_waves": 4,
-        "sample_peak_position": advance / 2,
-        "sample_trough_position": advance / 4,
-        "stroke_width": MANGA_WAVE_STROKE_WIDTH,
     }
     horizontal_start = make_sine_wave_tile(
         source, advance, round_start=True, **parameters
@@ -1125,7 +1118,7 @@ def build(
         manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     ]
     manga_wave_middle, manga_wave_parts = make_manga_wave_parts(
-        glyph_path(font, manga_wave_base),
+        glyph_path(font, wave_base),
         1000,
         manga_wave_vertical_origin,
     )
