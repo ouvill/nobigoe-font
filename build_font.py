@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a Noto Serif JP derivative with Adobe-Manga1-style extensible choon marks."""
+"""Build a Noto Serif JP derivative with extensible manga punctuation."""
 
 from __future__ import annotations
 
@@ -24,7 +24,8 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION = "Version 1.000"
+VERSION_NUMBER = "1.001"
+VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
 
@@ -32,8 +33,8 @@ OVERLAP = 0
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Add automatically joining ー glyphs to Noto Serif JP. "
-            "Two or more consecutive ー characters join through the calt feature."
+            "Add automatically joining ー and ― glyphs to Noto Serif JP. "
+            "Consecutive marks join through the calt feature."
         )
     )
     parser.add_argument(
@@ -86,7 +87,7 @@ def find_vertical_glyph(font: TTFont, base_name: str) -> str:
             mapping = getattr(subtable, "mapping", None)
             if mapping and base_name in mapping:
                 return mapping[base_name]
-    raise ValueError("The source font has no vertical substitution for U+30FC")
+    raise ValueError(f"The source font has no vertical substitution for {base_name}")
 
 
 def allocate_cid_names(font: TTFont, count: int) -> list[str]:
@@ -220,65 +221,87 @@ def append_cff_glyphs(
     font["maxp"].numGlyphs = len(glyph_order)
 
 
-def feature_source(base: str, vertical: str, names: list[str]) -> str:
-    h_start, h_middle, h_end, v_start, v_middle, v_end = names
+def add_linear_extension(
+    font: TTFont, base: str, names: list[str]
+) -> tuple[str, list[str]]:
+    vertical = find_vertical_glyph(font, base)
+    advance = font["hmtx"].metrics[base][0]
+    if advance != 1000:
+        raise ValueError(f"Expected a 1000-unit full-width glyph, got {advance}")
+
+    horizontal_parts = make_horizontal_parts(glyph_path(font, base), advance)
+    _, _, _, vertical_y_max = bounds(font, vertical)
+    vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
+    vertical_parts = make_vertical_parts(
+        glyph_path(font, vertical), advance, vertical_origin
+    )
+    append_cff_glyphs(
+        font,
+        list(horizontal_parts + vertical_parts),
+        names,
+        base,
+        vertical_origin,
+    )
+    return vertical, names
+
+
+def contextual_extension_rules(
+    prefix: str, base: str, start: str, middle: str, end: str
+) -> str:
     return f"""
-languagesystem DFLT dflt;
-
-feature calt {{
-  lookup choon_start {{
-    ignore sub {base} [{base} {h_middle} {h_end} {h_start}]';
-    sub {base}' [{base} {h_start} {h_middle} {h_end}] by {h_start};
-  }} choon_start;
-
-  lookup choon_end {{
-    sub [{base} {h_start} {h_middle} {h_end}] {base}' by {h_end};
-  }} choon_end;
-
-  sub [{h_start} {h_middle}] {h_start}' by {h_middle};
-
-  lookup choon_vertical_start {{
-    ignore sub {vertical} [{vertical} {v_middle} {v_end} {v_start}]';
-    sub {vertical}' [{vertical} {v_start} {v_middle} {v_end}] by {v_start};
-  }} choon_vertical_start;
-
-  lookup choon_vertical_end {{
-    sub [{vertical} {v_start} {v_middle} {v_end}] {vertical}' by {v_end};
-  }} choon_vertical_end;
-
-  sub [{v_start} {v_middle}] {v_start}' by {v_middle};
-}} calt;
-
-feature vert {{
-  lookup choon_vert_start {{
-    ignore sub {base} [{base} {v_middle} {v_end} {v_start}]';
-    sub {base}' [{base} {v_start} {v_middle} {v_end}] by {v_start};
-  }} choon_vert_start;
-  lookup choon_vert_end {{
-    sub [{base} {v_start} {v_middle} {v_end}] {base}' by {v_end};
-  }} choon_vert_end;
-  sub [{v_start} {v_middle}] {v_start}' by {v_middle};
-
-  sub {h_start} by {v_start};
-  sub {h_middle} by {v_middle};
-  sub {h_end} by {v_end};
-}} vert;
-
-feature vrt2 {{
-  lookup choon_vrt2_start {{
-    ignore sub {base} [{base} {v_middle} {v_end} {v_start}]';
-    sub {base}' [{base} {v_start} {v_middle} {v_end}] by {v_start};
-  }} choon_vrt2_start;
-  lookup choon_vrt2_end {{
-    sub [{base} {v_start} {v_middle} {v_end}] {base}' by {v_end};
-  }} choon_vrt2_end;
-  sub [{v_start} {v_middle}] {v_start}' by {v_middle};
-
-  sub {h_start} by {v_start};
-  sub {h_middle} by {v_middle};
-  sub {h_end} by {v_end};
-}} vrt2;
+  lookup {prefix}_start {{
+    ignore sub {base} [{base} {middle} {end} {start}]';
+    sub {base}' [{base} {start} {middle} {end}] by {start};
+  }} {prefix}_start;
+  lookup {prefix}_end {{
+    sub [{base} {start} {middle} {end}] {base}' by {end};
+  }} {prefix}_end;
+  sub [{start} {middle}] {start}' by {middle};
 """
+
+
+def feature_source(
+    extensions: list[tuple[str, str, str, list[str]]],
+) -> str:
+    calt_rules: list[str] = []
+    vert_rules: list[str] = []
+    vrt2_rules: list[str] = []
+    for prefix, base, vertical, names in extensions:
+        h_start, h_middle, h_end, v_start, v_middle, v_end = names
+        calt_rules.append(
+            contextual_extension_rules(
+                f"{prefix}_h", base, h_start, h_middle, h_end
+            )
+        )
+        calt_rules.append(
+            contextual_extension_rules(
+                f"{prefix}_v", vertical, v_start, v_middle, v_end
+            )
+        )
+        vertical_maps = (
+            f"  sub {h_start} by {v_start};\n"
+            f"  sub {h_middle} by {v_middle};\n"
+            f"  sub {h_end} by {v_end};\n"
+        )
+        vert_rules.append(
+            contextual_extension_rules(
+                f"{prefix}_vert", base, v_start, v_middle, v_end
+            )
+            + vertical_maps
+        )
+        vrt2_rules.append(
+            contextual_extension_rules(
+                f"{prefix}_vrt2", base, v_start, v_middle, v_end
+            )
+            + vertical_maps
+        )
+
+    return (
+        "languagesystem DFLT dflt;\n\n"
+        f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
+        f"feature vert {{\n{''.join(vert_rules)}}} vert;\n\n"
+        f"feature vrt2 {{\n{''.join(vrt2_rules)}}} vrt2;\n"
+    )
 
 
 def shift_nested_lookup_indices(value: object, amount: int, seen: set[int]) -> None:
@@ -405,7 +428,7 @@ def set_name(font: TTFont, name_id: int, value: str) -> None:
 def rename_font(font: TTFont) -> None:
     set_name(font, 1, FAMILY)
     set_name(font, 2, "Regular")
-    set_name(font, 3, f"1.000;CHOON;{POSTSCRIPT_NAME}")
+    set_name(font, 3, f"{VERSION_NUMBER};CHOON;{POSTSCRIPT_NAME}")
     set_name(font, 4, FULL_NAME)
     set_name(font, 5, VERSION)
     set_name(font, 6, POSTSCRIPT_NAME)
@@ -422,30 +445,27 @@ def rename_font(font: TTFont) -> None:
 def build(source_path: Path, output_path: Path, face: int) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
     cmap = font.getBestCmap()
-    if 0x30FC not in cmap:
-        raise ValueError("The source font does not contain U+30FC KATAKANA-HIRAGANA PROLONGED SOUND MARK")
+    codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
+    missing = [
+        f"U+{codepoint:04X}"
+        for _, codepoint in codepoints
+        if codepoint not in cmap
+    ]
+    if missing:
+        raise ValueError(f"The source font does not contain {', '.join(missing)}")
 
-    base = cmap[0x30FC]
-    vertical = find_vertical_glyph(font, base)
-    advance = font["hmtx"].metrics[base][0]
-    if advance != 1000:
-        raise ValueError(f"Expected a 1000-unit full-width choon mark, got {advance}")
+    allocated_names = allocate_cid_names(
+        font, NEW_GLYPH_COUNT * len(codepoints)
+    )
+    extensions: list[tuple[str, str, str, list[str]]] = []
+    for index, (prefix, codepoint) in enumerate(codepoints):
+        base = cmap[codepoint]
+        start = index * NEW_GLYPH_COUNT
+        names = allocated_names[start : start + NEW_GLYPH_COUNT]
+        vertical, names = add_linear_extension(font, base, names)
+        extensions.append((prefix, base, vertical, names))
 
-    horizontal_parts = make_horizontal_parts(glyph_path(font, base), advance)
-    _, _, _, vertical_y_max = bounds(font, vertical)
-    vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
-    vertical_parts = make_vertical_parts(
-        glyph_path(font, vertical), advance, vertical_origin
-    )
-    names = allocate_cid_names(font, NEW_GLYPH_COUNT)
-    append_cff_glyphs(
-        font,
-        list(horizontal_parts + vertical_parts),
-        names,
-        base,
-        vertical_origin,
-    )
-    merge_features(font, feature_source(base, vertical, names))
+    merge_features(font, feature_source(extensions))
     rename_font(font)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
