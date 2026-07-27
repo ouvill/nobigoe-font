@@ -1,8 +1,8 @@
-# Noto Serif JP Choon
+# のびごえ明朝 (Nobigoe Mincho)
 
 Noto Serif JPをベースに、漫画向けの伸長記号と感嘆符・疑問符合字を追加するフォント生成プロジェクトです。
 
-生成されるフォント名は `Noto Serif JP Choon Regular`、既定の出力先は `dist/NotoSerifJPChoon-Regular.otf` です。現在はRegularウェイトのみを生成します。
+生成されるフォント名は `Nobigoe Mincho Regular`（日本語ファミリー名: `のびごえ明朝`）、既定の出力先は `dist/NobigoeMincho-Regular.otf` です。現在はRegularウェイトのみを生成します。
 
 ## 機能
 
@@ -88,7 +88,7 @@ python3 -m venv .venv
 出力:
 
 ```text
-dist/NotoSerifJPChoon-Regular.otf
+dist/NobigoeMincho-Regular.otf
 ```
 
 ### ローカルの元フォントを使用
@@ -97,7 +97,7 @@ dist/NotoSerifJPChoon-Regular.otf
 .venv/bin/python build_font.py \
   --source /path/to/NotoSerifJP-Regular.otf \
   --punctuation-source /path/to/ShipporiMincho-OTF-Regular.otf \
-  --output dist/NotoSerifJPChoon-Regular.otf
+  --output dist/NobigoeMincho-Regular.otf
 ```
 
 `--source` または `--punctuation-source` の片方だけを指定した場合、指定しなかったフォントだけを自動取得します。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。
@@ -112,11 +112,11 @@ dist/NotoSerifJPChoon-Regular.otf
 python3 -m http.server 8000
 ```
 
-配信用Webfontは`site/assets/NotoSerifJPChoon-Regular.woff2`です。生成フォントを更新した場合は、次のコマンドでWebfontも更新します。
+配信用Webfontは`site/assets/NobigoeMincho-Regular.woff2`です。生成フォントを更新した場合は、次のコマンドでWebfontも更新します。
 
 ```sh
-.venv/bin/pyftsubset dist/NotoSerifJPChoon-Regular.otf \
-  --output-file=site/assets/NotoSerifJPChoon-Regular.woff2 \
+.venv/bin/pyftsubset dist/NobigoeMincho-Regular.otf \
+  --output-file=site/assets/NobigoeMincho-Regular.woff2 \
   --flavor=woff2 \
   --glyphs='*' \
   --layout-features='*' \
@@ -141,6 +141,6 @@ python3 -m http.server 8000
 
 生成フォントに取り込まれるNoto Serif JPとしっぽり明朝は、どちらもSIL Open Font License 1.1で提供されています。本プロジェクトのフォント関連ファイルと生成フォントも [`OFL.txt`](OFL.txt) の条件に従います。
 
-第三者フォントの著作権表示と改変内容は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) を参照してください。生成フォントのファミリー名は元フォントと区別するため `Noto Serif JP Choon` に変更しています。
+第三者フォントの著作権表示と改変内容は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) を参照してください。生成フォントのファミリー名は元フォントと区別し、`Noto`の名称を派生フォント名に残さない `Nobigoe Mincho`（のびごえ明朝）に変更しています。
 
 本プロジェクトはAdobe、Google、Noto Project、またはShippori Mincho Projectによる公式配布物ではありません。`Noto`はGoogle LLCの商標です。各名称は出典と互換性を明示する目的でのみ使用しています。

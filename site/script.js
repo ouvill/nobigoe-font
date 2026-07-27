@@ -223,7 +223,7 @@ async function loadCatalog() {
 
 async function revealFont() {
   try {
-    await document.fonts.load("64px Choon", "ー〜〰あ゙！！？？");
+    await document.fonts.load("64px Nobigoe", "ー〜〰あ゙！！？？");
     await document.fonts.ready;
   } finally {
     root.classList.remove("fonts-loading");

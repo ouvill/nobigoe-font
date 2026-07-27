@@ -40,10 +40,12 @@ SHIPPORI_COPYRIGHT = (
     "Copyright (c) 2021, The Shippori Mincho Project Authors "
     "(https://github.com/fontdasu/ShipporiMincho)"
 )
-DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
-FAMILY = "Noto Serif JP Choon"
+DEFAULT_OUTPUT = Path("dist/NobigoeMincho-Regular.otf")
+FAMILY = "Nobigoe Mincho"
+JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
-POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
+JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
+POSTSCRIPT_NAME = "NobigoeMincho-Regular"
 VERSION_NUMBER = "1.013"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
@@ -1135,18 +1137,25 @@ def set_name(font: TTFont, name_id: int, value: str) -> None:
         name_table.setName(value, name_id, 3, 1, 0x409)
 
 
+def set_japanese_name(font: TTFont, name_id: int, value: str) -> None:
+    font["name"].setName(value, name_id, 3, 1, 0x411)
+
+
 def rename_font(
     font: TTFont, copyright_notice: str, font_notice: str
 ) -> None:
     set_name(font, 0, copyright_notice)
     set_name(font, 1, FAMILY)
     set_name(font, 2, "Regular")
-    set_name(font, 3, f"{VERSION_NUMBER};CHOON;{POSTSCRIPT_NAME}")
+    set_name(font, 3, f"{VERSION_NUMBER};NOBIGOE;{POSTSCRIPT_NAME}")
     set_name(font, 4, FULL_NAME)
     set_name(font, 5, VERSION)
     set_name(font, 6, POSTSCRIPT_NAME)
     set_name(font, 16, FAMILY)
     set_name(font, 17, "Regular")
+    set_japanese_name(font, 1, JAPANESE_FAMILY)
+    set_japanese_name(font, 4, JAPANESE_FULL_NAME)
+    set_japanese_name(font, 16, JAPANESE_FAMILY)
 
     cff = font["CFF "].cff
     cff.fontNames = [POSTSCRIPT_NAME]

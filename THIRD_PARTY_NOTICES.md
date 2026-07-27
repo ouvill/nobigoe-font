@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-`Noto Serif JP Choon Regular`は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。
+`Nobigoe Mincho Regular`（のびごえ明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。
 
 ## Noto Serif JP Regular
 
@@ -22,7 +22,7 @@ Noto Serif JP Regularを生成フォントのベースとして使用してい�
 - Manga1方式の濁点・半濁点付き仮名と小書きコ
 - ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータ
 
-元フォントと区別するため、生成フォントのファミリー名は `Noto Serif JP Choon` です。
+元フォントと区別するため、生成フォントのファミリー名は `Nobigoe Mincho`（のびごえ明朝）です。
 
 ## Shippori Mincho Regular（しっぽり明朝）
 
