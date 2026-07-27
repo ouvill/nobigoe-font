@@ -18,15 +18,21 @@ from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-SOURCE_URL = (
-    "https://raw.githubusercontent.com/notofonts/noto-cjk/main/"
-    "Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf"
+NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
+NOTO_SOURCE_URL = (
+    "https://raw.githubusercontent.com/notofonts/noto-cjk/"
+    f"{NOTO_COMMIT}/Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf"
+)
+SHIPPORI_COMMIT = "63431fee6c2cfea772325d6251d2935b7cfa7c6d"
+SHIPPORI_SOURCE_URL = (
+    "https://raw.githubusercontent.com/fontdasu/ShipporiMincho/"
+    f"{SHIPPORI_COMMIT}/fonts/ttf/ShipporiMincho-Regular.ttf"
 )
 DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.003"
+VERSION_NUMBER = "1.004"
 WAVE_GLYPH_COUNT = 10
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
@@ -62,9 +68,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source",
         type=Path,
-        help="Noto Serif JP OTF/TTC source (the official JP SubsetOTF is recommended)",
+        help=(
+            "Noto Serif JP OTF/TTC source "
+            "(the official JP SubsetOTF is recommended)"
+        ),
     )
-    parser.add_argument("--face", type=int, default=0, help="TTC face index")
+    parser.add_argument(
+        "--punctuation-source",
+        type=Path,
+        help=(
+            "Shippori Mincho Regular TTF used for Manga1 "
+            "exclamation/question ligatures"
+        ),
+    )
+    parser.add_argument(
+        "--face", type=int, default=0, help="TTC face index"
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args()
 
@@ -765,7 +784,10 @@ def set_name(font: TTFont, name_id: int, value: str) -> None:
         name_table.setName(value, name_id, 3, 1, 0x409)
 
 
-def rename_font(font: TTFont) -> None:
+def rename_font(
+    font: TTFont, copyright_notice: str, font_notice: str
+) -> None:
+    set_name(font, 0, copyright_notice)
     set_name(font, 1, FAMILY)
     set_name(font, 2, "Regular")
     set_name(font, 3, f"{VERSION_NUMBER};CHOON;{POSTSCRIPT_NAME}")
@@ -778,13 +800,39 @@ def rename_font(font: TTFont) -> None:
     cff = font["CFF "].cff
     cff.fontNames = [POSTSCRIPT_NAME]
     top = cff.topDictIndex[0]
+    top.Notice = font_notice
     top.FamilyName = FAMILY
     top.FullName = FULL_NAME
 
 
-def build(source_path: Path, output_path: Path, face: int) -> None:
+def build(
+    source_path: Path,
+    punctuation_source_path: Path,
+    output_path: Path,
+    face: int,
+) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
+    punctuation_font = TTFont(punctuation_source_path)
     cmap = font.getBestCmap()
+    punctuation_cmap = punctuation_font.getBestCmap()
+    punctuation_missing = [
+        f"U+{codepoint:04X}"
+        for codepoint in (0x21, 0x3F)
+        if codepoint not in punctuation_cmap
+    ]
+    if punctuation_missing:
+        raise ValueError(
+            "The punctuation source does not contain "
+            + ", ".join(punctuation_missing)
+        )
+    if (
+        punctuation_font["head"].unitsPerEm
+        != font["head"].unitsPerEm
+    ):
+        raise ValueError(
+            "The base and punctuation sources must use the same "
+            "units per em"
+        )
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
     required_codepoints.extend(
@@ -843,7 +891,7 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
         + len(MANGA_PUNCTUATION_SEQUENCES)
     ]
     punctuation_paths = [
-        make_punctuation_ligature(font, sequence)
+        make_punctuation_ligature(punctuation_font, sequence)
         for sequence in MANGA_PUNCTUATION_SEQUENCES
     ]
     punctuation_vertical_origin = round(
@@ -871,10 +919,29 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
         ),
     )
 
+    copyright_notices = [
+        notice
+        for notice in (
+            font["name"].getDebugName(0),
+            punctuation_font["name"].getDebugName(0),
+        )
+        if notice
+    ]
+    copyright_notice = " / ".join(dict.fromkeys(copyright_notices))
+    font_notices = [
+        notice
+        for notice in (
+            font["CFF "].cff.topDictIndex[0].Notice,
+            punctuation_font["name"].getDebugName(0),
+        )
+        if notice
+    ]
+    font_notice = " / ".join(dict.fromkeys(font_notices))
+
     merge_features(
         font, feature_source(extensions, wave, punctuation)
     )
-    rename_font(font)
+    rename_font(font, copyright_notice, font_notice)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path, reorderTables=True)
@@ -882,15 +949,34 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
 
 def main() -> None:
     args = parse_args()
-    if args.source is not None:
-        build(args.source, args.output, args.face)
-        return
+    with tempfile.TemporaryDirectory(
+        prefix="noto-serif-choon-"
+    ) as directory:
+        temporary_directory = Path(directory)
+        source_path = args.source
+        if source_path is None:
+            source_path = (
+                temporary_directory / "NotoSerifJP-Regular.otf"
+            )
+            print(f"Downloading {NOTO_SOURCE_URL}")
+            urllib.request.urlretrieve(NOTO_SOURCE_URL, source_path)
 
-    with tempfile.TemporaryDirectory(prefix="noto-serif-choon-") as directory:
-        source_path = Path(directory) / "NotoSerifJP-Regular.otf"
-        print(f"Downloading {SOURCE_URL}")
-        urllib.request.urlretrieve(SOURCE_URL, source_path)
-        build(source_path, args.output, 0)
+        punctuation_source_path = args.punctuation_source
+        if punctuation_source_path is None:
+            punctuation_source_path = (
+                temporary_directory / "ShipporiMincho-Regular.ttf"
+            )
+            print(f"Downloading {SHIPPORI_SOURCE_URL}")
+            urllib.request.urlretrieve(
+                SHIPPORI_SOURCE_URL, punctuation_source_path
+            )
+
+        build(
+            source_path,
+            punctuation_source_path,
+            args.output,
+            args.face,
+        )
 
 
 if __name__ == "__main__":
