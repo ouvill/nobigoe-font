@@ -47,7 +47,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.016"
+VERSION_NUMBER = "1.017"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -121,6 +121,36 @@ MANGA_HANDAKUTEN_BASES = tuple(
 MANGA_MARK_PAIRS = tuple(
     [(base, 0x3099) for base in MANGA_DAKUTEN_BASES]
     + [(base, 0x309A) for base in MANGA_HANDAKUTEN_BASES]
+)
+KOBURI_PUA_START = 0xE082
+KOBURI_PUA_MARK_PAIRS = tuple(
+    [
+        (int(value, 16), 0x3099)
+        for value in """
+3042 3044 3048 304A 3093 30A2 30A4 30A8
+30AA 30F3
+""".split()
+    ]
+    + [
+        (int(value, 16), 0x309A)
+        for value in """
+304B 304D 304F 3051 3053 30AB 30AD 30AF
+30B1 30B3 30BB 30C4 30C8 31F7
+""".split()
+    ]
+    + [
+        (int(value, 16), 0x3099)
+        for value in """
+306A 306B 306C 306D 306E 307E 307F 3080
+3081 3082 3084 3086 3088 3089 308A 308B
+308C 308D 308F 3090 3091 3092 3041 3043
+3045 3047 3049 3095 3096 3063 3083 3085
+3087 308E 30CA 30CB 30CC 30CD 30CE 30DE
+30DF 30E0 30E1 30E2 30E4 30E6 30E8 30E9
+30EA 30EB 30EC 30ED 30A1 30A3 30A5 30A7
+30A9 30F5 30F6 30C3 30E3 30E5 30E7 30EE
+""".split()
+    ]
 )
 MANGA_VERTICAL_DAKUTEN_BASES = tuple(
     int(value, 16)
@@ -1330,6 +1360,10 @@ def build(
         raise AssertionError("Expected 191 Manga1 kana mark sequences")
     if len(MANGA_VERTICAL_MARK_PAIRS) != 53:
         raise AssertionError("Expected 53 vertical Manga1 kana mark sequences")
+    if len(KOBURI_PUA_MARK_PAIRS) != 88:
+        raise AssertionError("Expected 88 Koburi Mincho PUA mappings")
+    if not set(KOBURI_PUA_MARK_PAIRS) <= set(MANGA_MARK_PAIRS):
+        raise AssertionError("Koburi Mincho PUA mappings must use Manga1 sequences")
     mark_position_overrides = load_mark_position_overrides()
     source_ccmp_ligatures = feature_ligatures(font, "ccmp")
     native_mark_outputs: dict[tuple[int, int], str] = {}
@@ -1577,6 +1611,12 @@ def build(
         )
 
     mark_outputs = native_mark_outputs | generated_mark_outputs
+    for offset, pair in enumerate(KOBURI_PUA_MARK_PAIRS):
+        add_unicode_mapping(
+            font,
+            KOBURI_PUA_START + offset,
+            mark_outputs[pair],
+        )
     kana_marks = [
         (cmap[base], cmap[mark], mark_outputs[(base, mark)])
         for base, mark in MANGA_MARK_PAIRS

@@ -138,7 +138,10 @@ function createCatalogItem(mark) {
   const item = document.createElement("article");
   item.className = "catalog-item";
   item.setAttribute("role", "listitem");
-  item.setAttribute("aria-label", `${mark.glyph}、${mark.codepoints}`);
+  item.setAttribute(
+    "aria-label",
+    `${mark.glyph}、${mark.codepoints}${mark.koburiPua ? `、源暎こぶり明朝外字 ${mark.koburiPua}` : ""}`,
+  );
 
   const glyph = document.createElement("span");
   glyph.className = "catalog-glyph";
@@ -149,11 +152,16 @@ function createCatalogItem(mark) {
   const base = document.createElement("span");
   base.textContent = `${mark.base} + ${mark.mark}`;
   const codepoints = document.createElement("span");
-  codepoints.textContent = mark.codepoints;
+  codepoints.textContent = mark.koburiPua
+    ? `${mark.codepoints} / 外字 ${mark.koburiPua}`
+    : mark.codepoints;
   meta.append(base, codepoints);
 
   const badges = document.createElement("span");
   badges.className = "catalog-badges";
+  if (mark.koburiPua) {
+    badges.append(createCatalogBadge("外", `源暎こぶり明朝外字 ${mark.koburiPua}`));
+  }
   if (mark.small) {
     badges.append(createCatalogBadge("小", "小書き仮名"));
   }
@@ -208,7 +216,7 @@ catalogWritingMode.addEventListener("click", () => {
 
 async function loadCatalog() {
   try {
-    const response = await fetch("marks-data.json");
+    const response = await fetch("marks-data.json?v=1.017");
     if (!response.ok) {
       throw new Error(`Glyph catalog: HTTP ${response.status}`);
     }
