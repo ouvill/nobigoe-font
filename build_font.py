@@ -32,12 +32,22 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.004"
+VERSION_NUMBER = "1.005"
 WAVE_GLYPH_COUNT = 10
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
+SHIPPORI_PRECOMPOSED_LIGATURES = {
+    "!!": 0x203C,
+    "??": 0x2047,
+    "?!": 0x2048,
+    "!?": 0x2049,
+}
+SHIPPORI_COMPONENT_LIGATURES = {
+    "!": 0x203C,
+    "?": 0x2047,
+}
 MANGA_PUNCTUATION_SEQUENCES = (
     "!!!!!",
     "!!!!",
@@ -413,29 +423,44 @@ def make_wave_parts(
 def make_punctuation_ligature(
     font: TTFont, sequence: str, advance: int = 1000
 ) -> pathops.Path:
-    source_codepoints = {"!": 0x21, "?": 0x3F}
     gap = 40
     components: list[tuple[pathops.Path, float, float]] = []
     total_width = gap * (len(sequence) - 1)
     cmap = font.getBestCmap()
+    precomposed_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES.get(
+        sequence
+    )
+    if precomposed_codepoint is not None:
+        return glyph_path(font, cmap[precomposed_codepoint])
+
     for mark in sequence:
-        name = cmap[source_codepoints[mark]]
-        outline = glyph_path(font, name)
+        if mark == "!" and "?" in sequence:
+            source_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES["!?"]
+        else:
+            source_codepoint = SHIPPORI_COMPONENT_LIGATURES[mark]
+        source = glyph_path(font, cmap[source_codepoint])
+        contours = list(source.contours)
+        if len(contours) != 4:
+            raise ValueError(
+                f"Expected four contours in U+{source_codepoint:04X}"
+            )
+        outline = pathops.Path()
+        outline.addPath(contours[0])
+        outline.addPath(contours[2])
         x_min, _, x_max, _ = outline.bounds
         width = x_max - x_min
         components.append((outline, x_min, width))
         total_width += width
-    if total_width > advance:
-        raise ValueError(
-            f"Punctuation ligature {sequence!r} exceeds one em"
-        )
 
+    scale = min(1.0, (advance - 40) / total_width)
     combined = pathops.Path()
-    cursor = (advance - total_width) / 2
+    cursor = (advance - total_width * scale) / 2
     for outline, x_min, width in components:
-        transform = Transform(1, 0, 0, 1, cursor - x_min, 0)
+        transform = Transform(
+            scale, 0, 0, 1, cursor - scale * x_min, 0
+        )
         outline.draw(TransformPen(combined.getPen(), transform))
-        cursor += width + gap
+        cursor += (width + gap) * scale
     return combined
 
 
@@ -817,7 +842,7 @@ def build(
     punctuation_cmap = punctuation_font.getBestCmap()
     punctuation_missing = [
         f"U+{codepoint:04X}"
-        for codepoint in (0x21, 0x3F)
+        for codepoint in SHIPPORI_PRECOMPOSED_LIGATURES.values()
         if codepoint not in punctuation_cmap
     ]
     if punctuation_missing:
