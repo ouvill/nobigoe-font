@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import math
 import tempfile
 import urllib.request
+import zipfile
 from pathlib import Path
 
 import pathops
@@ -18,19 +20,64 @@ from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-SOURCE_URL = (
-    "https://raw.githubusercontent.com/notofonts/noto-cjk/main/"
-    "Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf"
+NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
+NOTO_SOURCE_URL = (
+    "https://raw.githubusercontent.com/notofonts/noto-cjk/"
+    f"{NOTO_COMMIT}/Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf"
+)
+NOTO_SOURCE_SHA256 = (
+    "2c9a12dbd4f2408c4610c7ee84a108b62d7236c3775baed618c64d9cb44b2f04"
+)
+SHIPPORI_ARCHIVE_URL = "https://fontdasu.com/download/shippori3.zip"
+SHIPPORI_ARCHIVE_SHA256 = (
+    "dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e"
+)
+SHIPPORI_OTF_MEMBER = "ShipporiMincho-OTF-Regular.otf"
+SHIPPORI_OTF_SHA256 = (
+    "f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804"
+)
+SHIPPORI_COPYRIGHT = (
+    "Copyright (c) 2021, The Shippori Mincho Project Authors "
+    "(https://github.com/fontdasu/ShipporiMincho)"
 )
 DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.002"
+VERSION_NUMBER = "1.006"
 WAVE_GLYPH_COUNT = 10
+WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
+SHIPPORI_PRECOMPOSED_LIGATURES = {
+    "!!": 0x203C,
+    "??": 0x2047,
+    "?!": 0x2048,
+    "!?": 0x2049,
+}
+SHIPPORI_COMPONENT_LIGATURES = {
+    "!": 0x203C,
+    "?": 0x2047,
+}
+MANGA_PUNCTUATION_SEQUENCES = (
+    "!!!!!",
+    "!!!!",
+    "!!??",
+    "??!!",
+    "!!!",
+    "???",
+    "!!?",
+    "??!",
+    "?!?",
+    "!??",
+    "!?!",
+    "?!!",
+    "?!",
+    "!?",
+    "!!",
+    "??",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,11 +90,36 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--source",
         type=Path,
-        help="Noto Serif JP OTF/TTC source (the official JP SubsetOTF is recommended)",
+        help=(
+            "Noto Serif JP OTF/TTC source "
+            "(the official JP SubsetOTF is recommended)"
+        ),
     )
-    parser.add_argument("--face", type=int, default=0, help="TTC face index")
+    parser.add_argument(
+        "--punctuation-source",
+        type=Path,
+        help=(
+            "Shippori Mincho Regular OTF/TTF used for Manga1 "
+            "exclamation/question ligatures (OTF is recommended)"
+        ),
+    )
+    parser.add_argument(
+        "--face", type=int, default=0, help="TTC face index"
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args()
+
+
+def verify_sha256(path: Path, expected: str) -> None:
+    hasher = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            hasher.update(chunk)
+    digest = hasher.hexdigest()
+    if digest != expected:
+        raise ValueError(
+            f"SHA-256 mismatch for {path}: {digest} != {expected}"
+        )
 
 
 def rectangle(x_min: float, y_min: float, x_max: float, y_max: float) -> pathops.Path:
@@ -196,33 +268,63 @@ def make_sine_wave_tile(
     ) / 2
     half_stroke = thickness / 2
     direction = -1 if inverted else 1
-    frequency = 3 * math.pi / advance
+    normal_phase_velocity = 3 * math.pi / advance
     taper_length = advance / 4
-    phase_blend_length = advance / 2
 
-    source_x_min, _, source_x_max, _ = source.bounds
-    left_min, left_max = stroke_band(
-        source, "horizontal", source_x_min + 2
+    terminal_phase_extension = (
+        WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
     )
-    right_min, right_max = stroke_band(
-        source, "horizontal", source_x_max - 2
-    )
-    source_left_center = (left_min + left_max) / 2
-    source_right_center = (right_min + right_max) / 2
-    phase_ratio = (
-        source_left_center - source_right_center
-    ) / (2 * amplitude)
-    phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
-    natural_end = (
-        baseline
-        + direction
-        * amplitude
-        * math.sin(phase_offset + 3 * math.pi)
-    )
-    end_correction = source_right_center - natural_end
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
+
+    def smootherstep(progress: float) -> float:
+        return (
+            6 * progress**5
+            - 15 * progress**4
+            + 10 * progress**3
+        )
+
+    def smootherstep_derivative(progress: float) -> float:
+        return 30 * progress**2 * (progress - 1) ** 2
+
+    def phase_at(position: float) -> tuple[float, float]:
+        phase = normal_phase_velocity * position
+        phase_velocity = normal_phase_velocity
+        correction_start = taper_length
+        correction_end = advance - taper_length
+        correction_length = correction_end - correction_start
+        if taper_start:
+            if position <= correction_start:
+                phase -= terminal_phase_extension
+            elif position < correction_end:
+                progress = (
+                    position - correction_start
+                ) / correction_length
+                phase -= terminal_phase_extension * (
+                    1 - smootherstep(progress)
+                )
+                phase_velocity += (
+                    terminal_phase_extension
+                    * smootherstep_derivative(progress)
+                    / correction_length
+                )
+        if taper_end:
+            if position >= correction_end:
+                phase += terminal_phase_extension
+            elif position > correction_start:
+                progress = (
+                    position - correction_start
+                ) / correction_length
+                phase += terminal_phase_extension * smootherstep(
+                    progress
+                )
+                phase_velocity += (
+                    terminal_phase_extension
+                    * smootherstep_derivative(progress)
+                    / correction_length
+                )
+        return phase, phase_velocity
 
 
     def width_at(position: float) -> float:
@@ -237,45 +339,43 @@ def make_sine_wave_tile(
             scale *= smoothstep(progress)
         return half_stroke * scale
 
-    def end_shift(position: float) -> tuple[float, float]:
-        if not taper_end:
-            return 0.0, 0.0
-        blend_start = advance - phase_blend_length
-        if position <= blend_start:
-            return 0.0, 0.0
-        progress = (position - blend_start) / phase_blend_length
-        shift = end_correction * smoothstep(progress)
-        slope = (
-            end_correction
-            * 6
-            * progress
-            * (1 - progress)
-            / phase_blend_length
-        )
-        return shift, slope
 
     breakpoints = {0.0, float(advance)}
-    for index in range(-8, 16):
-        position = (index * math.pi / 2 - phase_offset) / frequency
-        if 0 < position < advance:
-            breakpoints.add(position)
+    if taper_start:
+        breakpoints.add(taper_length)
     if taper_end:
-        breakpoints.add(advance - phase_blend_length)
+        breakpoints.add(advance - taper_length)
+    phase_start, _ = phase_at(0)
+    phase_end, _ = phase_at(advance)
+    for index in range(-8, 16):
+        target = math.pi / 2 + index * math.pi
+        if not phase_start < target < phase_end:
+            continue
+        lower = 0.0
+        upper = float(advance)
+        for _ in range(32):
+            middle = (lower + upper) / 2
+            middle_phase, _ = phase_at(middle)
+            if middle_phase < target:
+                lower = middle
+            else:
+                upper = middle
+        breakpoints.add((lower + upper) / 2)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
-        phase = phase_offset + frequency * position
-        correction, correction_slope = end_shift(position)
-        center = (
-            baseline
-            + direction * amplitude * math.sin(phase)
-            + correction
+        phase, phase_velocity = phase_at(position)
+        center = baseline + direction * amplitude * math.sin(phase)
+        sine_slope = (
+            direction
+            * amplitude
+            * phase_velocity
+            * math.cos(phase)
         )
-        sine_slope = direction * amplitude * frequency * math.cos(phase)
-        slope = sine_slope + correction_slope
         points.append(
-            (position, center, slope, abs(sine_slope) < 1e-9)
+            (position, center, sine_slope, abs(sine_slope) < 1e-9)
         )
+
 
     segments = []
     for start, end in zip(points, points[1:]):
@@ -344,6 +444,63 @@ def make_wave_parts(
     return horizontal + vertical
 
 
+def make_punctuation_ligature(
+    font: TTFont, sequence: str, advance: int = 1000
+) -> pathops.Path:
+    gap = 40
+    components: list[tuple[pathops.Path, float, float]] = []
+    total_width = gap * (len(sequence) - 1)
+    cmap = font.getBestCmap()
+    precomposed_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES.get(
+        sequence
+    )
+    if precomposed_codepoint is not None:
+        return glyph_path(font, cmap[precomposed_codepoint])
+
+    for mark in sequence:
+        if mark == "!" and "?" in sequence:
+            source_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES["!?"]
+        else:
+            source_codepoint = SHIPPORI_COMPONENT_LIGATURES[mark]
+        source = glyph_path(font, cmap[source_codepoint])
+        contours = list(source.contours)
+        if len(contours) != 4:
+            raise ValueError(
+                f"Expected four contours in U+{source_codepoint:04X}"
+            )
+        outline = pathops.Path()
+        outline.addPath(contours[0])
+        outline.addPath(contours[2])
+        x_min, _, x_max, _ = outline.bounds
+        width = x_max - x_min
+        components.append((outline, x_min, width))
+        total_width += width
+
+    scale = min(1.0, (advance - 40) / total_width)
+    combined = pathops.Path()
+    cursor = (advance - total_width * scale) / 2
+    for outline, x_min, width in components:
+        transform = Transform(
+            scale, 0, 0, 1, cursor - scale * x_min, 0
+        )
+        outline.draw(TransformPen(combined.getPen(), transform))
+        cursor += (width + gap) * scale
+    return combined
+
+
+def punctuation_ligature_rules(
+    exclamation: str,
+    question: str,
+    ligatures: list[tuple[str, str]],
+) -> str:
+    inputs = {"!": exclamation, "?": question}
+    return "".join(
+        f"  sub {' '.join(inputs[mark] for mark in sequence)}"
+        f" by {name};\n"
+        for sequence, name in ligatures
+    )
+
+
 def append_cff_glyphs(
     font: TTFont,
     paths: list[pathops.Path],
@@ -351,6 +508,7 @@ def append_cff_glyphs(
     source_glyph: str,
     vertical_origin: int,
     add_stem_hints: bool = True,
+    advance_override: int | None = None,
 ) -> None:
     if "CFF " not in font:
         raise ValueError("Only OpenType/CFF Noto Serif JP sources are supported")
@@ -365,7 +523,11 @@ def append_cff_glyphs(
     source_gid = font.getGlyphID(source_glyph)
     fd_index = top.FDSelect[source_gid]
     private = top.FDArray[fd_index].Private
-    advance = font["hmtx"].metrics[source_glyph][0]
+    advance = (
+        font["hmtx"].metrics[source_glyph][0]
+        if advance_override is None
+        else advance_override
+    )
     hints: list[tuple[int, int, str]] = []
     if add_stem_hints:
         horizontal_bounds = paths[1].bounds
@@ -469,6 +631,7 @@ def alternating_wave_rules(
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
+    punctuation: tuple[str, str, list[tuple[str, str]]],
 ) -> str:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -535,8 +698,14 @@ def feature_source(
         + wave_vertical_maps
     )
 
+    exclamation, question, ligatures = punctuation
+    ccmp_rules = punctuation_ligature_rules(
+        exclamation, question, ligatures
+    )
+
     return (
         "languagesystem DFLT dflt;\n\n"
+        f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
         f"feature vert {{\n{''.join(vert_rules)}}} vert;\n\n"
         f"feature vrt2 {{\n{''.join(vrt2_rules)}}} vrt2;\n"
@@ -664,7 +833,10 @@ def set_name(font: TTFont, name_id: int, value: str) -> None:
         name_table.setName(value, name_id, 3, 1, 0x409)
 
 
-def rename_font(font: TTFont) -> None:
+def rename_font(
+    font: TTFont, copyright_notice: str, font_notice: str
+) -> None:
+    set_name(font, 0, copyright_notice)
     set_name(font, 1, FAMILY)
     set_name(font, 2, "Regular")
     set_name(font, 3, f"{VERSION_NUMBER};CHOON;{POSTSCRIPT_NAME}")
@@ -677,16 +849,44 @@ def rename_font(font: TTFont) -> None:
     cff = font["CFF "].cff
     cff.fontNames = [POSTSCRIPT_NAME]
     top = cff.topDictIndex[0]
+    top.Notice = font_notice
     top.FamilyName = FAMILY
     top.FullName = FULL_NAME
 
 
-def build(source_path: Path, output_path: Path, face: int) -> None:
+def build(
+    source_path: Path,
+    punctuation_source_path: Path,
+    output_path: Path,
+    face: int,
+) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
+    punctuation_font = TTFont(punctuation_source_path)
     cmap = font.getBestCmap()
+    punctuation_cmap = punctuation_font.getBestCmap()
+    punctuation_missing = [
+        f"U+{codepoint:04X}"
+        for codepoint in SHIPPORI_PRECOMPOSED_LIGATURES.values()
+        if codepoint not in punctuation_cmap
+    ]
+    if punctuation_missing:
+        raise ValueError(
+            "The punctuation source does not contain "
+            + ", ".join(punctuation_missing)
+        )
+    if (
+        punctuation_font["head"].unitsPerEm
+        != font["head"].unitsPerEm
+    ):
+        raise ValueError(
+            "The base and punctuation sources must use the same "
+            "units per em"
+        )
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
-    required_codepoints.extend([0x301C, 0xFF5E])
+    required_codepoints.extend(
+        [0x21, 0x3F, 0x301C, 0xFF01, 0xFF1F, 0xFF5E]
+    )
     missing = [
         f"U+{codepoint:04X}"
         for codepoint in required_codepoints
@@ -699,7 +899,9 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
 
     allocated_names = allocate_cid_names(
         font,
-        NEW_GLYPH_COUNT * len(linear_codepoints) + WAVE_GLYPH_COUNT,
+        NEW_GLYPH_COUNT * len(linear_codepoints)
+        + WAVE_GLYPH_COUNT
+        + len(MANGA_PUNCTUATION_SEQUENCES),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
     for index, (prefix, codepoint) in enumerate(linear_codepoints):
@@ -732,8 +934,63 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
     )
     wave = ("wave", wave_base, wave_vertical, wave_names)
 
-    merge_features(font, feature_source(extensions, wave))
-    rename_font(font)
+    punctuation_start = wave_start + WAVE_GLYPH_COUNT
+    punctuation_names = allocated_names[
+        punctuation_start : punctuation_start
+        + len(MANGA_PUNCTUATION_SEQUENCES)
+    ]
+    punctuation_paths = [
+        make_punctuation_ligature(punctuation_font, sequence)
+        for sequence in MANGA_PUNCTUATION_SEQUENCES
+    ]
+    punctuation_vertical_origin = round(
+        font["vmtx"].metrics[cmap[0xFF01]][1]
+        + bounds(font, cmap[0xFF01])[3]
+    )
+    append_cff_glyphs(
+        font,
+        punctuation_paths,
+        punctuation_names,
+        cmap[0x21],
+        punctuation_vertical_origin,
+        add_stem_hints=False,
+        advance_override=1000,
+    )
+    punctuation = (
+        cmap[0xFF01],
+        cmap[0xFF1F],
+        list(
+            zip(
+                MANGA_PUNCTUATION_SEQUENCES,
+                punctuation_names,
+                strict=True,
+            )
+        ),
+    )
+
+    copyright_notices = [
+        notice
+        for notice in (
+            font["name"].getDebugName(0),
+            SHIPPORI_COPYRIGHT,
+        )
+        if notice
+    ]
+    copyright_notice = " / ".join(dict.fromkeys(copyright_notices))
+    font_notices = [
+        notice
+        for notice in (
+            font["CFF "].cff.topDictIndex[0].Notice,
+            SHIPPORI_COPYRIGHT,
+        )
+        if notice
+    ]
+    font_notice = " / ".join(dict.fromkeys(font_notices))
+
+    merge_features(
+        font, feature_source(extensions, wave, punctuation)
+    )
+    rename_font(font, copyright_notice, font_notice)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path, reorderTables=True)
@@ -741,15 +998,48 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
 
 def main() -> None:
     args = parse_args()
-    if args.source is not None:
-        build(args.source, args.output, args.face)
-        return
+    with tempfile.TemporaryDirectory(
+        prefix="noto-serif-choon-"
+    ) as directory:
+        temporary_directory = Path(directory)
+        source_path = args.source
+        if source_path is None:
+            source_path = (
+                temporary_directory / "NotoSerifJP-Regular.otf"
+            )
+            print(f"Downloading {NOTO_SOURCE_URL}")
+            urllib.request.urlretrieve(NOTO_SOURCE_URL, source_path)
+            verify_sha256(source_path, NOTO_SOURCE_SHA256)
 
-    with tempfile.TemporaryDirectory(prefix="noto-serif-choon-") as directory:
-        source_path = Path(directory) / "NotoSerifJP-Regular.otf"
-        print(f"Downloading {SOURCE_URL}")
-        urllib.request.urlretrieve(SOURCE_URL, source_path)
-        build(source_path, args.output, 0)
+        punctuation_source_path = args.punctuation_source
+        if punctuation_source_path is None:
+            punctuation_archive_path = (
+                temporary_directory / "shippori3.zip"
+            )
+            punctuation_source_path = (
+                temporary_directory / SHIPPORI_OTF_MEMBER
+            )
+            print(f"Downloading {SHIPPORI_ARCHIVE_URL}")
+            urllib.request.urlretrieve(
+                SHIPPORI_ARCHIVE_URL, punctuation_archive_path
+            )
+            verify_sha256(
+                punctuation_archive_path, SHIPPORI_ARCHIVE_SHA256
+            )
+            with zipfile.ZipFile(punctuation_archive_path) as archive:
+                punctuation_source_path.write_bytes(
+                    archive.read(SHIPPORI_OTF_MEMBER)
+                )
+            verify_sha256(
+                punctuation_source_path, SHIPPORI_OTF_SHA256
+            )
+
+        build(
+            source_path,
+            punctuation_source_path,
+            args.output,
+            args.face,
+        )
 
 
 if __name__ == "__main__":
