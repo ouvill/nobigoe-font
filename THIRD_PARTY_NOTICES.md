@@ -17,9 +17,9 @@
 
 Noto Serif JP Regularを生成フォントのベースとして使用しています。既存字形・メトリクス・OpenTypeテーブルを保持し、次を追加または変更しています。
 
-- `ー`、`―`、`〜`、`～`の連結用字形
-- 横組・縦組の文脈置換
+- `ー`、`―`、`〜`、`～`、`〰`の横組・縦組用連結字形と文脈置換
 - Manga1方式の全角感嘆符・疑問符合字
+- Manga1方式の濁点・半濁点付き仮名と小書きコ
 - ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータ
 
 元フォントと区別するため、生成フォントのファミリー名は `Noto Serif JP Choon` です。
@@ -46,8 +46,8 @@ Noto Serif JP Regularを生成フォントのベースとして使用してい�
 - Project: [Adobe-Manga1](https://github.com/adobe-type-tools/Adobe-Manga1)
 - License: Apache License 2.0
 
-Adobe-Manga1-0は、対応する感嘆符・疑問符シーケンスとGSUB動作を確認するための仕様資料として参照しています。Adobe-Manga1のサンプルフォント字形やCIDデータを生成フォントへコピーしていません。
+Adobe-Manga1-0は、伸長記号、感嘆符・疑問符シーケンス、濁点・半濁点付き仮名、およびGSUB動作を確認するための仕様資料として参照しています。Adobe-Manga1のサンプルフォント字形やCIDデータを生成フォントへコピーしていません。
 
 ## License Distribution
 
-Noto Serif JPとしっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスを生成フォントとともに配布してください。
+Noto Serif JPとしっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。

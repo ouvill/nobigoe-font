@@ -104,6 +104,29 @@ dist/NotoSerifJPChoon-Regular.otf
 
 しっぽり明朝はOTF版とTTF版のどちらも `--punctuation-source` に指定できます。本プロジェクトの生成先はOpenType/CFFなので、同じ3次ベジェ曲線を保持できるOTF版を推奨し、既定の自動取得でもOTF版を使用します。TTF版ではTrueTypeの2次ベジェ曲線をCFFの3次ベジェ曲線へ変換します。
 
+## 紹介サイト
+
+`site/`に静的な紹介ページと文字テスターがあります。リポジトリ直下でHTTPサーバーを起動し、`http://localhost:8000/site/`を開いてください。
+
+```sh
+python3 -m http.server 8000
+```
+
+配信用Webfontは`site/assets/NotoSerifJPChoon-Regular.woff2`です。生成フォントを更新した場合は、次のコマンドでWebfontも更新します。
+
+```sh
+.venv/bin/pyftsubset dist/NotoSerifJPChoon-Regular.otf \
+  --output-file=site/assets/NotoSerifJPChoon-Regular.woff2 \
+  --flavor=woff2 \
+  --glyphs='*' \
+  --layout-features='*' \
+  --name-IDs='*' \
+  --name-languages='*' \
+  --notdef-glyph \
+  --notdef-outline \
+  --recommended-glyphs
+```
+
 ## OpenType機能
 
 | feature | 用途 |
