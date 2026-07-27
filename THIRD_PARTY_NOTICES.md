@@ -18,11 +18,26 @@
 Noto Serif JP Regularを生成フォントのベースとして使用しています。既存字形・メトリクス・OpenTypeテーブルを保持し、次を追加または変更しています。
 
 - `ー`、`―`、`〜`、`～`、`〰`の横組・縦組用連結字形と文脈置換
-- Manga1方式の全角感嘆符・疑問符合字
-- Manga1方式の濁点・半濁点付き仮名と小書きコ
+- Manga1方式の全角感嘆符・疑問符合字と斜体明朝異体字
+- Manga1方式の濁点・半濁点付き仮名、半濁点付きルビ、小書きコ
 - ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータ
 
 元フォントと区別するため、生成フォントのファミリー名は `Nobigoe Mincho`（のびごえ明朝）です。
+
+## Noto Sans JP Regular
+
+- Project: [Noto CJK](https://github.com/notofonts/noto-cjk)
+- Source file: `Sans/SubsetOTF/JP/NotoSansJP-Regular.otf`
+- Version: `2.004`
+- Commit: [`9b0f1436e455d902de067a2501422e5dc71ad16b`](https://github.com/notofonts/noto-cjk/commit/9b0f1436e455d902de067a2501422e5dc71ad16b)
+- Download: <https://raw.githubusercontent.com/notofonts/noto-cjk/9b0f1436e455d902de067a2501422e5dc71ad16b/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf>
+- SHA-256: `dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073`
+- Copyright: `Copyright 2017-2024 Adobe (http://www.adobe.com/). Noto is a trademark of Google Inc.`
+- License: SIL Open Font License 1.1
+
+### 使用箇所と改変
+
+Noto Sans JP Regularの全角感嘆符 `！`（U+FF01）と全角疑問符 `？`（U+FF1F）の輪郭を使用しています。単独字形とManga1方式の16シーケンスを全角1文字幅へ再配置し、ゴシック異体字を生成します。さらに右へ12度傾けた斜体ゴシック異体字を生成します。Noto Sans JPの本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
 
 ## Shippori Mincho Regular（しっぽり明朝）
 
@@ -39,7 +54,7 @@ Noto Serif JP Regularを生成フォントのベースとして使用してい�
 
 ### 使用箇所と改変
 
-しっぽり明朝Regularに収録された既存合字 `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。2記号の組み合わせには該当する既存合字のCFF輪郭を直接使用し、3記号以上では `‼`、`⁇`、`⁉` の構成輪郭を抽出して全角1文字幅へ再配置します。OTF版から直接流用する2記号合字では曲線形状を変更しません。利用者がTTF版を指定した場合に限り、TrueTypeの2次ベジェ曲線をOpenType/CFFの3次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
+しっぽり明朝Regularに収録された既存合字 `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。2記号の組み合わせには該当する既存合字のCFF輪郭を直接使用し、3記号以上では `‼`、`⁇`、`⁉` の構成輪郭を抽出して全角1文字幅へ再配置します。さらに各字形を右へ12度傾けた斜体明朝異体字を生成します。OTF版から直接流用する2記号合字では、既定の明朝字形の曲線形状を変更しません。利用者がTTF版を指定した場合に限り、TrueTypeの2次ベジェ曲線をOpenType/CFFの3次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
 
 ## Adobe-Manga1-0
 
@@ -50,4 +65,4 @@ Adobe-Manga1-0は、伸長記号、感嘆符・疑問符シーケンス、濁点
 
 ## License Distribution
 
-Noto Serif JPとしっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。
+Noto Serif JP、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。

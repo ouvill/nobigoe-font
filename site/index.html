@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="漫画の声をどこまでも伸ばせる明朝体、のびごえ明朝の紹介サイト。">
   <title>のびごえ明朝 — 声を、どこまでも。</title>
-  <link rel="stylesheet" href="styles.css?v=1.019">
-  <script src="script.js?v=1.019" defer></script>
+  <link rel="stylesheet" href="styles.css?v=1.020">
+  <script src="script.js?v=1.020" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -22,7 +22,7 @@
       <a href="#marks-list">濁点一覧</a>
       <a href="#spec">仕様</a>
     </nav>
-    <a class="download-link" href="assets/NobigoeMincho-Regular.woff2?v=1.019" download>
+    <a class="download-link" href="assets/NobigoeMincho-Regular.woff2?v=1.020" download>
       Webfontを入手
     </a>
   </header>
@@ -126,8 +126,8 @@
       <article class="feature-card feature-card-liga">
         <div class="feature-meta"><span>03</span><span>CCMP</span></div>
         <p class="feature-glyph">！！？？</p>
-        <h3>感情を、一文字幅に。</h3>
-        <p>Manga1方式の16シーケンスを、全角一文字の中へ密度高く収めます。</p>
+        <h3>感情を、四つの表情で。</h3>
+        <p>明朝・斜体明朝・ゴシック・斜体ゴシック。Manga1方式の16シーケンスを一文字幅へ収めます。</p>
       </article>
 
       <article class="feature-card feature-card-marks">
@@ -142,7 +142,7 @@
       <div class="section-heading section-heading-light">
         <p class="section-number">02 / TYPE TESTER</p>
         <h2 id="tester-title">あなたの台詞で。</h2>
-        <p>欄内を直接編集できます。文字サイズと組方向を変えて、表情を確かめてください。</p>
+        <p>欄内を直接編集できます。文字サイズ、組方向、句読点の字形、ルビ機能を変えて表情を確かめてください。</p>
       </div>
 
       <div class="tester-shell">
@@ -155,6 +155,16 @@
           <div class="writing-modes" role="group" aria-label="組方向">
             <button type="button" class="is-active" data-writing-mode="horizontal" aria-pressed="true">横組</button>
             <button type="button" data-writing-mode="vertical" aria-pressed="false">縦組</button>
+          </div>
+          <div class="writing-modes punctuation-styles" role="group" aria-label="感嘆符と疑問符の字形">
+            <button type="button" class="is-active" data-punctuation-style="" aria-pressed="true">明朝</button>
+            <button type="button" data-punctuation-style="ss01" aria-pressed="false">斜明朝</button>
+            <button type="button" data-punctuation-style="ss02" aria-pressed="false">ゴシック</button>
+            <button type="button" data-punctuation-style="ss03" aria-pressed="false">斜ゴシック</button>
+          </div>
+          <div class="writing-modes" role="group" aria-label="ルビ字形">
+            <button type="button" class="is-active" data-ruby-mode="normal" aria-pressed="true">通常</button>
+            <button type="button" data-ruby-mode="ruby" aria-pressed="false">ルビ</button>
           </div>
         </div>
 
@@ -178,6 +188,7 @@
           <button type="button" data-sample="！？　？！　！！？？\nあ゙　な゙　ま゚　𛄲゙\nー　〜　〰　―">字形一覧</button>
           <button type="button" data-sample="&#xE082;　&#xE0B0;　&#xE09A;　&#xE08C;　&#xE099;　&#xE0CE;">こぶり外字</button>
           <button type="button" data-sample="♡゙　♥゙　&#xE0DC;　&#xE0DD;">ハート濁点</button>
+          <button type="button" data-sample="ㇷ゚　か゚　き゚　く゚　け゚　こ゚　カ゚　キ゚　ク゚　ケ゚　コ゚　セ゚　ツ゚　ト゚">半濁点ルビ</button>
         </div>
       </div>
     </section>
@@ -189,7 +200,7 @@
         <p>
           普通のかなに結合濁点・半濁点を続けるだけ。
           191通りのManga1シーケンスと2通りのハート濁点を、一つの安定した字形として描きます。
-          うち90字形は、源暎こぶり明朝の私用領域コードでも入力できます。
+          うち90字形は源暎こぶり明朝の私用領域コードでも入力でき、半濁点14字形はルビ機能にも対応します。
         </p>
       </div>
       <div class="marks-specimen" aria-label="濁点と半濁点の字形見本">
@@ -246,14 +257,14 @@
       <dl class="spec-list">
         <div><dt>Base</dt><dd>Noto Serif JP Regular 2.003</dd></div>
         <div><dt>Style</dt><dd>Regular / OpenType CFF</dd></div>
-        <div><dt>Features</dt><dd>ccmp, calt, vert, vrt2</dd></div>
+        <div><dt>Features</dt><dd>ccmp, calt, aalt, ss01–03, ruby, vert, vrt2</dd></div>
         <div><dt>Writing</dt><dd>横組・縦組</dd></div>
-        <div><dt>Version</dt><dd>1.019</dd></div>
+        <div><dt>Version</dt><dd>1.020</dd></div>
         <div><dt>License</dt><dd>SIL Open Font License 1.1</dd></div>
       </dl>
 
       <div class="spec-note">
-        <p>Adobe-Manga1-0の伸長記号、句読符合字、濁点・半濁点規則を参照した実験的フォントです。Adobe-Manga1 CIDコレクション全体を実装するものではありません。</p>
+        <p>Adobe-Manga1-0の伸長記号、句読符合字と異体字、濁点・半濁点、ルビ規則を参照した実験的フォントです。Adobe-Manga1 CIDコレクション全体を実装するものではありません。</p>
         <a href="../THIRD_PARTY_NOTICES.md">第三者ライセンスと出典</a>
       </div>
     </section>
@@ -267,7 +278,7 @@
     <div class="footer-links">
       <a href="#top">ページ上部へ</a>
       <a href="../README.md">README</a>
-      <a href="assets/NobigoeMincho-Regular.woff2?v=1.019" download>Webfontを入手</a>
+      <a href="assets/NobigoeMincho-Regular.woff2?v=1.020" download>Webfontを入手</a>
     </div>
     <p class="footer-credit">An independent type experiment. Not an official Adobe, Google, Noto, or Shippori Mincho project.</p>
   </footer>

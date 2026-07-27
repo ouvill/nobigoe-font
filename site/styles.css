@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Nobigoe";
-  src: url("assets/NobigoeMincho-Regular.woff2?v=1.019") format("woff2");
+  src: url("assets/NobigoeMincho-Regular.woff2?v=1.020") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -731,8 +731,8 @@ input:focus-visible {
 
 .tester-toolbar {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) auto;
-  gap: 50px;
+  grid-template-columns: minmax(280px, 1fr) auto auto auto;
+  gap: 18px;
   align-items: center;
   padding: 18px 22px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.28);
@@ -767,6 +767,11 @@ input:focus-visible {
 
 .writing-modes button + button {
   border-left: 0;
+}
+
+.punctuation-styles button {
+  min-width: 64px;
+  padding-inline: 10px;
 }
 
 .writing-modes button:hover,
@@ -1415,6 +1420,10 @@ input:focus-visible {
 
   .writing-modes button {
     width: 50%;
+  }
+
+  .punctuation-styles button {
+    width: 25%;
   }
 
   .tester-canvas {

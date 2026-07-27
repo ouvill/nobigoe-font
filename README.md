@@ -1,6 +1,6 @@
 # のびごえ明朝 (Nobigoe Mincho)
 
-Noto Serif JPをベースに、漫画向けの伸長記号と感嘆符・疑問符合字を追加するフォント生成プロジェクトです。
+Noto Serif JPをベースに、漫画向けの伸長記号、感嘆符・疑問符合字と異体字、濁点・半濁点付き仮名を追加するフォント生成プロジェクトです。
 
 生成されるフォント名は `Nobigoe Mincho Regular`（日本語ファミリー名: `のびごえ明朝`）、既定の出力先は `dist/NobigoeMincho-Regular.otf` です。現在はRegularウェイトのみを生成します。
 
@@ -37,9 +37,11 @@ Noto Serif JPに一体字形がある24列は既存輪郭を使用し、残る16
 
 このうち源暎こぶり明朝が一体字形を持つ濁点74列・半濁点14列の計88列には、同フォントと互換性のある私用領域U+E082–U+E0D9も割り当てています。たとえばU+E082を直接入力しても、`あ` + U+3099と同じ字形になります。OpenTypeの結合処理に対応しないアプリで使用できます。これは文字コードの互換割り当てであり、源暎こぶり明朝の輪郭は取り込んでいません。
 
-源暎こぶり明朝と同じく、白ハート `♡`（U+2661）と黒ハート `♥`（U+2665）に結合濁点を続けた2列も一体字形へ置換します。私用領域の基字U+E064・U+E065でも同じ結合が働き、完成字形はそれぞれU+E0DC・U+E0DDで直接入力できます。ハートはNoto Serif JPの輪郭を使用し、濁点の2画を源暎こぶり明朝の配置比率に合わせて個別に配置しています。濁点輪郭を16方向へ12 units拡張した範囲だけハートから差し引くため、接続部には細い白抜きが入り、ハートと濁点が重なりません。
+源暎こぶり明朝と同じく、白ハート `♡`（U+2661）と黒ハート `♥`（U+2665）に結合濁点を続けた2列も一体字形へ置換します。私用領域の基字U+E064・U+E065でも同じ結合が働き、完成字形はそれぞれU+E0DC・U+E0DDで直接入力できます。ハートはNoto Serif JPの輪郭を使用し、濁点の2画を源暎こぶり明朝の配置比率に合わせて個別に配置しています。ハートから差し引く白抜きの半径は、配置後の濁点2画の中心間距離の1/3です。濁点輪郭を16方向へこの半径だけ拡張した範囲を差し引くため、白抜き幅は濁点の大きさと配置に追従し、ハートと濁点が接触しません。
 
-元フォントにない `𛄲`（U+1B132、Hiragana Letter Small Ko）と `𛅕`（U+1B155、Katakana Letter Small Ko）は、Noto Serif JPの `こ` と `コ`を既存の小書き仮名に合わせて縮小・配置した横組・縦組字形を追加します。Manga1の半濁点付きルビ14字形はまだ含みません。
+元フォントにない `𛄲`（U+1B132、Hiragana Letter Small Ko）と `𛅕`（U+1B155、Katakana Letter Small Ko）は、Noto Serif JPの `こ` と `コ`を既存の小書き仮名に合わせて縮小・配置した横組・縦組字形を追加します。
+
+Manga1が規定する半濁点付きルビ14字形（`ㇷ゚`、`か゚`、`き゚`、`く゚`、`け゚`、`こ゚`、`カ゚`、`キ゚`、`ク゚`、`ケ゚`、`コ゚`、`セ゚`、`ツ゚`、`ト゚`）は、通常の一体字形を50%へ縮小した500 units幅の専用字形へ `ruby` で置換します。`ㇷ゚` には縦組専用ルビ字形も用意しています。
 
 ### Manga1方式の感嘆符・疑問符合字
 
@@ -56,7 +58,9 @@ Noto Serif JPに一体字形がある24列は既存輪郭を使用し、残る16
 
 2記号の合字は、しっぽり明朝Regularに収録されている `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭をそのまま流用します。3記号以上は、これら既存合字から感嘆符・疑問符の構成輪郭を抽出し、1文字セルへ再配置して生成します。横組・縦組とも記号はセル内で横並びになります。半角ASCIIの `!` と `?` は合字化しません。
 
-この機能は[Adobe-Manga1-0](https://github.com/adobe-type-tools/Adobe-Manga1)の合字シーケンス集合とGSUB規則を参考にしています。Adobe-Manga1のCIDコレクション全体を実装するものではなく、斜体・異体字CIDも含みません。
+単独の全角 `！`・`？` と16通りの合字には、明朝、右へ12度傾けた明朝、ゴシック、右へ12度傾けたゴシックの4字形を用意しています。既定は明朝です。`ss01`、`ss02`、`ss03` でそれぞれ斜体明朝、ゴシック、斜体ゴシックへ切り替えられ、3異体字は `aalt` にも登録されています。明朝合字はしっぽり明朝、ゴシック字形はNoto Sans JPをもとに、全角1文字幅へ収めています。
+
+この機能は[Adobe-Manga1-0](https://github.com/adobe-type-tools/Adobe-Manga1)の合字シーケンス集合、異体字構成、GSUB規則を参考にしています。Adobe-Manga1のCIDコレクション全体を実装するものではありません。
 
 ## 使用フォント
 
@@ -64,6 +68,7 @@ Noto Serif JPに一体字形がある24列は既存輪郭を使用し、残る16
 |---|---|---:|
 | 本文、長音、ダッシュ、波線 | [Noto Serif JP Regular](https://github.com/notofonts/noto-cjk) | 2.003 |
 | Manga1感嘆符・疑問符合字の記号輪郭 | [Shippori Mincho OTF Regular（しっぽり明朝）](https://fontdasu.com/shippori-mincho/) | 3.300 |
+| Manga1感嘆符・疑問符合字のゴシック異体字 | [Noto Sans JP Regular](https://github.com/notofonts/noto-cjk) | 2.004 |
 
 取得元、バージョン、SHA-256、著作権表示は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) に記載しています。
 
@@ -85,7 +90,7 @@ python3 -m venv .venv
 
 ### 自動取得して生成
 
-引数を省略すると、固定コミットからNoto Serif JP Regularを、FONTDASU公式配布ページからしっぽり明朝OTF版のアーカイブを一時ディレクトリへダウンロードして生成します。両方のSHA-256を検証し、想定した配布物と異なる場合は停止します。元フォントのバイナリはリポジトリへ保存しません。
+引数を省略すると、固定コミットからNoto Serif JP RegularとNoto Sans JP Regularを、FONTDASU公式配布ページからしっぽり明朝OTF版のアーカイブを一時ディレクトリへダウンロードして生成します。3ファイルのSHA-256を検証し、想定した配布物と異なる場合は停止します。元フォントのバイナリはリポジトリへ保存しません。
 
 ```sh
 .venv/bin/python build_font.py
@@ -103,10 +108,11 @@ dist/NobigoeMincho-Regular.otf
 .venv/bin/python build_font.py \
   --source /path/to/NotoSerifJP-Regular.otf \
   --punctuation-source /path/to/ShipporiMincho-OTF-Regular.otf \
+  --sans-source /path/to/NotoSansJP-Regular.otf \
   --output dist/NobigoeMincho-Regular.otf
 ```
 
-`--source` または `--punctuation-source` の片方だけを指定した場合、指定しなかったフォントだけを自動取得します。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。
+`--source`、`--punctuation-source`、`--sans-source` の一部だけを指定した場合、指定しなかったフォントだけを自動取得します。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。
 
 しっぽり明朝はOTF版とTTF版のどちらも `--punctuation-source` に指定できます。本プロジェクトの生成先はOpenType/CFFなので、同じ3次ベジェ曲線を保持できるOTF版を推奨し、既定の自動取得でもOTF版を使用します。TTF版ではTrueTypeの2次ベジェ曲線をCFFの3次ベジェ曲線へ変換します。
 
@@ -162,14 +168,21 @@ python3 -m http.server 8000
 | feature | 用途 |
 |---|---|
 | `ccmp` | 全角感嘆符・疑問符合字と濁点・半濁点付き仮名 |
+| `aalt` | 全角感嘆符・疑問符および合字の3異体字を列挙 |
+| `ss01` | 全角感嘆符・疑問符および合字を斜体明朝へ置換 |
+| `ss02` | 全角感嘆符・疑問符および合字をゴシックへ置換 |
+| `ss03` | 全角感嘆符・疑問符および合字を斜体ゴシックへ置換 |
+| `ruby` | Manga1の半濁点付きルビ14字形へ置換 |
 | `calt` | 連続する長音・ダッシュ・波線の始端／中間／終端置換 |
-| `vert` / `vrt2` | 縦組用の伸長記号と濁点・半濁点付き仮名字形 |
+| `vert` / `vrt2` | 縦組用の伸長記号、濁点・半濁点付き仮名、`ㇷ゚`ルビ字形 |
 
 一般的なシェーピングエンジンでは `ccmp` と `calt` は既定で有効です。アプリケーション側で `calt` を無効にすると、伸長記号の自動連結は行われません。
 
+CSSでは、たとえば `font-feature-settings: "ss03" 1;` で全角感嘆符・疑問符を斜体ゴシックへ、`font-feature-settings: "ruby" 1;` で対象の半濁点付き仮名をルビ字形へ切り替えられます。
+
 ## ライセンス
 
-生成フォントに取り込まれるNoto Serif JPとしっぽり明朝は、どちらもSIL Open Font License 1.1で提供されています。本プロジェクトのフォント関連ファイルと生成フォントも [`OFL.txt`](OFL.txt) の条件に従います。
+生成フォントに取り込まれるNoto Serif JP、Noto Sans JP、しっぽり明朝は、いずれもSIL Open Font License 1.1で提供されています。本プロジェクトのフォント関連ファイルと生成フォントも [`OFL.txt`](OFL.txt) の条件に従います。
 
 第三者フォントの著作権表示と改変内容は [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) を参照してください。生成フォントのファミリー名は元フォントと区別し、`Noto`の名称を派生フォント名に残さない `Nobigoe Mincho`（のびごえ明朝）に変更しています。
 

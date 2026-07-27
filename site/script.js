@@ -80,11 +80,28 @@ const testerText = document.querySelector("#tester-text");
 const testerCanvas = document.querySelector("#tester-canvas");
 const writingModeButtons = [...document.querySelectorAll("[data-writing-mode]")];
 const sampleButtons = [...document.querySelectorAll("[data-sample]")];
+const punctuationStyleButtons = [
+  ...document.querySelectorAll("[data-punctuation-style]"),
+];
+const rubyModeButtons = [...document.querySelectorAll("[data-ruby-mode]")];
+let punctuationStyle = "";
+let rubyMode = false;
 
 function updateTesterSize() {
   const size = `${sizeInput.value}px`;
   sizeValue.value = size;
   testerText.style.fontSize = size;
+}
+
+function updateTesterFeatures() {
+  const features = [];
+  if (punctuationStyle) {
+    features.push(`"${punctuationStyle}" 1`);
+  }
+  if (rubyMode) {
+    features.push('"ruby" 1');
+  }
+  testerText.style.fontFeatureSettings = features.join(", ") || "normal";
 }
 
 sizeInput.addEventListener("input", updateTesterSize);
@@ -98,6 +115,22 @@ for (const button of writingModeButtons) {
       candidate.classList.toggle("is-active", active);
       candidate.setAttribute("aria-pressed", String(active));
     }
+  });
+}
+
+for (const button of punctuationStyleButtons) {
+  button.addEventListener("click", () => {
+    punctuationStyle = button.dataset.punctuationStyle;
+    updatePressedButtons(punctuationStyleButtons, button);
+    updateTesterFeatures();
+  });
+}
+
+for (const button of rubyModeButtons) {
+  button.addEventListener("click", () => {
+    rubyMode = button.dataset.rubyMode === "ruby";
+    updatePressedButtons(rubyModeButtons, button);
+    updateTesterFeatures();
   });
 }
 
@@ -216,7 +249,7 @@ catalogWritingMode.addEventListener("click", () => {
 
 async function loadCatalog() {
   try {
-    const response = await fetch("marks-data.json?v=1.019");
+    const response = await fetch("marks-data.json?v=1.020");
     if (!response.ok) {
       throw new Error(`Glyph catalog: HTTP ${response.status}`);
     }

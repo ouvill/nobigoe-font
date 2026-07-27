@@ -29,6 +29,13 @@ NOTO_SOURCE_URL = (
 NOTO_SOURCE_SHA256 = (
     "2c9a12dbd4f2408c4610c7ee84a108b62d7236c3775baed618c64d9cb44b2f04"
 )
+NOTO_SANS_SOURCE_URL = (
+    "https://raw.githubusercontent.com/notofonts/noto-cjk/"
+    f"{NOTO_COMMIT}/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf"
+)
+NOTO_SANS_SOURCE_SHA256 = (
+    "dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073"
+)
 SHIPPORI_ARCHIVE_URL = "https://fontdasu.com/download/shippori3.zip"
 SHIPPORI_ARCHIVE_SHA256 = (
     "dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e"
@@ -47,7 +54,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.019"
+VERSION_NUMBER = "1.020"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -82,6 +89,34 @@ MANGA_PUNCTUATION_SEQUENCES = (
     "!!",
     "??",
 )
+PUNCTUATION_VARIANT_SEQUENCES = (
+    "!",
+    "?",
+    *MANGA_PUNCTUATION_SEQUENCES,
+)
+PUNCTUATION_ALTERNATE_COUNT = 3 * len(PUNCTUATION_VARIANT_SEQUENCES)
+PUNCTUATION_SLANT_ANGLE = 12
+MANGA_RUBY_HANDAKUTEN_BASES = (
+    0x31F7,
+    0x304B,
+    0x304D,
+    0x304F,
+    0x3051,
+    0x3053,
+    0x30AB,
+    0x30AD,
+    0x30AF,
+    0x30B1,
+    0x30B3,
+    0x30BB,
+    0x30C4,
+    0x30C8,
+)
+MANGA_RUBY_HANDAKUTEN_PAIRS = tuple(
+    (base, 0x309A) for base in MANGA_RUBY_HANDAKUTEN_BASES
+)
+RUBY_SCALE = 0.5
+RUBY_GLYPH_COUNT = len(MANGA_RUBY_HANDAKUTEN_PAIRS) + 1
 
 MANGA_DAKUTEN_BASES = tuple(
     int(value, 16)
@@ -159,7 +194,7 @@ HEART_DAKUTEN_MARK_TRANSFORMS = (
     Transform(0.96, 0, 0, 0.96, 971, 61),
     Transform(0.96, 0, 0, 0.96, 1002, 32),
 )
-HEART_DAKUTEN_CLEARANCE = 12
+HEART_DAKUTEN_CLEARANCE_RATIO = 1 / 3
 HEART_DAKUTEN_CLEARANCE_STEPS = 16
 MANGA_VERTICAL_DAKUTEN_BASES = tuple(
     int(value, 16)
@@ -289,6 +324,11 @@ def parse_args() -> argparse.Namespace:
             "Shippori Mincho Regular OTF/TTF used for Manga1 "
             "exclamation/question ligatures (OTF is recommended)"
         ),
+    )
+    parser.add_argument(
+        "--sans-source",
+        type=Path,
+        help="Noto Sans JP OTF source used for sans punctuation variants",
     )
     parser.add_argument(
         "--face", type=int, default=0, help="TTC face index"
@@ -459,14 +499,25 @@ def compose_heart_dakuten_glyph(
     mark_contours = list(mark.contours)
     if len(mark_contours) != len(HEART_DAKUTEN_MARK_TRANSFORMS):
         raise ValueError("Expected a two-contour combining dakuten glyph")
+    placed_contours = [
+        transform_path(contour, transform)
+        for contour, transform in zip(
+            mark_contours, HEART_DAKUTEN_MARK_TRANSFORMS, strict=True
+        )
+    ]
     placed_mark = pathops.Path()
-    for contour, transform in zip(
-        mark_contours, HEART_DAKUTEN_MARK_TRANSFORMS, strict=True
-    ):
-        placed_mark.addPath(transform_path(contour, transform))
+    for contour in placed_contours:
+        placed_mark.addPath(contour)
+    centers = [
+        ((x_min + x_max) / 2, (y_min + y_max) / 2)
+        for x_min, y_min, x_max, y_max in (
+            contour.bounds for contour in placed_contours
+        )
+    ]
+    clearance_radius = math.dist(*centers) * HEART_DAKUTEN_CLEARANCE_RATIO
     clearance = expand_outline(
         placed_mark,
-        HEART_DAKUTEN_CLEARANCE,
+        clearance_radius,
         HEART_DAKUTEN_CLEARANCE_STEPS,
     )
     notched_base = pathops.op(
@@ -881,6 +932,47 @@ def make_punctuation_ligature(
     return combined
 
 
+def make_sans_punctuation_ligature(
+    font: TTFont, sequence: str, advance: int = 1000
+) -> pathops.Path:
+    gap = 40
+    cmap = font.getBestCmap()
+    components = [
+        glyph_path(font, cmap[0xFF01 if mark == "!" else 0xFF1F])
+        for mark in sequence
+    ]
+    component_metrics = [
+        (outline, outline.bounds[0], outline.bounds[2] - outline.bounds[0])
+        for outline in components
+    ]
+    total_width = sum(width for _, _, width in component_metrics)
+    total_width += gap * (len(sequence) - 1)
+    scale = min(1.0, (advance - 40) / total_width)
+    combined = pathops.Path()
+    cursor = (advance - total_width * scale) / 2
+    for outline, x_min, width in component_metrics:
+        combined.addPath(
+            transform_path(
+                outline,
+                Transform(scale, 0, 0, 1, cursor - scale * x_min, 0),
+            )
+        )
+        cursor += (width + gap) * scale
+    return combined
+
+
+def slant_punctuation_outline(
+    outline: pathops.Path,
+) -> pathops.Path:
+    shear = math.tan(math.radians(PUNCTUATION_SLANT_ANGLE))
+    slanted = transform_path(outline, Transform(1, 0, shear, 1, 0, 0))
+    x_min, _, x_max, _ = slanted.bounds
+    return transform_path(
+        slanted,
+        Transform(1, 0, 0, 1, 500 - (x_min + x_max) / 2, 0),
+    )
+
+
 def punctuation_ligature_rules(
     exclamation: str,
     question: str,
@@ -1058,15 +1150,14 @@ def alternating_wave_rules(
 """
 
 
-
-
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
-    punctuation: tuple[str, str, list[tuple[str, str]]],
+    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
     kana_marks: list[tuple[str, str, str]],
     kana_vertical_maps: list[tuple[str, str]],
+    ruby_substitutions: list[tuple[str, str]],
 ) -> str:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -1186,19 +1277,45 @@ def feature_source(
     vert_rules.append(kana_vertical_rules)
     vrt2_rules.append(kana_vertical_rules)
 
-    exclamation, question, ligatures = punctuation
+    punctuation_names = dict(punctuation_variants)
     ccmp_rules = punctuation_ligature_rules(
-        exclamation, question, ligatures
+        punctuation_names["!"][0],
+        punctuation_names["?"][0],
+        [
+            (sequence, names[0])
+            for sequence, names in punctuation_variants
+            if len(sequence) > 1
+        ],
     )
     ccmp_rules += "".join(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in kana_marks
+    )
+    alternate_rules = "".join(
+        f"  sub {names[0]} from [{' '.join(names[1:])}];\n"
+        for _, names in punctuation_variants
+    )
+    stylistic_set_rules = [
+        "".join(
+            f"  sub {names[0]} by {names[index]};\n"
+            for _, names in punctuation_variants
+        )
+        for index in range(1, 4)
+    ]
+    ruby_rules = "".join(
+        f"  sub {normal} by {ruby};\n"
+        for normal, ruby in ruby_substitutions
     )
 
     return (
         "languagesystem DFLT dflt;\n\n"
         f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
+        f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
+        f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"
+        f"feature ss02 {{\n{stylistic_set_rules[1]}}} ss02;\n\n"
+        f"feature ss03 {{\n{stylistic_set_rules[2]}}} ss03;\n\n"
+        f"feature ruby {{\n{ruby_rules}}} ruby;\n\n"
         f"feature vert {{\n{''.join(vert_rules)}}} vert;\n\n"
         f"feature vrt2 {{\n{''.join(vrt2_rules)}}} vrt2;\n"
     )
@@ -1356,13 +1473,16 @@ def rename_font(
 def build(
     source_path: Path,
     punctuation_source_path: Path,
+    sans_source_path: Path,
     output_path: Path,
     face: int,
 ) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
     punctuation_font = TTFont(punctuation_source_path)
+    sans_font = TTFont(sans_source_path)
     cmap = font.getBestCmap()
     punctuation_cmap = punctuation_font.getBestCmap()
+    sans_cmap = sans_font.getBestCmap()
     punctuation_missing = [
         f"U+{codepoint:04X}"
         for codepoint in SHIPPORI_PRECOMPOSED_LIGATURES.values()
@@ -1380,6 +1500,19 @@ def build(
         raise ValueError(
             "The base and punctuation sources must use the same "
             "units per em"
+        )
+    sans_missing = [
+        f"U+{codepoint:04X}"
+        for codepoint in (0xFF01, 0xFF1F)
+        if codepoint not in sans_cmap
+    ]
+    if sans_missing:
+        raise ValueError(
+            "The sans source does not contain " + ", ".join(sans_missing)
+        )
+    if sans_font["head"].unitsPerEm != font["head"].unitsPerEm:
+        raise ValueError(
+            "The base and sans sources must use the same units per em"
         )
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
@@ -1444,10 +1577,12 @@ def build(
         + WAVE_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
+        + PUNCTUATION_ALTERNATE_COUNT
         + 2 * len(MANGA_MISSING_SMALL_KANA)
         + len(generated_mark_pairs)
         + len(generated_vertical_mark_pairs)
-        + len(KOBURI_HEART_MARK_PAIRS),
+        + len(KOBURI_HEART_MARK_PAIRS)
+        + RUBY_GLYPH_COUNT,
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
     for index, (prefix, codepoint) in enumerate(linear_codepoints):
@@ -1537,19 +1672,80 @@ def build(
         add_stem_hints=False,
         advance_override=1000,
     )
-    punctuation = (
-        cmap[0xFF01],
-        cmap[0xFF1F],
-        list(
+    default_punctuation_names = {
+        "!": cmap[0xFF01],
+        "?": cmap[0xFF1F],
+        **dict(
             zip(
                 MANGA_PUNCTUATION_SEQUENCES,
                 punctuation_names,
                 strict=True,
             )
         ),
+    }
+    default_punctuation_paths = {
+        "!": glyph_path(font, cmap[0xFF01]),
+        "?": glyph_path(font, cmap[0xFF1F]),
+        **dict(
+            zip(
+                MANGA_PUNCTUATION_SEQUENCES,
+                punctuation_paths,
+                strict=True,
+            )
+        ),
+    }
+    punctuation_alternate_start = (
+        punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
+    )
+    punctuation_alternate_names = allocated_names[
+        punctuation_alternate_start
+        : punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
+    ]
+    punctuation_alternate_paths: list[pathops.Path] = []
+    punctuation_variants: list[
+        tuple[str, tuple[str, str, str, str]]
+    ] = []
+    for index, sequence in enumerate(PUNCTUATION_VARIANT_SEQUENCES):
+        default_path = default_punctuation_paths[sequence]
+        if len(sequence) == 1:
+            sans_path = glyph_path(
+                sans_font,
+                sans_cmap[0xFF01 if sequence == "!" else 0xFF1F],
+            )
+        else:
+            sans_path = make_sans_punctuation_ligature(
+                sans_font, sequence
+            )
+        alternate_paths = (
+            slant_punctuation_outline(default_path),
+            sans_path,
+            slant_punctuation_outline(sans_path),
+        )
+        punctuation_alternate_paths.extend(alternate_paths)
+        name_start = index * 3
+        alternate_names = tuple(
+            punctuation_alternate_names[name_start : name_start + 3]
+        )
+        punctuation_variants.append(
+            (
+                sequence,
+                (
+                    default_punctuation_names[sequence],
+                    *alternate_names,
+                ),
+            )
+        )
+    append_cff_glyphs(
+        font,
+        punctuation_alternate_paths,
+        punctuation_alternate_names,
+        cmap[0xFF01],
+        punctuation_vertical_origin,
+        add_stem_hints=False,
+        advance_override=1000,
     )
 
-    kana_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
+    kana_start = punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
     small_kana_names = allocated_names[
         kana_start : kana_start + 2 * len(MANGA_MISSING_SMALL_KANA)
     ]
@@ -1702,6 +1898,42 @@ def build(
         add_unicode_mapping(font, codepoint, output)
 
     mark_outputs = native_mark_outputs | generated_mark_outputs
+    ruby_start = heart_start + len(KOBURI_HEART_MARK_PAIRS)
+    ruby_names = allocated_names[
+        ruby_start : ruby_start + RUBY_GLYPH_COUNT
+    ]
+    ruby_normal_names = [
+        mark_outputs[pair] for pair in MANGA_RUBY_HANDAKUTEN_PAIRS
+    ]
+    ruby_paths = [
+        transform_path(
+            glyph_path(font, name),
+            Transform(RUBY_SCALE, 0, 0, RUBY_SCALE, 0, 0),
+        )
+        for name in ruby_normal_names
+    ]
+    ruby_vertical_source = dict(kana_vertical_maps)[ruby_normal_names[0]]
+    ruby_vertical_path = transform_path(
+        glyph_path(font, ruby_vertical_source),
+        Transform(RUBY_SCALE, 0, 0, RUBY_SCALE, 0, 0),
+    )
+    append_cff_glyphs(
+        font,
+        [*ruby_paths, ruby_vertical_path],
+        ruby_names,
+        ruby_normal_names[0],
+        440,
+        add_stem_hints=False,
+        advance_override=500,
+    )
+    kana_vertical_maps.append((ruby_names[0], ruby_names[-1]))
+    ruby_substitutions = list(
+        zip(
+            ruby_normal_names,
+            ruby_names[: len(ruby_normal_names)],
+            strict=True,
+        )
+    )
     for offset, pair in enumerate(KOBURI_PUA_MARK_PAIRS):
         add_unicode_mapping(
             font,
@@ -1744,9 +1976,10 @@ def build(
             extensions,
             wave,
             manga_wave,
-            punctuation,
+            punctuation_variants,
             kana_marks,
             kana_vertical_maps,
+            ruby_substitutions,
         ),
     )
     rename_font(font, copyright_notice, font_notice)
@@ -1769,6 +2002,19 @@ def main() -> None:
             print(f"Downloading {NOTO_SOURCE_URL}")
             urllib.request.urlretrieve(NOTO_SOURCE_URL, source_path)
             verify_sha256(source_path, NOTO_SOURCE_SHA256)
+        sans_source_path = args.sans_source
+        if sans_source_path is None:
+            sans_source_path = (
+                temporary_directory / "NotoSansJP-Regular.otf"
+            )
+            print(f"Downloading {NOTO_SANS_SOURCE_URL}")
+            urllib.request.urlretrieve(
+                NOTO_SANS_SOURCE_URL, sans_source_path
+            )
+            verify_sha256(
+                sans_source_path, NOTO_SANS_SOURCE_SHA256
+            )
+
 
         punctuation_source_path = args.punctuation_source
         if punctuation_source_path is None:
@@ -1796,6 +2042,7 @@ def main() -> None:
         build(
             source_path,
             punctuation_source_path,
+            sans_source_path,
             args.output,
             args.face,
         )
