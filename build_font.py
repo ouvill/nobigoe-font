@@ -12,8 +12,10 @@ from pathlib import Path
 
 import pathops
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+from fontTools.misc.transform import Transform
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.t2CharStringPen import T2CharStringPen
+from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
 SOURCE_URL = (
@@ -24,7 +26,8 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.001"
+VERSION_NUMBER = "1.002"
+WAVE_GLYPH_COUNT = 10
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
@@ -33,8 +36,8 @@ OVERLAP = 0
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Add automatically joining ー and ― glyphs to Noto Serif JP. "
-            "Consecutive marks join through the calt feature."
+            "Add automatically joining ー, ―, 〜, and ～ glyphs to "
+            "Noto Serif JP. Consecutive marks join through the calt feature."
         )
     )
     parser.add_argument(
@@ -56,6 +59,8 @@ def rectangle(x_min: float, y_min: float, x_max: float, y_max: float) -> pathops
     pen.lineTo((x_min, y_max))
     pen.closePath()
     return path
+
+
 
 
 def glyph_path(font: TTFont, glyph_name: str) -> pathops.Path:
@@ -161,12 +166,191 @@ def make_vertical_parts(
     return start, middle, end
 
 
+def transform_path(outline: pathops.Path, transform: Transform) -> pathops.Path:
+    transformed = pathops.Path()
+    outline.draw(TransformPen(transformed.getPen(), transform))
+    return transformed
+
+
+def make_sine_wave_tile(
+    source: pathops.Path,
+    advance: int,
+    *,
+    inverted: bool = False,
+    taper_start: bool = False,
+    taper_end: bool = False,
+) -> pathops.Path:
+    sample_peak_min, sample_peak_max = stroke_band(
+        source, "horizontal", advance / 4
+    )
+    sample_trough_min, sample_trough_max = stroke_band(
+        source, "horizontal", 3 * advance / 4
+    )
+    peak_center = (sample_peak_min + sample_peak_max) / 2
+    trough_center = (sample_trough_min + sample_trough_max) / 2
+    baseline = (peak_center + trough_center) / 2
+    amplitude = (peak_center - trough_center) / 2
+    thickness = (
+        (sample_peak_max - sample_peak_min)
+        + (sample_trough_max - sample_trough_min)
+    ) / 2
+    half_stroke = thickness / 2
+    direction = -1 if inverted else 1
+    frequency = 3 * math.pi / advance
+    taper_length = advance / 4
+    phase_blend_length = advance / 2
+
+    source_x_min, _, source_x_max, _ = source.bounds
+    left_min, left_max = stroke_band(
+        source, "horizontal", source_x_min + 2
+    )
+    right_min, right_max = stroke_band(
+        source, "horizontal", source_x_max - 2
+    )
+    source_left_center = (left_min + left_max) / 2
+    source_right_center = (right_min + right_max) / 2
+    phase_ratio = (
+        source_left_center - source_right_center
+    ) / (2 * amplitude)
+    phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
+    natural_end = (
+        baseline
+        + direction
+        * amplitude
+        * math.sin(phase_offset + 3 * math.pi)
+    )
+    end_correction = source_right_center - natural_end
+
+    def smoothstep(progress: float) -> float:
+        return progress * progress * (3 - 2 * progress)
+
+
+    def width_at(position: float) -> float:
+        scale = 1.0
+        if taper_start:
+            progress = min(1.0, max(0.0, position / taper_length))
+            scale *= smoothstep(progress)
+        if taper_end:
+            progress = min(
+                1.0, max(0.0, (advance - position) / taper_length)
+            )
+            scale *= smoothstep(progress)
+        return half_stroke * scale
+
+    def end_shift(position: float) -> tuple[float, float]:
+        if not taper_end:
+            return 0.0, 0.0
+        blend_start = advance - phase_blend_length
+        if position <= blend_start:
+            return 0.0, 0.0
+        progress = (position - blend_start) / phase_blend_length
+        shift = end_correction * smoothstep(progress)
+        slope = (
+            end_correction
+            * 6
+            * progress
+            * (1 - progress)
+            / phase_blend_length
+        )
+        return shift, slope
+
+    breakpoints = {0.0, float(advance)}
+    for index in range(-8, 16):
+        position = (index * math.pi / 2 - phase_offset) / frequency
+        if 0 < position < advance:
+            breakpoints.add(position)
+    if taper_end:
+        breakpoints.add(advance - phase_blend_length)
+
+    points: list[tuple[float, float, float, bool]] = []
+    for position in sorted(breakpoints):
+        phase = phase_offset + frequency * position
+        correction, correction_slope = end_shift(position)
+        center = (
+            baseline
+            + direction * amplitude * math.sin(phase)
+            + correction
+        )
+        sine_slope = direction * amplitude * frequency * math.cos(phase)
+        slope = sine_slope + correction_slope
+        points.append(
+            (position, center, slope, abs(sine_slope) < 1e-9)
+        )
+
+    segments = []
+    for start, end in zip(points, points[1:]):
+        length = end[0] - start[0]
+        start_handle = length * (0.42 if start[3] else 1 / 3)
+        end_handle = length * (0.42 if end[3] else 1 / 3)
+        control_1 = (
+            start[0] + start_handle,
+            start[1] + start[2] * start_handle,
+        )
+        control_2 = (
+            end[0] - end_handle,
+            end[1] - end[2] * end_handle,
+        )
+        segments.append((control_1, control_2, (end[0], end[1])))
+
+    tile = pathops.Path()
+    pen = tile.getPen()
+    pen.moveTo((0, points[0][1] + width_at(0)))
+    for control_1, control_2, endpoint in segments:
+        pen.curveTo(
+            (control_1[0], control_1[1] + width_at(control_1[0])),
+            (control_2[0], control_2[1] + width_at(control_2[0])),
+            (endpoint[0], endpoint[1] + width_at(endpoint[0])),
+        )
+    pen.lineTo((advance, points[-1][1] - width_at(advance)))
+    for index in range(len(segments) - 1, -1, -1):
+        control_1, control_2, _ = segments[index]
+        start = points[index]
+        pen.curveTo(
+            (control_2[0], control_2[1] - width_at(control_2[0])),
+            (control_1[0], control_1[1] - width_at(control_1[0])),
+            (start[0], start[1] - width_at(start[0])),
+        )
+    pen.closePath()
+    return tile
+
+
+def make_wave_parts(
+    source: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, ...]:
+    horizontal = (
+        make_sine_wave_tile(source, advance, taper_start=True),
+        make_sine_wave_tile(source, advance),
+        make_sine_wave_tile(source, advance, inverted=True),
+        make_sine_wave_tile(source, advance, taper_end=True),
+        make_sine_wave_tile(
+            source, advance, inverted=True, taper_end=True
+        ),
+    )
+    tile_center_y = (
+        horizontal[1].bounds[1] + horizontal[1].bounds[3]
+    ) / 2
+    vertical_phase_flip = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + tile_center_y,
+        vertical_origin,
+    )
+    vertical = tuple(
+        transform_path(outline, vertical_phase_flip)
+        for outline in horizontal
+    )
+    return horizontal + vertical
+
+
 def append_cff_glyphs(
     font: TTFont,
     paths: list[pathops.Path],
     names: list[str],
     source_glyph: str,
     vertical_origin: int,
+    add_stem_hints: bool = True,
 ) -> None:
     if "CFF " not in font:
         raise ValueError("Only OpenType/CFF Noto Serif JP sources are supported")
@@ -182,29 +366,32 @@ def append_cff_glyphs(
     fd_index = top.FDSelect[source_gid]
     private = top.FDArray[fd_index].Private
     advance = font["hmtx"].metrics[source_glyph][0]
-    horizontal_bounds = paths[1].bounds
-    vertical_bounds = paths[4].bounds
-    hints = [
-        (
-            round(horizontal_bounds[1]),
-            round(horizontal_bounds[3] - horizontal_bounds[1]),
-            "hstem",
-        ),
-        (
-            round(vertical_bounds[0]),
-            round(vertical_bounds[2] - vertical_bounds[0]),
-            "vstem",
-        ),
-    ]
+    hints: list[tuple[int, int, str]] = []
+    if add_stem_hints:
+        horizontal_bounds = paths[1].bounds
+        vertical_bounds = paths[4].bounds
+        hints = [
+            (
+                round(horizontal_bounds[1]),
+                round(horizontal_bounds[3] - horizontal_bounds[1]),
+                "hstem",
+            ),
+            (
+                round(vertical_bounds[0]),
+                round(vertical_bounds[2] - vertical_bounds[0]),
+                "vstem",
+            ),
+        ]
 
     for index, (name, outline) in enumerate(zip(names, paths, strict=True)):
         pen = T2CharStringPen(advance, None)
         outline.draw(pen)
         char_string = pen.getCharString(private=private, globalSubrs=cff.GlobalSubrs)
-        if not char_string.program or char_string.program[0] != advance:
-            raise ValueError("Could not locate the Type 2 width operand")
-        stem_start, stem_width, operator = hints[index // 3]
-        char_string.program[1:1] = [stem_start, stem_width, operator]
+        if add_stem_hints:
+            if not char_string.program or char_string.program[0] != advance:
+                raise ValueError("Could not locate the Type 2 width operand")
+            stem_start, stem_width, operator = hints[index // 3]
+            char_string.program[1:1] = [stem_start, stem_width, operator]
         char_strings.charStrings[name] = len(char_strings.charStringsIndex)
         char_strings.charStringsIndex.append(char_string)
         top.FDSelect.gidArray.append(fd_index)
@@ -260,8 +447,28 @@ def contextual_extension_rules(
 """
 
 
+def alternating_wave_rules(
+    prefix: str, base: str, names: list[str]
+) -> str:
+    start, middle_a, middle_b, end_a, end_b = names
+    glyphs = f"{base} {start} {middle_a} {middle_b} {end_a} {end_b}"
+    return f"""
+  lookup {prefix}_start {{
+    ignore sub {base} [{glyphs}]';
+    sub {base}' [{glyphs}] by {start};
+  }} {prefix}_start;
+  lookup {prefix}_end {{
+    sub [{glyphs}] {base}' by {end_a};
+  }} {prefix}_end;
+  sub [{start} {middle_a}] {start}' by {middle_b};
+  sub {middle_b} {start}' by {middle_a};
+  sub [{start} {middle_a}] {end_a}' by {end_b};
+"""
+
+
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
+    wave: tuple[str, str, str, list[str]],
 ) -> str:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -295,6 +502,38 @@ def feature_source(
             )
             + vertical_maps
         )
+
+    wave_prefix, wave_base, wave_vertical, wave_names = wave
+    horizontal_wave_names = wave_names[:5]
+    vertical_wave_names = wave_names[5:]
+    calt_rules.append(
+        alternating_wave_rules(
+            f"{wave_prefix}_h", wave_base, horizontal_wave_names
+        )
+    )
+    calt_rules.append(
+        alternating_wave_rules(
+            f"{wave_prefix}_v", wave_vertical, vertical_wave_names
+        )
+    )
+    wave_vertical_maps = "".join(
+        f"  sub {horizontal} by {vertical};\n"
+        for horizontal, vertical in zip(
+            horizontal_wave_names, vertical_wave_names, strict=True
+        )
+    )
+    vert_rules.append(
+        alternating_wave_rules(
+            f"{wave_prefix}_vert", wave_base, vertical_wave_names
+        )
+        + wave_vertical_maps
+    )
+    vrt2_rules.append(
+        alternating_wave_rules(
+            f"{wave_prefix}_vrt2", wave_base, vertical_wave_names
+        )
+        + wave_vertical_maps
+    )
 
     return (
         "languagesystem DFLT dflt;\n\n"
@@ -445,27 +684,55 @@ def rename_font(font: TTFont) -> None:
 def build(source_path: Path, output_path: Path, face: int) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
     cmap = font.getBestCmap()
-    codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
+    linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
+    required_codepoints = [codepoint for _, codepoint in linear_codepoints]
+    required_codepoints.extend([0x301C, 0xFF5E])
     missing = [
         f"U+{codepoint:04X}"
-        for _, codepoint in codepoints
+        for codepoint in required_codepoints
         if codepoint not in cmap
     ]
     if missing:
         raise ValueError(f"The source font does not contain {', '.join(missing)}")
+    if cmap[0x301C] != cmap[0xFF5E]:
+        raise ValueError("U+301C and U+FF5E must share a source glyph")
 
     allocated_names = allocate_cid_names(
-        font, NEW_GLYPH_COUNT * len(codepoints)
+        font,
+        NEW_GLYPH_COUNT * len(linear_codepoints) + WAVE_GLYPH_COUNT,
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
-    for index, (prefix, codepoint) in enumerate(codepoints):
+    for index, (prefix, codepoint) in enumerate(linear_codepoints):
         base = cmap[codepoint]
         start = index * NEW_GLYPH_COUNT
         names = allocated_names[start : start + NEW_GLYPH_COUNT]
         vertical, names = add_linear_extension(font, base, names)
         extensions.append((prefix, base, vertical, names))
 
-    merge_features(font, feature_source(extensions))
+    wave_base = cmap[0x301C]
+    wave_vertical = find_vertical_glyph(font, wave_base)
+    _, _, _, wave_vertical_y_max = bounds(font, wave_vertical)
+    wave_vertical_origin = round(
+        font["vmtx"].metrics[wave_vertical][1] + wave_vertical_y_max
+    )
+    wave_start = len(linear_codepoints) * NEW_GLYPH_COUNT
+    wave_names = allocated_names[
+        wave_start : wave_start + WAVE_GLYPH_COUNT
+    ]
+    wave_parts = make_wave_parts(
+        glyph_path(font, wave_base), 1000, wave_vertical_origin
+    )
+    append_cff_glyphs(
+        font,
+        list(wave_parts),
+        wave_names,
+        wave_base,
+        wave_vertical_origin,
+        add_stem_hints=False,
+    )
+    wave = ("wave", wave_base, wave_vertical, wave_names)
+
+    merge_features(font, feature_source(extensions, wave))
     rename_font(font)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
