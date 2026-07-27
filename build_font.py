@@ -198,7 +198,7 @@ def make_sine_wave_tile(
     direction = -1 if inverted else 1
     frequency = 3 * math.pi / advance
     taper_length = advance / 4
-    phase_blend_length = advance / 2
+    termination_length = advance / 2
 
     source_x_min, _, source_x_max, _ = source.bounds
     left_min, left_max = stroke_band(
@@ -209,17 +209,18 @@ def make_sine_wave_tile(
     )
     source_left_center = (left_min + left_max) / 2
     source_right_center = (right_min + right_max) / 2
+    slope_sample_x = source_x_max - 22
+    slope_min, slope_max = stroke_band(
+        source, "horizontal", slope_sample_x
+    )
+    slope_sample_center = (slope_min + slope_max) / 2
+    source_right_slope = (
+        source_right_center - slope_sample_center
+    ) / (source_x_max - 2 - slope_sample_x)
     phase_ratio = (
         source_left_center - source_right_center
     ) / (2 * amplitude)
     phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
-    natural_end = (
-        baseline
-        + direction
-        * amplitude
-        * math.sin(phase_offset + 3 * math.pi)
-    )
-    end_correction = source_right_center - natural_end
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
@@ -237,44 +238,34 @@ def make_sine_wave_tile(
             scale *= smoothstep(progress)
         return half_stroke * scale
 
-    def end_shift(position: float) -> tuple[float, float]:
-        if not taper_end:
-            return 0.0, 0.0
-        blend_start = advance - phase_blend_length
-        if position <= blend_start:
-            return 0.0, 0.0
-        progress = (position - blend_start) / phase_blend_length
-        shift = end_correction * smoothstep(progress)
-        slope = (
-            end_correction
-            * 6
-            * progress
-            * (1 - progress)
-            / phase_blend_length
-        )
-        return shift, slope
 
     breakpoints = {0.0, float(advance)}
+    termination_start = advance - termination_length
     for index in range(-8, 16):
         position = (index * math.pi / 2 - phase_offset) / frequency
-        if 0 < position < advance:
+        limit = termination_start if taper_end else advance
+        if 0 < position < limit:
             breakpoints.add(position)
     if taper_end:
-        breakpoints.add(advance - phase_blend_length)
+        breakpoints.add(termination_start)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
+        if taper_end and position == advance:
+            points.append(
+                (
+                    position,
+                    source_right_center,
+                    source_right_slope,
+                    False,
+                )
+            )
+            continue
         phase = phase_offset + frequency * position
-        correction, correction_slope = end_shift(position)
-        center = (
-            baseline
-            + direction * amplitude * math.sin(phase)
-            + correction
-        )
+        center = baseline + direction * amplitude * math.sin(phase)
         sine_slope = direction * amplitude * frequency * math.cos(phase)
-        slope = sine_slope + correction_slope
         points.append(
-            (position, center, slope, abs(sine_slope) < 1e-9)
+            (position, center, sine_slope, abs(sine_slope) < 1e-9)
         )
 
     segments = []
