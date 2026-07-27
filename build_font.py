@@ -213,35 +213,37 @@ def make_sine_wave_tile(
         source_left_center - source_right_center
     ) / (2 * amplitude)
     phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
-    mirrored_end_center = source_left_center
-    mirrored_end_slope = (
-        -amplitude * normal_phase_velocity * math.cos(phase_offset)
-    )
-    extrema = [
-        (math.pi / 2 + index * math.pi - phase_offset)
-        / normal_phase_velocity
-        for index in range(-8, 16)
-    ]
-    if end_tile:
-        termination_start = min(
-            position
-            for position in extrema
-            if advance / 2 <= position < advance
-            and (
-                mirrored_end_center
-                - (
-                    baseline
-                    + direction
-                    * amplitude
-                    * math.sin(
-                        phase_offset
-                        + normal_phase_velocity * position
-                    )
-                )
+    if not end_tile:
+        phase_span = 3 * math.pi
+    elif inverted:
+        phase_span = 2 * math.pi - 2 * phase_offset
+    else:
+        phase_span = 3 * math.pi - 2 * phase_offset
+
+    def phase_at(position: float) -> tuple[float, float]:
+        progress = position / advance
+        if not end_tile:
+            return (
+                phase_offset + phase_span * progress,
+                normal_phase_velocity,
             )
-            * mirrored_end_slope
-            >= 0
+        h01 = -2 * progress**3 + 3 * progress**2
+        h10 = progress**3 - 2 * progress**2 + progress
+        h11 = progress**3 - progress**2
+        phase_progress = (
+            phase_span * h01
+            + 3 * math.pi * h10
+            + 3 * math.pi * h11
         )
+        h01_derivative = -6 * progress**2 + 6 * progress
+        h10_derivative = 3 * progress**2 - 4 * progress + 1
+        h11_derivative = 3 * progress**2 - 2 * progress
+        phase_velocity = (
+            phase_span * h01_derivative
+            + 3 * math.pi * h10_derivative
+            + 3 * math.pi * h11_derivative
+        ) / advance
+        return phase_offset + phase_progress, phase_velocity
 
 
     def smoothstep(progress: float) -> float:
@@ -263,55 +265,33 @@ def make_sine_wave_tile(
 
     breakpoints = {0.0, float(advance)}
     for index in range(-8, 16):
-        position = (
-            index * math.pi / 2 - phase_offset
-        ) / normal_phase_velocity
-        limit = termination_start if end_tile else advance
-        if 0 < position < limit:
-            breakpoints.add(position)
-    if end_tile:
-        breakpoints.add(termination_start)
+        target = math.pi / 2 + index * math.pi - phase_offset
+        if not 0 < target < phase_span:
+            continue
+        if not end_tile:
+            breakpoints.add(target / normal_phase_velocity)
+            continue
+        lower = 0.0
+        upper = float(advance)
+        for _ in range(32):
+            middle = (lower + upper) / 2
+            middle_phase, _ = phase_at(middle)
+            if middle_phase - phase_offset < target:
+                lower = middle
+            else:
+                upper = middle
+        breakpoints.add((lower + upper) / 2)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
-        if end_tile and position == advance:
-            points.append(
-                (
-                    position,
-                    mirrored_end_center,
-                    mirrored_end_slope,
-                    False,
-                )
-            )
-            continue
-        phase = phase_offset + normal_phase_velocity * position
+        phase, phase_velocity = phase_at(position)
         center = baseline + direction * amplitude * math.sin(phase)
         sine_slope = (
-            direction
-            * amplitude
-            * normal_phase_velocity
-            * math.cos(phase)
+            direction * amplitude * phase_velocity * math.cos(phase)
         )
         points.append(
             (position, center, sine_slope, abs(sine_slope) < 1e-9)
         )
-
-    if end_tile:
-        start = points[-2]
-        end = points[-1]
-        secant = (end[1] - start[1]) / (end[0] - start[0])
-        start_slope = start[2] if start[2] * secant > 0 else 0.0
-        end_slope = end[2] if end[2] * secant > 0 else 0.0
-        if secant:
-            alpha = start_slope / secant
-            beta = end_slope / secant
-            magnitude = math.hypot(alpha, beta)
-            if magnitude > 3:
-                scale = 3 / magnitude
-                start_slope *= scale
-                end_slope *= scale
-        points[-2] = (start[0], start[1], start_slope, start[3])
-        points[-1] = (end[0], end[1], end_slope, end[3])
 
 
     segments = []
