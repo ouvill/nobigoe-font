@@ -108,6 +108,119 @@ for (const button of sampleButtons) {
   });
 }
 
+const catalogGrid = document.querySelector("#catalog-grid");
+const catalogCount = document.querySelector("#catalog-count");
+const catalogWritingMode = document.querySelector("#catalog-writing-mode");
+const markTypeButtons = [...document.querySelectorAll("[data-mark-type]")];
+const markScriptButtons = [...document.querySelectorAll("[data-mark-script]")];
+
+let catalogData = [];
+let activeMarkType = "all";
+let activeMarkScript = "all";
+
+function updatePressedButtons(buttons, activeButton) {
+  for (const button of buttons) {
+    const active = button === activeButton;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+}
+
+function createCatalogBadge(text, label) {
+  const badge = document.createElement("span");
+  badge.className = "catalog-badge";
+  badge.textContent = text;
+  badge.title = label;
+  return badge;
+}
+
+function createCatalogItem(mark) {
+  const item = document.createElement("article");
+  item.className = "catalog-item";
+  item.setAttribute("role", "listitem");
+  item.setAttribute("aria-label", `${mark.glyph}、${mark.codepoints}`);
+
+  const glyph = document.createElement("span");
+  glyph.className = "catalog-glyph";
+  glyph.textContent = mark.glyph;
+
+  const meta = document.createElement("span");
+  meta.className = "catalog-item-meta";
+  const base = document.createElement("span");
+  base.textContent = `${mark.base} + ${mark.mark}`;
+  const codepoints = document.createElement("span");
+  codepoints.textContent = mark.codepoints;
+  meta.append(base, codepoints);
+
+  const badges = document.createElement("span");
+  badges.className = "catalog-badges";
+  if (mark.small) {
+    badges.append(createCatalogBadge("小", "小書き仮名"));
+  }
+  if (mark.vertical) {
+    badges.append(createCatalogBadge("縦", "Manga1縦組専用字形"));
+  }
+
+  item.append(glyph, meta, badges);
+  return item;
+}
+
+function renderCatalog() {
+  const visible = catalogData.filter((mark) => {
+    const matchesType =
+      activeMarkType === "all" || mark.type === activeMarkType;
+    const matchesScript =
+      activeMarkScript === "all" || mark.script === activeMarkScript;
+    return matchesType && matchesScript;
+  });
+  const fragment = document.createDocumentFragment();
+  for (const mark of visible) {
+    fragment.append(createCatalogItem(mark));
+  }
+  catalogGrid.replaceChildren(fragment);
+  catalogCount.textContent = String(visible.length);
+}
+
+for (const button of markTypeButtons) {
+  button.addEventListener("click", () => {
+    activeMarkType = button.dataset.markType;
+    updatePressedButtons(markTypeButtons, button);
+    renderCatalog();
+  });
+}
+
+for (const button of markScriptButtons) {
+  button.addEventListener("click", () => {
+    activeMarkScript = button.dataset.markScript;
+    updatePressedButtons(markScriptButtons, button);
+    renderCatalog();
+  });
+}
+
+catalogWritingMode.addEventListener("click", () => {
+  const vertical = !catalogGrid.classList.contains("is-vertical");
+  catalogGrid.classList.toggle("is-vertical", vertical);
+  catalogWritingMode.setAttribute("aria-pressed", String(vertical));
+  catalogWritingMode.textContent = vertical
+    ? "横組で見る"
+    : "縦組で見る";
+});
+
+async function loadCatalog() {
+  try {
+    const response = await fetch("marks-data.json");
+    if (!response.ok) {
+      throw new Error(`Glyph catalog: HTTP ${response.status}`);
+    }
+    catalogData = await response.json();
+    renderCatalog();
+  } catch (error) {
+    catalogCount.textContent = "0";
+    catalogGrid.textContent = "字形データを読み込めませんでした。";
+    console.error(error);
+  }
+}
+
 async function revealFont() {
   try {
     await document.fonts.load("64px Choon", "ー〜〰あ゙！！？？");
@@ -120,4 +233,5 @@ async function revealFont() {
 
 updateExtension();
 updateTesterSize();
+loadCatalog();
 revealFont();

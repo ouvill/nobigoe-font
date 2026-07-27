@@ -44,7 +44,7 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.012"
+VERSION_NUMBER = "1.013"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -143,6 +143,17 @@ MANGA_VERTICAL_MARK_PAIRS = frozenset(
         (base, 0x309A)
         for base in MANGA_VERTICAL_HANDAKUTEN_BASES
     ]
+)
+MANGA_SMALL_KANA_BASES = frozenset(
+    MANGA_VERTICAL_DAKUTEN_BASES
+    + MANGA_VERTICAL_HANDAKUTEN_BASES
+)
+DEFAULT_MARK_TRANSFORM = Transform(1, 0, 0, 1, 1000, 0)
+SMALL_KANA_HORIZONTAL_MARK_TRANSFORM = Transform(
+    0.9, 0, 0, 0.9, 900, -147
+)
+SMALL_KANA_VERTICAL_MARK_TRANSFORM = Transform(
+    0.915, 0, 0, 0.915, 1056, -20
 )
 MANGA_MISSING_SMALL_KANA = (0x1B132, 0x1B155)
 
@@ -295,13 +306,13 @@ def centered_scaled_path(
 
 
 def compose_mark_glyph(
-    base: pathops.Path, mark: pathops.Path
+    base: pathops.Path,
+    mark: pathops.Path,
+    mark_transform: Transform = DEFAULT_MARK_TRANSFORM,
 ) -> pathops.Path:
     combined = pathops.Path()
     combined.addPath(base)
-    combined.addPath(
-        transform_path(mark, Transform(1, 0, 0, 1, 1000, 0))
-    )
+    combined.addPath(transform_path(mark, mark_transform))
     return combined
 
 
@@ -1394,7 +1405,13 @@ def build(
     }
     horizontal_mark_paths = [
         compose_mark_glyph(
-            glyph_path(font, cmap[base]), mark_paths[mark]
+            glyph_path(font, cmap[base]),
+            mark_paths[mark],
+            (
+                SMALL_KANA_HORIZONTAL_MARK_TRANSFORM
+                if base in MANGA_SMALL_KANA_BASES
+                else DEFAULT_MARK_TRANSFORM
+            ),
         )
         for base, mark in generated_mark_pairs
     ]
@@ -1422,7 +1439,9 @@ def build(
             vertical_base = find_vertical_glyph(font, cmap[base])
         vertical_mark_paths.append(
             compose_mark_glyph(
-                glyph_path(font, vertical_base), mark_paths[mark]
+                glyph_path(font, vertical_base),
+                mark_paths[mark],
+                SMALL_KANA_VERTICAL_MARK_TRANSFORM,
             )
         )
     append_cff_glyphs(

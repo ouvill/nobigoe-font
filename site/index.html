@@ -19,6 +19,7 @@
     <nav class="global-nav" aria-label="メインナビゲーション">
       <a href="#features">特徴</a>
       <a href="#tester">文字を試す</a>
+      <a href="#marks-list">濁点一覧</a>
       <a href="#spec">仕様</a>
     </nav>
     <a class="download-link" href="assets/NotoSerifJPChoon-Regular.woff2" download>
@@ -195,9 +196,45 @@
       </div>
     </section>
 
+    <section class="mark-catalog" id="marks-list" aria-labelledby="catalog-title">
+      <div class="catalog-heading">
+        <div>
+          <p class="section-number">04 / GLYPH CATALOG</p>
+          <h2 id="catalog-title">濁点・半濁点、<br>全191字形。</h2>
+        </div>
+        <p>記号と文字種で絞り込めます。縦組を選ぶと、Manga1が専用字形を規定する小書き仮名の配置も確認できます。</p>
+      </div>
+
+      <div class="catalog-controls">
+        <div class="catalog-filter" role="group" aria-label="記号で絞り込む">
+          <span>記号</span>
+          <button class="is-active" type="button" data-mark-type="all" aria-pressed="true">すべて</button>
+          <button type="button" data-mark-type="dakuten" aria-pressed="false">濁点</button>
+          <button type="button" data-mark-type="handakuten" aria-pressed="false">半濁点</button>
+        </div>
+        <div class="catalog-filter" role="group" aria-label="文字種で絞り込む">
+          <span>文字種</span>
+          <button class="is-active" type="button" data-mark-script="all" aria-pressed="true">すべて</button>
+          <button type="button" data-mark-script="hiragana" aria-pressed="false">ひらがな</button>
+          <button type="button" data-mark-script="katakana" aria-pressed="false">カタカナ</button>
+        </div>
+        <button class="catalog-writing-mode" id="catalog-writing-mode" type="button" aria-pressed="false">
+          縦組で見る
+        </button>
+      </div>
+
+      <p class="catalog-result" aria-live="polite">
+        <strong id="catalog-count">191</strong>
+        <span>字形を表示</span>
+      </p>
+      <div class="catalog-grid" id="catalog-grid" role="list" aria-label="濁点・半濁点付き仮名一覧"></div>
+      <noscript><p class="catalog-noscript">一覧を表示するにはJavaScriptを有効にしてください。</p></noscript>
+    </section>
+
+
     <section class="spec" id="spec" aria-labelledby="spec-title">
       <div class="section-heading">
-        <p class="section-number">04 / SPECIFICATION</p>
+        <p class="section-number">05 / SPECIFICATION</p>
         <h2 id="spec-title">明朝の骨格に、<br>漫画の機能を。</h2>
       </div>
 
@@ -206,7 +243,7 @@
         <div><dt>Style</dt><dd>Regular / OpenType CFF</dd></div>
         <div><dt>Features</dt><dd>ccmp, calt, vert, vrt2</dd></div>
         <div><dt>Writing</dt><dd>横組・縦組</dd></div>
-        <div><dt>Version</dt><dd>1.012</dd></div>
+        <div><dt>Version</dt><dd>1.013</dd></div>
         <div><dt>License</dt><dd>SIL Open Font License 1.1</dd></div>
       </dl>
 
