@@ -26,12 +26,30 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.002"
+VERSION_NUMBER = "1.003"
 WAVE_GLYPH_COUNT = 10
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
+MANGA_PUNCTUATION_SEQUENCES = (
+    "!!!!!",
+    "!!!!",
+    "!!??",
+    "??!!",
+    "!!!",
+    "???",
+    "!!?",
+    "??!",
+    "?!?",
+    "!??",
+    "!?!",
+    "?!!",
+    "?!",
+    "!?",
+    "!!",
+    "??",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -373,6 +391,48 @@ def make_wave_parts(
     return horizontal + vertical
 
 
+def make_punctuation_ligature(
+    font: TTFont, sequence: str, advance: int = 1000
+) -> pathops.Path:
+    source_codepoints = {"!": 0x21, "?": 0x3F}
+    gap = 40
+    components: list[tuple[pathops.Path, float, float]] = []
+    total_width = gap * (len(sequence) - 1)
+    cmap = font.getBestCmap()
+    for mark in sequence:
+        name = cmap[source_codepoints[mark]]
+        outline = glyph_path(font, name)
+        x_min, _, x_max, _ = outline.bounds
+        width = x_max - x_min
+        components.append((outline, x_min, width))
+        total_width += width
+    if total_width > advance:
+        raise ValueError(
+            f"Punctuation ligature {sequence!r} exceeds one em"
+        )
+
+    combined = pathops.Path()
+    cursor = (advance - total_width) / 2
+    for outline, x_min, width in components:
+        transform = Transform(1, 0, 0, 1, cursor - x_min, 0)
+        outline.draw(TransformPen(combined.getPen(), transform))
+        cursor += width + gap
+    return combined
+
+
+def punctuation_ligature_rules(
+    exclamation: str,
+    question: str,
+    ligatures: list[tuple[str, str]],
+) -> str:
+    inputs = {"!": exclamation, "?": question}
+    return "".join(
+        f"  sub {' '.join(inputs[mark] for mark in sequence)}"
+        f" by {name};\n"
+        for sequence, name in ligatures
+    )
+
+
 def append_cff_glyphs(
     font: TTFont,
     paths: list[pathops.Path],
@@ -380,6 +440,7 @@ def append_cff_glyphs(
     source_glyph: str,
     vertical_origin: int,
     add_stem_hints: bool = True,
+    advance_override: int | None = None,
 ) -> None:
     if "CFF " not in font:
         raise ValueError("Only OpenType/CFF Noto Serif JP sources are supported")
@@ -394,7 +455,11 @@ def append_cff_glyphs(
     source_gid = font.getGlyphID(source_glyph)
     fd_index = top.FDSelect[source_gid]
     private = top.FDArray[fd_index].Private
-    advance = font["hmtx"].metrics[source_glyph][0]
+    advance = (
+        font["hmtx"].metrics[source_glyph][0]
+        if advance_override is None
+        else advance_override
+    )
     hints: list[tuple[int, int, str]] = []
     if add_stem_hints:
         horizontal_bounds = paths[1].bounds
@@ -498,6 +563,7 @@ def alternating_wave_rules(
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
+    punctuation: tuple[str, str, list[tuple[str, str]]],
 ) -> str:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -564,8 +630,14 @@ def feature_source(
         + wave_vertical_maps
     )
 
+    exclamation, question, ligatures = punctuation
+    ccmp_rules = punctuation_ligature_rules(
+        exclamation, question, ligatures
+    )
+
     return (
         "languagesystem DFLT dflt;\n\n"
+        f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
         f"feature vert {{\n{''.join(vert_rules)}}} vert;\n\n"
         f"feature vrt2 {{\n{''.join(vrt2_rules)}}} vrt2;\n"
@@ -715,7 +787,9 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
     cmap = font.getBestCmap()
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
-    required_codepoints.extend([0x301C, 0xFF5E])
+    required_codepoints.extend(
+        [0x21, 0x3F, 0x301C, 0xFF01, 0xFF1F, 0xFF5E]
+    )
     missing = [
         f"U+{codepoint:04X}"
         for codepoint in required_codepoints
@@ -728,7 +802,9 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
 
     allocated_names = allocate_cid_names(
         font,
-        NEW_GLYPH_COUNT * len(linear_codepoints) + WAVE_GLYPH_COUNT,
+        NEW_GLYPH_COUNT * len(linear_codepoints)
+        + WAVE_GLYPH_COUNT
+        + len(MANGA_PUNCTUATION_SEQUENCES),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
     for index, (prefix, codepoint) in enumerate(linear_codepoints):
@@ -761,7 +837,43 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
     )
     wave = ("wave", wave_base, wave_vertical, wave_names)
 
-    merge_features(font, feature_source(extensions, wave))
+    punctuation_start = wave_start + WAVE_GLYPH_COUNT
+    punctuation_names = allocated_names[
+        punctuation_start : punctuation_start
+        + len(MANGA_PUNCTUATION_SEQUENCES)
+    ]
+    punctuation_paths = [
+        make_punctuation_ligature(font, sequence)
+        for sequence in MANGA_PUNCTUATION_SEQUENCES
+    ]
+    punctuation_vertical_origin = round(
+        font["vmtx"].metrics[cmap[0xFF01]][1]
+        + bounds(font, cmap[0xFF01])[3]
+    )
+    append_cff_glyphs(
+        font,
+        punctuation_paths,
+        punctuation_names,
+        cmap[0x21],
+        punctuation_vertical_origin,
+        add_stem_hints=False,
+        advance_override=1000,
+    )
+    punctuation = (
+        cmap[0xFF01],
+        cmap[0xFF1F],
+        list(
+            zip(
+                MANGA_PUNCTUATION_SEQUENCES,
+                punctuation_names,
+                strict=True,
+            )
+        ),
+    )
+
+    merge_features(
+        font, feature_source(extensions, wave, punctuation)
+    )
     rename_font(font)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
