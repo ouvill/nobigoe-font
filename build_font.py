@@ -213,23 +213,36 @@ def make_sine_wave_tile(
         source_left_center - source_right_center
     ) / (2 * amplitude)
     phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
-
-    def phase_at(position: float) -> tuple[float, float]:
-        progress = position / advance
-        if not end_tile:
-            return (
-                phase_offset + 3 * math.pi * progress,
-                normal_phase_velocity,
+    mirrored_end_center = source_left_center
+    mirrored_end_slope = (
+        -amplitude * normal_phase_velocity * math.cos(phase_offset)
+    )
+    extrema = [
+        (math.pi / 2 + index * math.pi - phase_offset)
+        / normal_phase_velocity
+        for index in range(-8, 16)
+    ]
+    if end_tile:
+        termination_start = min(
+            position
+            for position in extrema
+            if advance / 2 <= position < advance
+            and (
+                mirrored_end_center
+                - (
+                    baseline
+                    + direction
+                    * amplitude
+                    * math.sin(
+                        phase_offset
+                        + normal_phase_velocity * position
+                    )
+                )
             )
-        phase_progress = math.pi * (
-            2 * progress**3 - 3 * progress**2 + 3 * progress
+            * mirrored_end_slope
+            >= 0
         )
-        phase_velocity = (
-            math.pi
-            * (6 * progress**2 - 6 * progress + 3)
-            / advance
-        )
-        return phase_offset + phase_progress, phase_velocity
+
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
@@ -249,35 +262,56 @@ def make_sine_wave_tile(
 
 
     breakpoints = {0.0, float(advance)}
-    total_phase = 2 * math.pi if end_tile else 3 * math.pi
     for index in range(-8, 16):
-        target = math.pi / 2 + index * math.pi - phase_offset
-        if not 0 < target < total_phase:
-            continue
-        if not end_tile:
-            breakpoints.add(target / normal_phase_velocity)
-            continue
-        lower = 0.0
-        upper = float(advance)
-        for _ in range(32):
-            middle = (lower + upper) / 2
-            middle_phase, _ = phase_at(middle)
-            if middle_phase - phase_offset < target:
-                lower = middle
-            else:
-                upper = middle
-        breakpoints.add((lower + upper) / 2)
+        position = (
+            index * math.pi / 2 - phase_offset
+        ) / normal_phase_velocity
+        limit = termination_start if end_tile else advance
+        if 0 < position < limit:
+            breakpoints.add(position)
+    if end_tile:
+        breakpoints.add(termination_start)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
-        phase, phase_velocity = phase_at(position)
+        if end_tile and position == advance:
+            points.append(
+                (
+                    position,
+                    mirrored_end_center,
+                    mirrored_end_slope,
+                    False,
+                )
+            )
+            continue
+        phase = phase_offset + normal_phase_velocity * position
         center = baseline + direction * amplitude * math.sin(phase)
         sine_slope = (
-            direction * amplitude * phase_velocity * math.cos(phase)
+            direction
+            * amplitude
+            * normal_phase_velocity
+            * math.cos(phase)
         )
         points.append(
             (position, center, sine_slope, abs(sine_slope) < 1e-9)
         )
+
+    if end_tile:
+        start = points[-2]
+        end = points[-1]
+        secant = (end[1] - start[1]) / (end[0] - start[0])
+        start_slope = start[2] if start[2] * secant > 0 else 0.0
+        end_slope = end[2] if end[2] * secant > 0 else 0.0
+        if secant:
+            alpha = start_slope / secant
+            beta = end_slope / secant
+            magnitude = math.hypot(alpha, beta)
+            if magnitude > 3:
+                scale = 3 / magnitude
+                start_slope *= scale
+                end_slope *= scale
+        points[-2] = (start[0], start[1], start_slope, start[3])
+        points[-1] = (end[0], end[1], end_slope, end[3])
 
 
     segments = []
