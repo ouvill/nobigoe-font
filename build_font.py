@@ -207,32 +207,52 @@ def make_sine_wave_tile(
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
 
-    def smoothstep_derivative(progress: float) -> float:
-        return 6 * progress * (1 - progress)
+    def smootherstep(progress: float) -> float:
+        return (
+            6 * progress**5
+            - 15 * progress**4
+            + 10 * progress**3
+        )
+
+    def smootherstep_derivative(progress: float) -> float:
+        return 30 * progress**2 * (progress - 1) ** 2
 
     def phase_at(position: float) -> tuple[float, float]:
         phase = normal_phase_velocity * position
         phase_velocity = normal_phase_velocity
-        if taper_start and position < taper_length:
-            progress = position / taper_length
-            phase -= terminal_phase_extension * (
-                1 - smoothstep(progress)
-            )
-            phase_velocity += (
-                terminal_phase_extension
-                * smoothstep_derivative(progress)
-                / taper_length
-            )
-        if taper_end and position > advance - taper_length:
-            progress = (advance - position) / taper_length
-            phase += terminal_phase_extension * (
-                1 - smoothstep(progress)
-            )
-            phase_velocity += (
-                terminal_phase_extension
-                * smoothstep_derivative(progress)
-                / taper_length
-            )
+        correction_start = taper_length
+        correction_end = advance - taper_length
+        correction_length = correction_end - correction_start
+        if taper_start:
+            if position <= correction_start:
+                phase -= terminal_phase_extension
+            elif position < correction_end:
+                progress = (
+                    position - correction_start
+                ) / correction_length
+                phase -= terminal_phase_extension * (
+                    1 - smootherstep(progress)
+                )
+                phase_velocity += (
+                    terminal_phase_extension
+                    * smootherstep_derivative(progress)
+                    / correction_length
+                )
+        if taper_end:
+            if position >= correction_end:
+                phase += terminal_phase_extension
+            elif position > correction_start:
+                progress = (
+                    position - correction_start
+                ) / correction_length
+                phase += terminal_phase_extension * smootherstep(
+                    progress
+                )
+                phase_velocity += (
+                    terminal_phase_extension
+                    * smootherstep_derivative(progress)
+                    / correction_length
+                )
         return phase, phase_velocity
 
 
