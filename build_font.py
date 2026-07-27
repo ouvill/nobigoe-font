@@ -179,6 +179,7 @@ def make_sine_wave_tile(
     inverted: bool = False,
     taper_start: bool = False,
     taper_end: bool = False,
+    end_tile: bool = False,
 ) -> pathops.Path:
     sample_peak_min, sample_peak_max = stroke_band(
         source, "horizontal", advance / 4
@@ -196,7 +197,7 @@ def make_sine_wave_tile(
     ) / 2
     half_stroke = thickness / 2
     direction = -1 if inverted else 1
-    frequency = 3 * math.pi / advance
+    normal_phase_velocity = 3 * math.pi / advance
     taper_length = advance / 4
 
     source_x_min, _, source_x_max, _ = source.bounds
@@ -212,6 +213,23 @@ def make_sine_wave_tile(
         source_left_center - source_right_center
     ) / (2 * amplitude)
     phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
+
+    def phase_at(position: float) -> tuple[float, float]:
+        progress = position / advance
+        if not end_tile:
+            return (
+                phase_offset + 3 * math.pi * progress,
+                normal_phase_velocity,
+            )
+        phase_progress = math.pi * (
+            2 * progress**3 - 3 * progress**2 + 3 * progress
+        )
+        phase_velocity = (
+            math.pi
+            * (6 * progress**2 - 6 * progress + 3)
+            / advance
+        )
+        return phase_offset + phase_progress, phase_velocity
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
@@ -231,16 +249,32 @@ def make_sine_wave_tile(
 
 
     breakpoints = {0.0, float(advance)}
+    total_phase = 2 * math.pi if end_tile else 3 * math.pi
     for index in range(-8, 16):
-        position = (index * math.pi / 2 - phase_offset) / frequency
-        if 0 < position < advance:
-            breakpoints.add(position)
+        target = math.pi / 2 + index * math.pi - phase_offset
+        if not 0 < target < total_phase:
+            continue
+        if not end_tile:
+            breakpoints.add(target / normal_phase_velocity)
+            continue
+        lower = 0.0
+        upper = float(advance)
+        for _ in range(32):
+            middle = (lower + upper) / 2
+            middle_phase, _ = phase_at(middle)
+            if middle_phase - phase_offset < target:
+                lower = middle
+            else:
+                upper = middle
+        breakpoints.add((lower + upper) / 2)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
-        phase = phase_offset + frequency * position
+        phase, phase_velocity = phase_at(position)
         center = baseline + direction * amplitude * math.sin(phase)
-        sine_slope = direction * amplitude * frequency * math.cos(phase)
+        sine_slope = (
+            direction * amplitude * phase_velocity * math.cos(phase)
+        )
         points.append(
             (position, center, sine_slope, abs(sine_slope) < 1e-9)
         )
@@ -290,9 +324,15 @@ def make_wave_parts(
         make_sine_wave_tile(source, advance, taper_start=True),
         make_sine_wave_tile(source, advance),
         make_sine_wave_tile(source, advance, inverted=True),
-        make_sine_wave_tile(source, advance, taper_end=True),
         make_sine_wave_tile(
-            source, advance, inverted=True, taper_end=True
+            source, advance, taper_end=True, end_tile=True
+        ),
+        make_sine_wave_tile(
+            source,
+            advance,
+            inverted=True,
+            taper_end=True,
+            end_tile=True,
         ),
     )
     tile_center_y = (
