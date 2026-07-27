@@ -28,6 +28,7 @@ FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
 VERSION_NUMBER = "1.002"
 WAVE_GLYPH_COUNT = 10
+WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
@@ -199,11 +200,40 @@ def make_sine_wave_tile(
     normal_phase_velocity = 3 * math.pi / advance
     taper_length = advance / 4
 
-    phase_offset = 0.0
-
+    terminal_phase_extension = (
+        WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
+    )
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
+
+    def smoothstep_derivative(progress: float) -> float:
+        return 6 * progress * (1 - progress)
+
+    def phase_at(position: float) -> tuple[float, float]:
+        phase = normal_phase_velocity * position
+        phase_velocity = normal_phase_velocity
+        if taper_start and position < taper_length:
+            progress = position / taper_length
+            phase -= terminal_phase_extension * (
+                1 - smoothstep(progress)
+            )
+            phase_velocity += (
+                terminal_phase_extension
+                * smoothstep_derivative(progress)
+                / taper_length
+            )
+        if taper_end and position > advance - taper_length:
+            progress = (advance - position) / taper_length
+            phase += terminal_phase_extension * (
+                1 - smoothstep(progress)
+            )
+            phase_velocity += (
+                terminal_phase_extension
+                * smoothstep_derivative(progress)
+                / taper_length
+            )
+        return phase, phase_velocity
 
 
     def width_at(position: float) -> float:
@@ -224,21 +254,31 @@ def make_sine_wave_tile(
         breakpoints.add(taper_length)
     if taper_end:
         breakpoints.add(advance - taper_length)
+    phase_start, _ = phase_at(0)
+    phase_end, _ = phase_at(advance)
     for index in range(-8, 16):
-        position = (
-            index * math.pi / 2 - phase_offset
-        ) / normal_phase_velocity
-        if 0 < position < advance:
-            breakpoints.add(position)
+        target = math.pi / 2 + index * math.pi
+        if not phase_start < target < phase_end:
+            continue
+        lower = 0.0
+        upper = float(advance)
+        for _ in range(32):
+            middle = (lower + upper) / 2
+            middle_phase, _ = phase_at(middle)
+            if middle_phase < target:
+                lower = middle
+            else:
+                upper = middle
+        breakpoints.add((lower + upper) / 2)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
-        phase = phase_offset + normal_phase_velocity * position
+        phase, phase_velocity = phase_at(position)
         center = baseline + direction * amplitude * math.sin(phase)
         sine_slope = (
             direction
             * amplitude
-            * normal_phase_velocity
+            * phase_velocity
             * math.cos(phase)
         )
         points.append(
