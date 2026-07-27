@@ -208,38 +208,10 @@ def make_sine_wave_tile(
     )
     source_left_center = (left_min + left_max) / 2
     source_right_center = (right_min + right_max) / 2
-    slope_sample_x = source_x_max - 22
-    slope_min, slope_max = stroke_band(
-        source, "horizontal", slope_sample_x
-    )
-    slope_sample_center = (slope_min + slope_max) / 2
-    source_right_slope = (
-        source_right_center - slope_sample_center
-    ) / (source_x_max - 2 - slope_sample_x)
     phase_ratio = (
         source_left_center - source_right_center
     ) / (2 * amplitude)
     phase_offset = math.asin(min(1.0, max(-1.0, phase_ratio)))
-    extrema = [
-        (math.pi / 2 + index * math.pi - phase_offset) / frequency
-        for index in range(-8, 16)
-    ]
-    termination_start = min(
-        position
-        for position in extrema
-        if advance / 2 <= position < advance
-        and (
-            source_right_center
-            - (
-                baseline
-                + direction
-                * amplitude
-                * math.sin(phase_offset + frequency * position)
-            )
-        )
-        * source_right_slope
-        >= 0
-    )
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
@@ -261,24 +233,11 @@ def make_sine_wave_tile(
     breakpoints = {0.0, float(advance)}
     for index in range(-8, 16):
         position = (index * math.pi / 2 - phase_offset) / frequency
-        limit = termination_start if taper_end else advance
-        if 0 < position < limit:
+        if 0 < position < advance:
             breakpoints.add(position)
-    if taper_end:
-        breakpoints.add(termination_start)
 
     points: list[tuple[float, float, float, bool]] = []
     for position in sorted(breakpoints):
-        if taper_end and position == advance:
-            points.append(
-                (
-                    position,
-                    source_right_center,
-                    source_right_slope,
-                    False,
-                )
-            )
-            continue
         phase = phase_offset + frequency * position
         center = baseline + direction * amplitude * math.sin(phase)
         sine_slope = direction * amplitude * frequency * math.cos(phase)
@@ -286,22 +245,6 @@ def make_sine_wave_tile(
             (position, center, sine_slope, abs(sine_slope) < 1e-9)
         )
 
-    if taper_end:
-        start = points[-2]
-        end = points[-1]
-        secant = (end[1] - start[1]) / (end[0] - start[0])
-        start_slope = start[2] if start[2] * secant > 0 else 0.0
-        end_slope = end[2] if end[2] * secant > 0 else 0.0
-        if secant:
-            alpha = start_slope / secant
-            beta = end_slope / secant
-            magnitude = math.hypot(alpha, beta)
-            if magnitude > 3:
-                scale = 3 / magnitude
-                start_slope *= scale
-                end_slope *= scale
-        points[-2] = (start[0], start[1], start_slope, start[3])
-        points[-1] = (end[0], end[1], end_slope, end[3])
 
     segments = []
     for start, end in zip(points, points[1:]):
