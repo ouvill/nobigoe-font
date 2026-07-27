@@ -47,7 +47,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.018"
+VERSION_NUMBER = "1.019"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -159,6 +159,8 @@ HEART_DAKUTEN_MARK_TRANSFORMS = (
     Transform(0.96, 0, 0, 0.96, 971, 61),
     Transform(0.96, 0, 0, 0.96, 1002, 32),
 )
+HEART_DAKUTEN_CLEARANCE = 12
+HEART_DAKUTEN_CLEARANCE_STEPS = 16
 MANGA_VERTICAL_DAKUTEN_BASES = tuple(
     int(value, 16)
     for value in """
@@ -430,18 +432,49 @@ def compose_mark_glyph(
     return combined
 
 
+def expand_outline(
+    outline: pathops.Path, radius: float, steps: int
+) -> pathops.Path:
+    expanded = outline
+    for index in range(steps):
+        angle = 2 * math.pi * index / steps
+        shifted = transform_path(
+            outline,
+            Transform(
+                1,
+                0,
+                0,
+                1,
+                radius * math.cos(angle),
+                radius * math.sin(angle),
+            ),
+        )
+        expanded = pathops.op(expanded, shifted, pathops.PathOp.UNION)
+    return expanded
+
+
 def compose_heart_dakuten_glyph(
     base: pathops.Path, mark: pathops.Path
 ) -> pathops.Path:
     mark_contours = list(mark.contours)
     if len(mark_contours) != len(HEART_DAKUTEN_MARK_TRANSFORMS):
         raise ValueError("Expected a two-contour combining dakuten glyph")
-    combined = pathops.Path()
-    combined.addPath(base)
+    placed_mark = pathops.Path()
     for contour, transform in zip(
         mark_contours, HEART_DAKUTEN_MARK_TRANSFORMS, strict=True
     ):
-        combined.addPath(transform_path(contour, transform))
+        placed_mark.addPath(transform_path(contour, transform))
+    clearance = expand_outline(
+        placed_mark,
+        HEART_DAKUTEN_CLEARANCE,
+        HEART_DAKUTEN_CLEARANCE_STEPS,
+    )
+    notched_base = pathops.op(
+        base, clearance, pathops.PathOp.DIFFERENCE
+    )
+    combined = pathops.Path()
+    combined.addPath(notched_base)
+    combined.addPath(placed_mark)
     return combined
 
 
