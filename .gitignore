@@ -1,0 +1,5 @@
+.venv/
+.cache/
+dist/
+__pycache__/
+*.py[cod]
