@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import json
 import math
 import tempfile
 import urllib.request
@@ -46,7 +47,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.013"
+VERSION_NUMBER = "1.014"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -151,13 +152,82 @@ MANGA_SMALL_KANA_BASES = frozenset(
     + MANGA_VERTICAL_HANDAKUTEN_BASES
 )
 DEFAULT_MARK_TRANSFORM = Transform(1, 0, 0, 1, 1000, 0)
-SMALL_KANA_HORIZONTAL_MARK_TRANSFORM = Transform(
-    0.9, 0, 0, 0.9, 900, -147
+MARK_POSITION_GROUPS = (
+    ("hiragana_dakuten.json", 0x3099, "hiragana"),
+    ("hiragana_handakuten.json", 0x309A, "hiragana"),
+    ("katakana_dakuten.json", 0x3099, "katakana"),
+    ("katakana_handakuten.json", 0x309A, "katakana"),
 )
-SMALL_KANA_VERTICAL_MARK_TRANSFORM = Transform(
-    0.915, 0, 0, 0.915, 1056, -20
-)
+MARK_POSITION_DIRECTORY = Path(__file__).resolve().parent / "mark_positions"
 MANGA_MISSING_SMALL_KANA = (0x1B132, 0x1B155)
+
+
+def small_kana_script(codepoint: int) -> str:
+    if 0x3040 <= codepoint <= 0x309F or codepoint == 0x1B132:
+        return "hiragana"
+    return "katakana"
+
+
+def load_mark_position_overrides(
+    directory: Path = MARK_POSITION_DIRECTORY,
+) -> dict[tuple[int, int], dict[str, Transform]]:
+    expected_pairs = {
+        pair for pair in MANGA_MARK_PAIRS if pair[0] in MANGA_SMALL_KANA_BASES
+    }
+    loaded: dict[tuple[int, int], dict[str, Transform]] = {}
+    for filename, expected_mark, expected_script in MARK_POSITION_GROUPS:
+        path = directory / filename
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mark = int(data["mark"], 16)
+        if mark != expected_mark:
+            raise ValueError(
+                f"{path}: expected mark U+{expected_mark:04X}, "
+                f"got U+{mark:04X}"
+            )
+        positions = data["positions"]
+        expected_bases = {
+            base
+            for base, pair_mark in expected_pairs
+            if pair_mark == mark
+            and small_kana_script(base) == expected_script
+        }
+        actual_bases = {int(value, 16) for value in positions}
+        if actual_bases != expected_bases:
+            missing = expected_bases - actual_bases
+            extra = actual_bases - expected_bases
+            details = [
+                *(f"missing U+{value:04X}" for value in sorted(missing)),
+                *(f"extra U+{value:04X}" for value in sorted(extra)),
+            ]
+            raise ValueError(f"{path}: {', '.join(details)}")
+        for base_hex, orientations in positions.items():
+            base = int(base_hex, 16)
+            pair = (base, mark)
+            loaded[pair] = {}
+            for orientation in ("horizontal", "vertical"):
+                values = orientations[orientation]
+                if len(values) != 3:
+                    raise ValueError(
+                        f"{path}: U+{base:04X} {orientation} "
+                        "must be [scale, x, y]"
+                    )
+                scale, x_offset, y_offset = values
+                if scale <= 0:
+                    raise ValueError(
+                        f"{path}: U+{base:04X} {orientation} "
+                        "scale must be positive"
+                    )
+                loaded[pair][orientation] = Transform(
+                    scale,
+                    0,
+                    0,
+                    scale,
+                    x_offset,
+                    y_offset,
+                )
+    if loaded.keys() != expected_pairs:
+        raise AssertionError("Mark position files must cover all 53 small kana")
+    return loaded
 
 
 def parse_args() -> argparse.Namespace:
@@ -1227,6 +1297,7 @@ def build(
         raise AssertionError("Expected 191 Manga1 kana mark sequences")
     if len(MANGA_VERTICAL_MARK_PAIRS) != 53:
         raise AssertionError("Expected 53 vertical Manga1 kana mark sequences")
+    mark_position_overrides = load_mark_position_overrides()
     source_ccmp_ligatures = feature_ligatures(font, "ccmp")
     native_mark_outputs: dict[tuple[int, int], str] = {}
     for base, mark in MANGA_MARK_PAIRS:
@@ -1417,7 +1488,7 @@ def build(
             glyph_path(font, cmap[base]),
             mark_paths[mark],
             (
-                SMALL_KANA_HORIZONTAL_MARK_TRANSFORM
+                mark_position_overrides[(base, mark)]["horizontal"]
                 if base in MANGA_SMALL_KANA_BASES
                 else DEFAULT_MARK_TRANSFORM
             ),
@@ -1450,7 +1521,7 @@ def build(
             compose_mark_glyph(
                 glyph_path(font, vertical_base),
                 mark_paths[mark],
-                SMALL_KANA_VERTICAL_MARK_TRANSFORM,
+                mark_position_overrides[(base, mark)]["vertical"],
             )
         )
     append_cff_glyphs(

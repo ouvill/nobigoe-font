@@ -104,6 +104,28 @@ dist/NobigoeMincho-Regular.otf
 
 しっぽり明朝はOTF版とTTF版のどちらも `--punctuation-source` に指定できます。本プロジェクトの生成先はOpenType/CFFなので、同じ3次ベジェ曲線を保持できるOTF版を推奨し、既定の自動取得でもOTF版を使用します。TTF版ではTrueTypeの2次ベジェ曲線をCFFの3次ベジェ曲線へ変換します。
 
+### 小書き仮名の濁点位置を調整
+
+小書き仮名53列の濁点・半濁点位置は、字種と記号ごとに次の4ファイルへ分割しています。各ファイルは独立して編集できるため、複数人または複数エージェントで並列に位置調整できます。
+
+```text
+mark_positions/hiragana_dakuten.json
+mark_positions/hiragana_handakuten.json
+mark_positions/katakana_dakuten.json
+mark_positions/katakana_handakuten.json
+```
+
+各字の `horizontal` と `vertical` は `[scale, x, y]` です。`scale` は結合記号の等方倍率、`x` と `y` は拡大後の平行移動量で、正の値は右・上へ移動します。`build_font.py` は4ファイルの記号種、キー集合、配列長、正の倍率を検証し、53列の不足や重複があれば生成を停止します。
+
+```json
+"3049": {
+  "horizontal": [0.9, 916, -92],
+  "vertical": [0.915, 1066, 45]
+}
+```
+
+U+31F7 `ㇷ` + U+309AはNoto Serif JPの既存一体字形を使用するため、設定ファイルの値を変更しても生成輪郭には適用されません。
+
 ## 紹介サイト
 
 `site/`に静的な紹介ページと文字テスターがあります。リポジトリ直下でHTTPサーバーを起動し、`http://localhost:8000/site/`を開いてください。
