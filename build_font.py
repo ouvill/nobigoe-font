@@ -47,7 +47,7 @@ JAPANESE_FAMILY = "のびごえ明朝"
 FULL_NAME = f"{FAMILY} Regular"
 JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
 POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.014"
+VERSION_NUMBER = "1.015"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -171,9 +171,7 @@ def small_kana_script(codepoint: int) -> str:
 def load_mark_position_overrides(
     directory: Path = MARK_POSITION_DIRECTORY,
 ) -> dict[tuple[int, int], dict[str, Transform]]:
-    expected_pairs = {
-        pair for pair in MANGA_MARK_PAIRS if pair[0] in MANGA_SMALL_KANA_BASES
-    }
+    expected_pairs = set(MANGA_MARK_PAIRS)
     loaded: dict[tuple[int, int], dict[str, Transform]] = {}
     for filename, expected_mark, expected_script in MARK_POSITION_GROUPS:
         path = directory / filename
@@ -226,7 +224,7 @@ def load_mark_position_overrides(
                     y_offset,
                 )
     if loaded.keys() != expected_pairs:
-        raise AssertionError("Mark position files must cover all 53 small kana")
+        raise AssertionError("Mark position files must cover all 191 sequences")
     return loaded
 
 
@@ -315,6 +313,13 @@ def find_vertical_glyph(font: TTFont, base_name: str) -> str:
             if mapping and base_name in mapping:
                 return mapping[base_name]
     raise ValueError(f"The source font has no vertical substitution for {base_name}")
+
+
+def vertical_glyph_or_self(font: TTFont, base_name: str) -> str:
+    try:
+        return find_vertical_glyph(font, base_name)
+    except ValueError:
+        return base_name
 
 
 def feature_ligatures(
@@ -1309,12 +1314,7 @@ def build(
     generated_mark_pairs = [
         pair for pair in MANGA_MARK_PAIRS if pair not in native_mark_outputs
     ]
-    generated_vertical_mark_pairs = [
-        pair
-        for pair in MANGA_MARK_PAIRS
-        if pair in MANGA_VERTICAL_MARK_PAIRS
-        and pair not in native_mark_outputs
-    ]
+    generated_vertical_mark_pairs = list(generated_mark_pairs)
 
     allocated_names = allocate_cid_names(
         font,
@@ -1487,11 +1487,7 @@ def build(
         compose_mark_glyph(
             glyph_path(font, cmap[base]),
             mark_paths[mark],
-            (
-                mark_position_overrides[(base, mark)]["horizontal"]
-                if base in MANGA_SMALL_KANA_BASES
-                else DEFAULT_MARK_TRANSFORM
-            ),
+            mark_position_overrides[(base, mark)]["horizontal"],
         )
         for base, mark in generated_mark_pairs
     ]
@@ -1516,7 +1512,7 @@ def build(
         if base in missing_small_glyphs:
             vertical_base = missing_small_glyphs[base][1]
         else:
-            vertical_base = find_vertical_glyph(font, cmap[base])
+            vertical_base = vertical_glyph_or_self(font, cmap[base])
         vertical_mark_paths.append(
             compose_mark_glyph(
                 glyph_path(font, vertical_base),
@@ -1542,11 +1538,10 @@ def build(
             strict=True,
         )
     )
-    for pair, horizontal in native_mark_outputs.items():
-        if pair in MANGA_VERTICAL_MARK_PAIRS:
-            kana_vertical_maps.append(
-                (horizontal, find_vertical_glyph(font, horizontal))
-            )
+    for horizontal in native_mark_outputs.values():
+        kana_vertical_maps.append(
+            (horizontal, find_vertical_glyph(font, horizontal))
+        )
 
     mark_outputs = native_mark_outputs | generated_mark_outputs
     kana_marks = [
