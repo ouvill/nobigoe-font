@@ -44,7 +44,7 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.009"
+VERSION_NUMBER = "1.010"
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 5
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
@@ -252,9 +252,8 @@ def make_sine_wave_tile(
     inverted: bool = False,
     taper_start: bool = False,
     taper_end: bool = False,
-    round_start: bool = False,
-    round_end: bool = False,
     half_waves: float = 3,
+    taper_fraction: float = 1 / 4,
     sample_peak_position: float | None = None,
     sample_trough_position: float | None = None,
 ) -> pathops.Path:
@@ -279,7 +278,7 @@ def make_sine_wave_tile(
     half_stroke = thickness / 2
     direction = -1 if inverted else 1
     normal_phase_velocity = half_waves * math.pi / advance
-    taper_length = advance / 4
+    taper_length = advance * taper_fraction
 
     terminal_phase_extension = (
         WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
@@ -411,23 +410,7 @@ def make_sine_wave_tile(
             (control_2[0], control_2[1] + width_at(control_2[0])),
             (endpoint[0], endpoint[1] + width_at(endpoint[0])),
         )
-    if round_end:
-        center = points[-1][1]
-        radius_y = width_at(advance)
-        radius_x = radius_y * 0.6
-        kappa = 0.5522847498307936
-        pen.curveTo(
-            (advance + kappa * radius_x, center + radius_y),
-            (advance + radius_x, center + kappa * radius_y),
-            (advance + radius_x, center),
-        )
-        pen.curveTo(
-            (advance + radius_x, center - kappa * radius_y),
-            (advance + kappa * radius_x, center - radius_y),
-            (advance, center - radius_y),
-        )
-    else:
-        pen.lineTo((advance, points[-1][1] - width_at(advance)))
+    pen.lineTo((advance, points[-1][1] - width_at(advance)))
     for index in range(len(segments) - 1, -1, -1):
         control_1, control_2, _ = segments[index]
         start = points[index]
@@ -435,21 +418,6 @@ def make_sine_wave_tile(
             (control_2[0], control_2[1] - width_at(control_2[0])),
             (control_1[0], control_1[1] - width_at(control_1[0])),
             (start[0], start[1] - width_at(start[0])),
-        )
-    if round_start:
-        center = points[0][1]
-        radius_y = width_at(0)
-        radius_x = radius_y * 0.6
-        kappa = 0.5522847498307936
-        pen.curveTo(
-            (-kappa * radius_x, center - radius_y),
-            (-radius_x, center - kappa * radius_y),
-            (-radius_x, center),
-        )
-        pen.curveTo(
-            (-radius_x, center + kappa * radius_y),
-            (-kappa * radius_x, center + radius_y),
-            (0, center + radius_y),
         )
     pen.closePath()
     return tile
@@ -490,15 +458,16 @@ def make_manga_wave_parts(
 ) -> tuple[pathops.Path, tuple[pathops.Path, ...]]:
     parameters = {
         "half_waves": 4,
+        "taper_fraction": 1 / 6,
     }
     horizontal_start = make_sine_wave_tile(
-        source, advance, round_start=True, **parameters
+        source, advance, taper_start=True, **parameters
     )
     horizontal_middle = make_sine_wave_tile(
         source, advance, **parameters
     )
     horizontal_end = make_sine_wave_tile(
-        source, advance, round_end=True, **parameters
+        source, advance, taper_end=True, **parameters
     )
     tile_center_y = (
         horizontal_middle.bounds[1] + horizontal_middle.bounds[3]
