@@ -44,8 +44,9 @@ DEFAULT_OUTPUT = Path("dist/NotoSerifJPChoon-Regular.otf")
 FAMILY = "Noto Serif JP Choon"
 FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
-VERSION_NUMBER = "1.006"
+VERSION_NUMBER = "1.007"
 WAVE_GLYPH_COUNT = 10
+MANGA_WAVE_GLYPH_COUNT = 5
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
@@ -83,7 +84,7 @@ MANGA_PUNCTUATION_SEQUENCES = (
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Add automatically joining ー, ―, 〜, and ～ glyphs to "
+            "Add automatically joining ー, ―, 〜, ～, and 〰 glyphs to "
             "Noto Serif JP. Consecutive marks join through the calt feature."
         )
     )
@@ -251,12 +252,21 @@ def make_sine_wave_tile(
     inverted: bool = False,
     taper_start: bool = False,
     taper_end: bool = False,
+    round_start: bool = False,
+    round_end: bool = False,
+    half_waves: float = 3,
+    sample_peak_position: float | None = None,
+    sample_trough_position: float | None = None,
 ) -> pathops.Path:
+    if sample_peak_position is None:
+        sample_peak_position = advance / 4
+    if sample_trough_position is None:
+        sample_trough_position = 3 * advance / 4
     sample_peak_min, sample_peak_max = stroke_band(
-        source, "horizontal", advance / 4
+        source, "horizontal", sample_peak_position
     )
     sample_trough_min, sample_trough_max = stroke_band(
-        source, "horizontal", 3 * advance / 4
+        source, "horizontal", sample_trough_position
     )
     peak_center = (sample_peak_min + sample_peak_max) / 2
     trough_center = (sample_trough_min + sample_trough_max) / 2
@@ -268,7 +278,7 @@ def make_sine_wave_tile(
     ) / 2
     half_stroke = thickness / 2
     direction = -1 if inverted else 1
-    normal_phase_velocity = 3 * math.pi / advance
+    normal_phase_velocity = half_waves * math.pi / advance
     taper_length = advance / 4
 
     terminal_phase_extension = (
@@ -401,7 +411,23 @@ def make_sine_wave_tile(
             (control_2[0], control_2[1] + width_at(control_2[0])),
             (endpoint[0], endpoint[1] + width_at(endpoint[0])),
         )
-    pen.lineTo((advance, points[-1][1] - width_at(advance)))
+    if round_end:
+        center = points[-1][1]
+        radius_y = width_at(advance)
+        radius_x = radius_y * 0.6
+        kappa = 0.5522847498307936
+        pen.curveTo(
+            (advance + kappa * radius_x, center + radius_y),
+            (advance + radius_x, center + kappa * radius_y),
+            (advance + radius_x, center),
+        )
+        pen.curveTo(
+            (advance + radius_x, center - kappa * radius_y),
+            (advance + kappa * radius_x, center - radius_y),
+            (advance, center - radius_y),
+        )
+    else:
+        pen.lineTo((advance, points[-1][1] - width_at(advance)))
     for index in range(len(segments) - 1, -1, -1):
         control_1, control_2, _ = segments[index]
         start = points[index]
@@ -409,6 +435,21 @@ def make_sine_wave_tile(
             (control_2[0], control_2[1] - width_at(control_2[0])),
             (control_1[0], control_1[1] - width_at(control_1[0])),
             (start[0], start[1] - width_at(start[0])),
+        )
+    if round_start:
+        center = points[0][1]
+        radius_y = width_at(0)
+        radius_x = radius_y * 0.6
+        kappa = 0.5522847498307936
+        pen.curveTo(
+            (-kappa * radius_x, center - radius_y),
+            (-radius_x, center - kappa * radius_y),
+            (-radius_x, center),
+        )
+        pen.curveTo(
+            (-radius_x, center + kappa * radius_y),
+            (-kappa * radius_x, center + radius_y),
+            (0, center + radius_y),
         )
     pen.closePath()
     return tile
@@ -442,6 +483,52 @@ def make_wave_parts(
         for outline in horizontal
     )
     return horizontal + vertical
+
+
+def make_manga_wave_parts(
+    source: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, tuple[pathops.Path, ...]]:
+    parameters = {
+        "half_waves": 4,
+        "sample_peak_position": advance / 2,
+        "sample_trough_position": advance / 4,
+    }
+    horizontal_start = make_sine_wave_tile(
+        source, advance, round_start=True, **parameters
+    )
+    horizontal_middle = make_sine_wave_tile(
+        source, advance, **parameters
+    )
+    horizontal_end = make_sine_wave_tile(
+        source, advance, round_end=True, **parameters
+    )
+    tile_center_y = (
+        horizontal_middle.bounds[1] + horizontal_middle.bounds[3]
+    ) / 2
+    vertical_rotation = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + tile_center_y,
+        vertical_origin,
+    )
+    vertical = tuple(
+        transform_path(outline, vertical_rotation)
+        for outline in (
+            horizontal_start,
+            horizontal_middle,
+            horizontal_end,
+        )
+    )
+    added = (
+        horizontal_start,
+        horizontal_end,
+        vertical[0],
+        vertical[1],
+        vertical[2],
+    )
+    return horizontal_middle, added
 
 
 def make_punctuation_ligature(
@@ -570,6 +657,34 @@ def append_cff_glyphs(
     font["maxp"].numGlyphs = len(glyph_order)
 
 
+def replace_cff_glyph(
+    font: TTFont,
+    name: str,
+    outline: pathops.Path,
+    vertical_origin: int,
+) -> None:
+    cff = font["CFF "].cff
+    top = cff.topDictIndex[0]
+    char_strings = top.CharStrings
+    glyph_id = font.getGlyphID(name)
+    fd_index = top.FDSelect[glyph_id]
+    private = top.FDArray[fd_index].Private
+    advance = font["hmtx"].metrics[name][0]
+    pen = T2CharStringPen(advance, None)
+    outline.draw(pen)
+    char_string = pen.getCharString(
+        private=private, globalSubrs=cff.GlobalSubrs
+    )
+    char_strings.charStringsIndex[char_strings.charStrings[name]] = char_string
+    x_min, _, _, y_max = outline.bounds
+    font["hmtx"].metrics[name] = (advance, math.floor(x_min))
+    if "vmtx" in font:
+        font["vmtx"].metrics[name] = (
+            font["vmtx"].metrics[name][0],
+            math.floor(vertical_origin - y_max),
+        )
+
+
 def add_linear_extension(
     font: TTFont, base: str, names: list[str]
 ) -> tuple[str, list[str]]:
@@ -628,9 +743,27 @@ def alternating_wave_rules(
 """
 
 
+def manga_wave_rules(
+    prefix: str, base: str, start: str, end: str
+) -> str:
+    glyphs = f"{base} {start} {end}"
+    return f"""
+  lookup {prefix}_start {{
+    ignore sub {start} [{glyphs}]';
+    sub {base}' [{glyphs}] by {start};
+  }} {prefix}_start;
+  lookup {prefix}_end {{
+    sub [{glyphs}] {base}' by {end};
+  }} {prefix}_end;
+  sub [{glyphs}] {start}' by {base};
+  sub {end}' [{glyphs}] by {base};
+"""
+
+
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
+    manga_wave: tuple[str, str, list[str]],
     punctuation: tuple[str, str, list[tuple[str, str]]],
 ) -> str:
     calt_rules: list[str] = []
@@ -696,6 +829,48 @@ def feature_source(
             f"{wave_prefix}_vrt2", wave_base, vertical_wave_names
         )
         + wave_vertical_maps
+    )
+
+    manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
+    (
+        manga_wave_start,
+        manga_wave_end,
+        manga_wave_vertical_start,
+        manga_wave_vertical_middle,
+        manga_wave_vertical_end,
+    ) = manga_wave_names
+    calt_rules.append(
+        manga_wave_rules(
+            manga_wave_prefix,
+            manga_wave_base,
+            manga_wave_start,
+            manga_wave_end,
+        )
+    )
+    manga_wave_vertical_maps = (
+        f"  sub {manga_wave_base} by {manga_wave_vertical_middle};\n"
+        f"  sub {manga_wave_start} by {manga_wave_vertical_start};\n"
+        f"  sub {manga_wave_end} by {manga_wave_vertical_end};\n"
+    )
+    vert_rules.append(
+        contextual_extension_rules(
+            f"{manga_wave_prefix}_vert",
+            manga_wave_base,
+            manga_wave_vertical_start,
+            manga_wave_vertical_middle,
+            manga_wave_vertical_end,
+        )
+        + manga_wave_vertical_maps
+    )
+    vrt2_rules.append(
+        contextual_extension_rules(
+            f"{manga_wave_prefix}_vrt2",
+            manga_wave_base,
+            manga_wave_vertical_start,
+            manga_wave_vertical_middle,
+            manga_wave_vertical_end,
+        )
+        + manga_wave_vertical_maps
     )
 
     exclamation, question, ligatures = punctuation
@@ -885,7 +1060,7 @@ def build(
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
     required_codepoints.extend(
-        [0x21, 0x3F, 0x301C, 0xFF01, 0xFF1F, 0xFF5E]
+        [0x21, 0x3F, 0x301C, 0x3030, 0xFF01, 0xFF1F, 0xFF5E]
     )
     missing = [
         f"U+{codepoint:04X}"
@@ -901,6 +1076,7 @@ def build(
         font,
         NEW_GLYPH_COUNT * len(linear_codepoints)
         + WAVE_GLYPH_COUNT
+        + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
@@ -934,7 +1110,37 @@ def build(
     )
     wave = ("wave", wave_base, wave_vertical, wave_names)
 
-    punctuation_start = wave_start + WAVE_GLYPH_COUNT
+    manga_wave_base = cmap[0x3030]
+    _, _, _, manga_wave_y_max = bounds(font, manga_wave_base)
+    manga_wave_vertical_origin = round(
+        font["vmtx"].metrics[manga_wave_base][1] + manga_wave_y_max
+    )
+    manga_wave_start = wave_start + WAVE_GLYPH_COUNT
+    manga_wave_names = allocated_names[
+        manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
+    ]
+    manga_wave_middle, manga_wave_parts = make_manga_wave_parts(
+        glyph_path(font, manga_wave_base),
+        1000,
+        manga_wave_vertical_origin,
+    )
+    replace_cff_glyph(
+        font,
+        manga_wave_base,
+        manga_wave_middle,
+        manga_wave_vertical_origin,
+    )
+    append_cff_glyphs(
+        font,
+        list(manga_wave_parts),
+        manga_wave_names,
+        manga_wave_base,
+        manga_wave_vertical_origin,
+        add_stem_hints=False,
+    )
+    manga_wave = ("manga_wave", manga_wave_base, manga_wave_names)
+
+    punctuation_start = manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     punctuation_names = allocated_names[
         punctuation_start : punctuation_start
         + len(MANGA_PUNCTUATION_SEQUENCES)
@@ -988,7 +1194,8 @@ def build(
     font_notice = " / ".join(dict.fromkeys(font_notices))
 
     merge_features(
-        font, feature_source(extensions, wave, punctuation)
+        font,
+        feature_source(extensions, wave, manga_wave, punctuation),
     )
     rename_font(font, copyright_notice, font_notice)
 
