@@ -26,7 +26,7 @@ FULL_NAME = f"{FAMILY} Regular"
 POSTSCRIPT_NAME = "NotoSerifJPChoon-Regular"
 VERSION = "Version 1.000"
 NEW_GLYPH_COUNT = 6
-OVERLAP = 8
+OVERLAP = 0
 
 
 def parse_args() -> argparse.Namespace:
@@ -137,7 +137,7 @@ def make_horizontal_parts(
 
 
 def make_vertical_parts(
-    outline: pathops.Path, advance: int
+    outline: pathops.Path, advance: int, vertical_origin: int
 ) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
     seam = advance * 0.4
     x_min, x_max = stroke_band(outline, "vertical", seam)
@@ -146,9 +146,15 @@ def make_vertical_parts(
     top_cap = pathops.op(outline, clip_top, pathops.PathOp.INTERSECTION)
     bottom_cap = pathops.op(outline, clip_bottom, pathops.PathOp.INTERSECTION)
 
-    start_bar = rectangle(x_min, -advance - OVERLAP, x_max, seam + OVERLAP)
-    middle = rectangle(x_min, -OVERLAP, x_max, advance + OVERLAP)
-    end_bar = rectangle(x_min, seam - OVERLAP, x_max, advance + OVERLAP)
+    cell_top = vertical_origin
+    cell_bottom = vertical_origin - advance
+    start_bar = rectangle(
+        x_min, cell_bottom - OVERLAP, x_max, seam + OVERLAP
+    )
+    middle = rectangle(
+        x_min, cell_bottom - OVERLAP, x_max, cell_top + OVERLAP
+    )
+    end_bar = rectangle(x_min, seam - OVERLAP, x_max, cell_top + OVERLAP)
     start = pathops.op(top_cap, start_bar, pathops.PathOp.UNION)
     end = pathops.op(end_bar, bottom_cap, pathops.PathOp.UNION)
     return start, middle, end
@@ -175,11 +181,29 @@ def append_cff_glyphs(
     fd_index = top.FDSelect[source_gid]
     private = top.FDArray[fd_index].Private
     advance = font["hmtx"].metrics[source_glyph][0]
+    horizontal_bounds = paths[1].bounds
+    vertical_bounds = paths[4].bounds
+    hints = [
+        (
+            round(horizontal_bounds[1]),
+            round(horizontal_bounds[3] - horizontal_bounds[1]),
+            "hstem",
+        ),
+        (
+            round(vertical_bounds[0]),
+            round(vertical_bounds[2] - vertical_bounds[0]),
+            "vstem",
+        ),
+    ]
 
-    for name, outline in zip(names, paths, strict=True):
+    for index, (name, outline) in enumerate(zip(names, paths, strict=True)):
         pen = T2CharStringPen(advance, None)
         outline.draw(pen)
         char_string = pen.getCharString(private=private, globalSubrs=cff.GlobalSubrs)
+        if not char_string.program or char_string.program[0] != advance:
+            raise ValueError("Could not locate the Type 2 width operand")
+        stem_start, stem_width, operator = hints[index // 3]
+        char_string.program[1:1] = [stem_start, stem_width, operator]
         char_strings.charStrings[name] = len(char_strings.charStringsIndex)
         char_strings.charStringsIndex.append(char_string)
         top.FDSelect.gidArray.append(fd_index)
@@ -408,11 +432,12 @@ def build(source_path: Path, output_path: Path, face: int) -> None:
         raise ValueError(f"Expected a 1000-unit full-width choon mark, got {advance}")
 
     horizontal_parts = make_horizontal_parts(glyph_path(font, base), advance)
-    vertical_parts = make_vertical_parts(glyph_path(font, vertical), advance)
-    names = allocate_cid_names(font, NEW_GLYPH_COUNT)
-
     _, _, _, vertical_y_max = bounds(font, vertical)
     vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
+    vertical_parts = make_vertical_parts(
+        glyph_path(font, vertical), advance, vertical_origin
+    )
+    names = allocate_cid_names(font, NEW_GLYPH_COUNT)
     append_cff_glyphs(
         font,
         list(horizontal_parts + vertical_parts),
