@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="長音、二種類の波線、結合濁点・結合半濁点などの組版機能を備えた明朝体フォントプロジェクト。">
-  <title>のびごえ明朝 — 声を、つなぐ。</title>
-  <link rel="stylesheet" href="styles.css?v=3.0">
-  <script src="script.js?v=3.0" defer></script>
+  <meta name="description" content="伸びる長音・波線や結合文字を備えた7ウェイトの「のびごえ明朝」と、小説・縦組向けの「のびごえこぶり明朝」を紹介します。">
+  <title>のびごえ明朝・のびごえこぶり明朝 — 声を、つなぐ。</title>
+  <link rel="stylesheet" href="styles.css?v=3.3">
+  <script src="script.js?v=3.2" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">本文へ移動</a>
@@ -21,8 +21,8 @@
     </a>
     <nav class="global-nav" aria-label="メインナビゲーション">
       <a href="#symbols">伸びる記号</a>
-      <a href="#families">ファミリー</a>
-      <a href="#reading">長文のために</a>
+      <a href="#families">二つの書体</a>
+      <a href="#reading">こぶりで読む</a>
       <a href="#tester">試す</a>
       <a href="#marks-list">字形一覧</a>
     </nav>
@@ -37,10 +37,7 @@
       <div class="hero-intro">
         <p class="overline">JAPANESE SERIF TYPEFACE / VERSION 1.024</p>
         <h1 id="hero-title"><span>声を、</span><span>つなぐ。</span></h1>
-        <p class="hero-lead">
-          文字の流れを、途切れさせない。<br>
-          長音や波線、結合文字のための字形を備えた明朝体です。
-        </p>
+        <p class="hero-lead">文字の流れを、途切れさせない。<br>長音や波線、結合文字のための字形を備えた二つの明朝体です。</p>
         <div class="hero-actions">
           <a class="action action-primary" href="#tester">文字を試す</a>
           <a class="action action-secondary" href="#how-it-works">形の変化を見る</a>
@@ -148,19 +145,20 @@
 
     <section class="families" id="families" aria-labelledby="families-title">
       <div class="section-intro section-intro-light">
-        <p class="section-index">03 — TWO FAMILIES</p>
-        <h2 id="families-title">太さで選ぶ。<br>仮名の表情で選ぶ。</h2>
-        <p>Noto Serif JPの和文と、各和文ウェイトに太さを合わせたLibertinus Serifの欧文による7ウェイト。源暎こぶり明朝ベースは、小ぶりな仮名を活かしたRegularです。追加したOpenType機能はどちらでも同じように使えます。</p>
+        <p class="section-index">03 — TWO DISTINCT FAMILIES</p>
+        <h2 id="families-title">二つの明朝体を、<br>用途で選ぶ。</h2>
+        <p>このサイトでは、二つの独立したフォントファミリーを紹介します。「のびごえ明朝」は7ウェイトの標準ファミリー。「のびごえこぶり明朝」は源暎こぶり明朝をベースにした小説・長文向けの本文ファミリーです。伸びる記号や結合文字は、どちらでも使えます。</p>
       </div>
 
       <div class="family-layout">
-        <article class="weight-family">
+        <article class="weight-family" aria-labelledby="nobigoe-family-title">
           <div class="family-label">
-            <span>A / NOTO JP + LIBERTINUS</span>
-            <strong data-project-name>のびごえ明朝</strong>
-            <small>OpenType/CFF · 7 weights</small>
+            <span>FAMILY A / STANDARD</span>
+            <strong id="nobigoe-family-title" data-project-name>のびごえ明朝</strong>
+            <small>見出しから本文まで · OpenType/CFF · 7 weights</small>
+            <p class="family-role">Noto Serif JPの和文に、各ウェイトへ太さを合わせたLibertinus Serifの欧文を組み合わせています。用途に応じて7段階の太さを選べます。</p>
           </div>
-          <div class="weight-specimen" aria-label="7ウェイトの文字見本">
+          <div class="weight-specimen" aria-label="のびごえ明朝、7ウェイトの文字見本">
             <p class="weight-200"><span>ExtraLight 200</span><strong>声を、どこまでも。</strong></p>
             <p class="weight-300"><span>Light 300</span><strong>声を、どこまでも。</strong></p>
             <p class="weight-400"><span>Regular 400</span><strong>声を、どこまでも。</strong></p>
@@ -171,20 +169,20 @@
           </div>
         </article>
 
-        <article class="koburi-family">
+        <article class="koburi-family" aria-labelledby="koburi-family-title">
           <div class="family-label">
-            <span>B / GENEI KOBURI MINCHO BASE</span>
-            <strong>のびごえこぶり明朝</strong>
-            <small>TrueType · Regular</small>
+            <span>FAMILY B / NOVEL TYPEFACE</span>
+            <strong id="koburi-family-title">のびごえこぶり明朝</strong>
+            <small>小説・長文・縦組 · TrueType · Regular</small>
+            <p class="family-role">源暎こぶり明朝の小ぶりな仮名と、漢字との抑揚を受け継いだ本文書体です。物語を静かに読み進める縦組に向いています。</p>
           </div>
-          <div class="koburi-specimen">
-            <p>あのねーーーー、</p>
-            <p>まだ話があるの。</p>
-            <span>小ぶりな仮名と、連続する字形。</span>
+          <div class="koburi-specimen" aria-label="のびごえこぶり明朝の縦組文字見本">
+            <p>雨の音が、遠くの屋根を静かに渡っていた。<br><span class="no-break">「待ってーーーー」。</span><br>呼び声は夜の奥へ伸びていく。</p>
+            <span>小説のための、小ぶりな仮名と縦組。</span>
           </div>
           <dl class="family-facts">
+            <div><dt>用途</dt><dd>小説・電子書籍・長文の縦組</dd></div>
             <div><dt>仮名</dt><dd>源暎こぶり明朝の小ぶりな設計</dd></div>
-            <div><dt>互換</dt><dd>濁点・半濁点外字90字形</dd></div>
             <div><dt>機能</dt><dd>長音・波線・約物・ルビ・縦組</dd></div>
           </dl>
         </article>
@@ -193,9 +191,9 @@
 
     <section class="reading" id="reading" aria-labelledby="reading-title">
       <div class="section-intro">
-        <p class="section-index">04 — FOR LONG-FORM READING</p>
-        <h2 id="reading-title">源暎こぶり明朝の、<br>静かな読み味。</h2>
-        <p>のびごえこぶり明朝の本文設計は、文芸・縦組み・長文向けに作られた源暎こぶり明朝を受け継いでいます。小ぶりな仮名、漢字との大小の抑揚、ゆったりとした字間は、いずれも源暎こぶり明朝が元来備える特徴です。そこへ長音や波線などを伸ばす機能を加え、文章の声や余韻を途切れさせずに表せるようにしています。</p>
+        <p class="section-index">04 — NOBIGOE KOBURI MINCHO / NOVEL READING</p>
+        <h2 id="reading-title"><span class="typeface-name">のびごえこぶり明朝</span><span>で、小説を読む。</span></h2>
+        <p>ここからは「のびごえこぶり明朝」だけの紹介です。文芸・縦組・長文向けに作られた源暎こぶり明朝の本文設計を受け継ぎ、長音や波線を伸ばす機能を加えました。小ぶりな仮名、漢字との大小の抑揚、ゆったりした字間が、物語の声と余韻を支えます。</p>
       </div>
 
       <div class="reading-layout">
@@ -206,23 +204,23 @@
           </div>
           <div>
             <dt>漢字との抑揚</dt>
-            <dd>漢字を大きく、仮名を小さく見せる源暎こぶり明朝の字面が、文節ごとに自然なリズムを生みます。</dd>
+            <dd>漢字を大きく、仮名を小さく見せる字面が、文節ごとに自然なリズムを生みます。</dd>
           </div>
           <div>
             <dt>長文の密度</dt>
-            <dd>8〜11pt前後の本文でも字間がゆったり見える源暎こぶり明朝の設計が、小説や電子書籍の長い段落になじみます。</dd>
+            <dd>8〜11pt前後の本文でも字間がゆったり見える設計が、小説や電子書籍の長い段落になじみます。</dd>
           </div>
           <div>
-            <dt>のびごえの追加</dt>
-            <dd>元の本文設計はそのままに、長音や波線などを連結。声と余韻を行の中でつなぎ、小説世界への没入を支えます。</dd>
+            <dt>追加した機能</dt>
+            <dd>長音や波線などを連結し、声と余韻を行の中でつなぎます。縦組でも同じ機能を使えます。</dd>
           </div>
         </dl>
 
         <figure class="reading-specimen">
-          <p class="reading-sample">雨の音が、遠くの屋根を静かに渡っていた。「待ってーーーー」。呼び声は夜の奥へ細く伸び、やがて風の気配に溶けていく。頁をめくったあとにも、物語の余韻だけが残っていた。</p>
+          <p class="reading-sample">雨の音が、遠くの屋根を静かに渡っていた。<br><span class="no-break">「待ってーーーー」。</span><br>呼び声は夜の奥へ細く伸び、やがて風の気配に溶けていく。頁をめくったあとにも、物語の余韻だけが残っていた。</p>
           <figcaption>
-            <span>源暎こぶり明朝の本文設計</span>
-            <span>のびごえこぶり明朝 Regular / 長音・波線を追加</span>
+            <span>のびごえこぶり明朝 Regular / 縦組</span>
+            <span>源暎こぶり明朝の本文設計を継承</span>
           </figcaption>
         </figure>
       </div>
@@ -231,11 +229,28 @@
     <section class="expression" aria-labelledby="expression-title">
       <div class="section-intro">
         <p class="section-index">05 — PUNCTUATION &amp; COMBINING MARKS</p>
-        <h2 id="expression-title">約物と結合文字を、<br>一文字の中へ。</h2>
+        <h2 id="expression-title">約物と<span class="no-break">結合文字</span>を、<br>一文字の中へ。</h2>
       </div>
       <div class="expression-grid">
         <article class="punctuation-feature">
-          <p class="expression-glyph">！！？？</p>
+          <div class="punctuation-specimen" role="img" aria-label="全角の感嘆符と疑問符による16通りの組み合わせ">
+            <span aria-hidden="true">？？</span>
+            <span aria-hidden="true">？？？</span>
+            <span aria-hidden="true">！！</span>
+            <span aria-hidden="true">！！！</span>
+            <span aria-hidden="true">！！！！</span>
+            <span aria-hidden="true">！！！！！</span>
+            <span aria-hidden="true">？！</span>
+            <span aria-hidden="true">！？</span>
+            <span aria-hidden="true">？？！</span>
+            <span aria-hidden="true">&#xFF1F;&#xFF01;&#xFF1F;</span>
+            <span aria-hidden="true">&#xFF01;&#xFF1F;&#xFF1F;</span>
+            <span aria-hidden="true">！！？</span>
+            <span aria-hidden="true">！？！</span>
+            <span aria-hidden="true">？！！</span>
+            <span aria-hidden="true">！！？？</span>
+            <span aria-hidden="true">？？！！</span>
+          </div>
           <div>
             <span>16 COMBINATIONS · 4 STYLES</span>
             <h3>連続する感嘆符と疑問符を、全角一文字に。</h3>
@@ -302,7 +317,7 @@
           <span>例文</span>
           <button type="button" data-sample="余韻ーーーーーー\n水面に波紋が〜〜〜\n静かな線が続いていく。">伸長記号</button>
           <button type="button" data-sample="が　き゚　く゚　け゚　こ゚\nガ　キ゚　ク゚　ケ゚　コ゚\n♡゙　♥゙">結合文字</button>
-          <button type="button" data-sample="！？　？！　！！？？\nー　〜　〰　―">約物</button>
+          <button type="button" data-sample="？？　？？？\n！！　！！！　！！！！　！！！！！\n？！　！？\n？？！　&#xFF1F;&#xFF01;&#xFF1F;　&#xFF01;&#xFF1F;&#xFF1F;\n！！？　！？！　？！！\n！！？？　？？！！">約物</button>
           <button type="button" data-sample="&#xE082;　&#xE0B0;　&#xE09A;　&#xE08C;　&#xE099;　&#xE0CE;">こぶり外字</button>
           <button type="button" data-sample="ㇷ゚　か゚　き゚　く゚　け゚　こ゚　カ゚　キ゚　ク゚　ケ゚　コ゚　セ゚　ツ゚　ト゚">半濁点ルビ</button>
         </div>
@@ -313,7 +328,7 @@
       <div class="catalog-heading">
         <div>
           <p class="section-index">07 — GLYPH CATALOG</p>
-          <h2 id="catalog-title">濁点・半濁点、<br>全193字形。</h2>
+          <h2 id="catalog-title">濁点・半濁点、全193字形。</h2>
         </div>
         <p>記号・文字種に加え、Noto版の7ウェイトとのびごえこぶり明朝を切り替えて、字形と配置を比較できます。「外」は源暎こぶり明朝互換の外字、「小」は小書き仮名、「縦」はAdobe-Manga1-0を参照した縦組専用字形です。</p>
       </div>
@@ -358,7 +373,7 @@
     <section class="distribution" id="download" aria-labelledby="distribution-title">
       <div class="distribution-copy">
         <p class="section-index">08 — DISTRIBUTION</p>
-        <h2 id="distribution-title">配布は、<br>GitHub Releasesから。</h2>
+        <h2 id="distribution-title">配布は、<br><span class="no-break">GitHub Releases</span>から。</h2>
         <p>公開版はファミリーごとに分けたZIPで配布予定です。各ZIPにはフォント本体、README、OFL、第三者ライセンス、SHA-256マニフェストを収録します。</p>
         <a class="github-button" data-release-url href="https://github.com/ouvill/nobigoe-font/releases">
           <span>GitHub Releasesを開く</span><span aria-hidden="true">↗</span>

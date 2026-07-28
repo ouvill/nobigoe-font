@@ -71,17 +71,17 @@
 }
 
 :root {
-  --ink: #292a27;
-  --ink-soft: #50514c;
-  --muted: #76766f;
+  --ink: #1e211e;
+  --ink-soft: #353a35;
+  --muted: #505750;
   --paper: #f4f1ea;
-  --paper-light: #faf8f3;
-  --paper-deep: #e9e5dc;
-  --sage: #68756c;
-  --sage-light: #dfe4de;
-  --warm: #887668;
-  --line: rgba(41, 42, 39, 0.18);
-  --line-strong: rgba(41, 42, 39, 0.34);
+  --paper-light: #fbf9f4;
+  --paper-deep: #e7e3d9;
+  --sage: #465c50;
+  --sage-light: #d7ded7;
+  --warm: #6b5849;
+  --line: rgba(30, 33, 30, 0.24);
+  --line-strong: rgba(30, 33, 30, 0.46);
   --gutter: clamp(24px, 5vw, 84px);
   --section-space: clamp(88px, 11vw, 168px);
   --serif: "Nobigoe", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif;
@@ -103,8 +103,24 @@ body {
   background: var(--paper);
   font-family: var(--serif);
   font-size: 17px;
+  font-weight: 400;
   line-height: 2;
   text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  line-break: strict;
+  text-wrap: balance;
+  word-break: auto-phrase;
+}
+
+p,
+dd {
+  line-break: strict;
+  text-wrap: pretty;
+  word-break: auto-phrase;
 }
 
 button,
@@ -199,7 +215,7 @@ button {
   margin-top: 4px;
   color: var(--muted);
   font-family: var(--sans);
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -223,7 +239,7 @@ button {
 
 .global-nav a {
   color: var(--ink-soft);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   transition: color 160ms ease;
 }
@@ -240,7 +256,7 @@ button {
   gap: 20px;
   padding: 9px 0 9px 16px;
   border-left: 1px solid var(--line-strong);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.07em;
   transition: color 160ms ease;
 }
@@ -274,7 +290,7 @@ button {
   margin: 0;
   color: var(--sage);
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.17em;
   text-transform: uppercase;
@@ -316,7 +332,7 @@ button {
   justify-content: center;
   padding: 9px 20px;
   border: 1px solid var(--line-strong);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.04em;
   transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
 }
@@ -448,8 +464,8 @@ button {
 .catalog-heading {
   display: grid;
   max-width: 1360px;
-  grid-template-columns: minmax(130px, 0.32fr) minmax(360px, 1.05fr) minmax(280px, 0.68fr);
-  gap: clamp(28px, 5vw, 78px);
+  grid-template-columns: minmax(120px, 0.26fr) minmax(420px, 1.15fr) minmax(300px, 0.75fr);
+  gap: clamp(28px, 4vw, 64px);
   align-items: start;
   margin: 0 auto clamp(58px, 8vw, 112px);
 }
@@ -459,10 +475,22 @@ button {
 .distribution h2,
 .spec h2 {
   margin: 0;
-  font-size: clamp(48px, 5.3vw, 82px);
+  font-size: clamp(40px, 4vw, 60px);
   font-weight: 400;
-  letter-spacing: -0.055em;
-  line-height: 1.2;
+  letter-spacing: -0.045em;
+  line-height: 1.28;
+}
+
+#reading-title span {
+  display: block;
+}
+
+#reading-title .typeface-name {
+  white-space: nowrap;
+}
+
+.no-break {
+  white-space: nowrap;
 }
 
 .section-intro > p:last-child,
@@ -471,8 +499,8 @@ button {
 .spec-title-block > p {
   margin: 4px 0 0;
   color: var(--ink-soft);
-  font-size: 14px;
-  line-height: 2.05;
+  font-size: 16px;
+  line-height: 2;
 }
 
 .change-story,
@@ -798,9 +826,9 @@ button {
 
 .symbol-story-sample {
   margin: 62px 0 44px;
-  overflow: hidden;
+  overflow: visible;
   font-feature-settings: "calt" 1;
-  font-size: clamp(38px, 4vw, 64px);
+  font-size: clamp(30px, 3.25vw, 50px);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -824,8 +852,8 @@ button {
 .family-layout {
   display: grid;
   max-width: 1360px;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.75fr);
-  gap: 24px;
+  grid-template-columns: 1fr;
+  gap: 28px;
   margin: 0 auto;
 }
 
@@ -837,29 +865,44 @@ button {
 }
 
 .family-label {
-  display: grid;
-  padding: 28px 30px;
-  border-bottom: 1px solid var(--line);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(30px, 4vw, 54px);
+  border-right: 1px solid var(--line);
 }
 
 .family-label > span {
-  margin-bottom: 18px;
+  margin-bottom: 22px;
 }
 
 .family-label strong {
-  font-size: clamp(28px, 3vw, 44px);
-  font-weight: 400;
+  font-size: clamp(28px, 2.6vw, 38px);
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .koburi-family .family-label strong {
-  font-size: clamp(25px, 2.5vw, 36px);
+  font-size: clamp(25px, 2.3vw, 34px);
 }
 
 .family-label small {
+  margin-top: 8px;
   color: var(--muted);
   font-family: var(--sans);
-  font-size: 9px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.family-role {
+  max-width: 32em;
+  margin: 30px 0 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.9;
 }
 
 .weight-specimen {
@@ -879,8 +922,9 @@ button {
 .weight-specimen span {
   color: var(--muted);
   font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.07em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
 }
 
 .weight-specimen strong {
@@ -899,39 +943,48 @@ button {
 .weight-700 strong { font-weight: 700; }
 .weight-900 strong { font-weight: 900; }
 
+.weight-family {
+  display: grid;
+  grid-template-columns: minmax(390px, 0.52fr) minmax(0, 1fr);
+}
+
 .koburi-family {
-  display: flex;
-  flex-direction: column;
-  background: #eef0eb;
+  display: grid;
+  grid-template-columns: minmax(420px, 0.56fr) minmax(340px, 0.9fr) minmax(250px, 0.5fr);
+  background: #e9eee9;
 }
 
 .koburi-specimen {
-  margin: auto 0;
-  padding: 66px 30px;
-  overflow: hidden;
+  display: flex;
+  min-width: 0;
+  min-height: 540px;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  padding: 48px 36px;
+  overflow-x: auto;
+  border-right: 1px solid var(--line);
 }
+
 
 .koburi-specimen p {
-  width: max-content;
+  height: 15em;
   margin: 0;
   font-family: "Nobigoe Koburi Demo", var(--serif);
-  font-feature-settings: "calt" 1;
-  font-size: clamp(31px, 2.8vw, 44px);
-  line-height: 1.6;
-  white-space: nowrap;
-}
-
-.koburi-specimen p:nth-child(2) {
-  margin-left: 0.8em;
+  font-feature-settings: "ccmp" 1, "calt" 1;
+  font-size: clamp(25px, 2.4vw, 35px);
+  letter-spacing: 0;
+  line-height: 1.9;
+  writing-mode: vertical-rl;
 }
 
 .koburi-specimen > span {
-  display: block;
-  margin-top: 34px;
   color: var(--muted);
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
 }
 
 .family-facts {
@@ -941,11 +994,11 @@ button {
 
 .family-facts div {
   display: grid;
-  grid-template-columns: 54px 1fr;
+  grid-template-columns: 58px 1fr;
   gap: 14px;
-  padding: 12px 20px;
+  padding: 18px 22px;
   border-bottom: 1px solid var(--line);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .family-facts dt {
@@ -995,7 +1048,7 @@ button {
 .reading-notes dt {
   color: var(--sage);
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -1003,39 +1056,46 @@ button {
 .reading-notes dd {
   margin: 0;
   color: var(--ink-soft);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 2;
 }
 
 .reading-specimen {
   display: flex;
   min-width: 0;
+  min-height: 760px;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   margin: 0;
   padding: clamp(42px, 6vw, 86px);
+  overflow-x: auto;
   background: var(--paper-deep);
 }
 
 .reading-sample {
-  max-width: 27em;
-  margin: 0;
+  height: 17em;
+  max-height: 620px;
+  margin: 0 auto;
   font-family: "Nobigoe Koburi Demo", var(--serif);
   font-feature-settings: "ccmp" 1, "calt" 1;
-  font-size: clamp(23px, 2.4vw, 36px);
+  font-size: clamp(24px, 2.1vw, 32px);
   letter-spacing: 0;
-  line-height: 2.25;
+  line-height: 2.15;
+  writing-mode: vertical-rl;
 }
 
 .reading-specimen figcaption {
   display: flex;
+  width: 100%;
   justify-content: space-between;
   gap: 24px;
   margin-top: 54px;
   color: var(--muted);
   font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
 }
 
 .expression-grid {
@@ -1062,6 +1122,34 @@ button {
 
 .marks-feature {
   background: var(--sage-light);
+}
+
+.punctuation-specimen {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 54px;
+  --punctuation-size: clamp(38px, 4.6vw, 68px);
+  overflow: hidden;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.expression-grid .punctuation-feature > .punctuation-specimen > span {
+  display: grid;
+  min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper-light);
+  font-family: var(--serif);
+  font-feature-settings: "ccmp" 1, "calt" 1;
+  font-size: var(--punctuation-size);
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
 }
 
 .expression-glyph {
@@ -1504,6 +1592,7 @@ button {
 .fonts-loading .extension-output,
 .fonts-loading .weight-specimen strong,
 .fonts-loading .koburi-specimen,
+.fonts-loading .punctuation-specimen,
 .fonts-loading .expression-glyph,
 .fonts-loading .tester-text {
   opacity: 0;
@@ -1513,6 +1602,7 @@ button {
 .fonts-ready .extension-output,
 .fonts-ready .weight-specimen strong,
 .fonts-ready .koburi-specimen,
+.fonts-ready .punctuation-specimen,
 .fonts-ready .expression-glyph,
 .fonts-ready .tester-text {
   opacity: 1;
@@ -1608,6 +1698,25 @@ button {
 
   .symbol-story + .symbol-story {
     border-left: 0;
+  }
+
+  .symbol-story-sample {
+    font-size: clamp(42px, 7vw, 56px);
+  }
+
+  .weight-family,
+  .koburi-family {
+    grid-template-columns: 1fr;
+  }
+
+  .family-label {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .koburi-specimen {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .reading-layout {
@@ -1726,11 +1835,6 @@ button {
   .hero-lead {
     font-size: 16px;
   }
-
-  .hero-lead br {
-    display: none;
-  }
-
   .project-identity {
     padding-top: 38px;
   }
@@ -1758,9 +1862,13 @@ button {
     font-size: 34px;
   }
 
-  .reading-notes,
-  .reading-specimen {
+  .reading-notes {
     padding: 34px 24px;
+  }
+
+  .reading-specimen {
+    min-height: 650px;
+    padding: 42px 24px 34px;
   }
 
   .reading-notes div {
@@ -1769,8 +1877,9 @@ button {
   }
 
   .reading-sample {
-    font-size: clamp(22px, 6vw, 28px);
-    line-height: 2.1;
+    height: 21em;
+    font-size: clamp(21px, 6vw, 27px);
+    line-height: 2;
   }
 
   .reading-specimen figcaption {
@@ -1792,7 +1901,7 @@ button {
   .catalog-heading h2,
   .distribution h2,
   .spec h2 {
-    font-size: clamp(42px, 13vw, 58px);
+    font-size: clamp(36px, 10.5vw, 46px);
   }
 
   .section-intro > p:last-child,
@@ -1864,15 +1973,13 @@ button {
   }
 
   .koburi-specimen {
-    padding: 48px 22px;
+    min-height: 500px;
+    padding: 38px 22px;
   }
 
   .koburi-specimen p {
-    font-size: clamp(29px, 8.6vw, 39px);
-  }
-
-  .koburi-specimen p:nth-child(2) {
-    margin-left: 0;
+    height: 16em;
+    font-size: clamp(23px, 7vw, 30px);
   }
 
   .expression-grid article {
@@ -1883,6 +1990,11 @@ button {
     min-height: 112px;
     margin-bottom: 38px;
     font-size: 62px;
+  }
+
+  .punctuation-specimen {
+    --punctuation-size: 38px;
+    margin-bottom: 38px;
   }
 
   .tester-toolbar {

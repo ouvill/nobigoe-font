@@ -15,7 +15,6 @@ for (const link of document.querySelectorAll("[data-release-url]")) {
 }
 const brandLink = document.querySelector(".brand");
 brandLink.setAttribute("aria-label", `${siteIdentity.nameJa} トップへ`);
-document.title = `${siteIdentity.nameJa} — 声を、つなぐ。`;
 
 const root = document.documentElement;
 root.classList.add("fonts-loading");
