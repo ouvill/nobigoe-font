@@ -8,3 +8,5 @@ __pycache__/
 *.py[cod]
 *.woff2
 website/public/nobigoe-mincho-vertical-specimen.pdf
+website/public/assets/readme-glyphs.png
+website/public/assets/x-*.png

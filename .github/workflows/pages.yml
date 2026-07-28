@@ -49,6 +49,10 @@ jobs:
         working-directory: website
         run: npm ci
 
+      - name: Install image renderer
+        working-directory: website
+        run: npx playwright install --with-deps chromium
+
       - name: Restore generated webfonts
         id: webfont-cache
         uses: actions/cache@v4
@@ -178,6 +182,7 @@ jobs:
       - name: Check and build Astro site
         working-directory: website
         run: |
+          npm run build:images
           npm run check
           npm run build
 
