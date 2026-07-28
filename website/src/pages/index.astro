@@ -14,10 +14,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         無料で使える明朝体フォント <span>Version {SITE.version}</span>
       </p>
       <h1 id="hero-title">
-        <span>長音や波線が、</span><span>自然につながる。</span>
+        <span>長音や波形記号が、</span><span>自然につながる。</span>
       </h1>
       <p class="hero-description">
-        長音「ー」、波線「〜」、波ダッシュ「〰」を、必要な長さまで切れ目なく伸ばせる明朝体フォントです。
+        長音「ー」、波ダッシュ「〜」、Wavy Dash「〰」を、必要な長さまで切れ目なく伸ばせる明朝体フォントです。
       </p>
       <div class="hero-actions">
         <a class="button button--solid" href={`${base}/tester/`}
@@ -28,7 +28,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         >
       </div>
     </div>
-    <div class="hero-specimen" aria-label="長音・波線・波ダッシュの見本">
+    <div class="hero-specimen" aria-label="長音・波ダッシュ・Wavy Dashの見本">
       <h2>「ー」「〜」「〰」を繰り返すだけ</h2>
       <p class="hero-specimen-description">
         OpenType対応アプリでは、並びに合わせた字形へ自動で置き換わります。
@@ -39,11 +39,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
           <strong>あーーーーーー</strong>
         </article>
         <article class="hero-symbols__wave">
-          <span>波線</span>
+          <span>波ダッシュ</span>
           <strong>ざわ〜〜〜〜〜</strong>
         </article>
         <article>
-          <span>波ダッシュ</span>
+          <span>Wavy Dash</span>
           <strong>波紋〰〰〰〰</strong>
         </article>
       </div>
@@ -71,8 +71,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       </h2>
     </header>
     <article class="wave-mechanism">
-      <div class="wave-mechanism__sample" aria-label="波線を6文字続けた見本">
-        <span>波線「〜」 / U+301C</span>
+      <div class="wave-mechanism__sample" aria-label="波ダッシュを6文字続けた見本">
+        <span>波ダッシュ「〜」 / U+301C WAVE DASH</span>
         <p>〜〜〜〜〜〜</p>
         <div
           class="wave-parity"
@@ -83,7 +83,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         </div>
       </div>
       <div class="wave-mechanism__copy">
-        <p>波線がつながる仕組み</p>
+        <p>波ダッシュがつながる仕組み</p>
         <h3>「〜」は一文字に3半波。奇数番目と偶数番目で波の形が変わります。</h3>
         <p>
           3半波は奇数なので、同じ字形をそのまま並べると波がつながりません。文字の並びに応じて二つの字形を交互に使い、切れ目のない波へ自動で置き換えます。
@@ -102,7 +102,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       <article>
         <p class="capability-glyph">波紋〰〰〰</p>
         <div>
-          <h3>波ダッシュ「〰」</h3><p>
+          <h3>Wavy Dash「〰」 / U+3030</h3><p>
             一文字に4半波を収めた細かな波が、そのまま連続します。
           </p>
         </div>
