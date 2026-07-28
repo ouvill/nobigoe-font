@@ -92,7 +92,7 @@ jobs:
           if not samples:
               raise SystemExit("No weight specimen text found in site/index.html")
           Path("/tmp/weight-showcase.txt").write_text(
-              "".join(html.unescape(sample) for sample in samples),
+              "".join(html.unescape(re.sub(r"<[^>]+>", "", sample)) for sample in samples),
               encoding="utf-8",
           )
           PY

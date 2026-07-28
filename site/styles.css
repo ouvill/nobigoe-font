@@ -946,7 +946,7 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
-.weight-specimen span {
+.weight-specimen p > span {
   color: var(--muted);
   font-family: var(--sans);
   font-size: 10px;
@@ -955,11 +955,30 @@ button {
 }
 
 .weight-specimen strong {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr);
+  gap: clamp(14px, 1.2vw, 22px);
+  align-items: baseline;
   overflow: hidden;
   font-family: "Nobigoe Weight", var(--serif);
-  font-size: clamp(27px, 3vw, 46px);
+  font-size: clamp(26px, 2.75vw, 40px);
   line-height: 1.35;
+}
+
+.weight-specimen strong span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font: inherit;
+  letter-spacing: 0;
+  text-overflow: clip;
   white-space: nowrap;
+}
+
+.weight-specimen strong [lang="en"] {
+  font-size: 0.8em;
+  letter-spacing: 0.005em;
 }
 
 .weight-200 strong { font-weight: 200; }
@@ -1671,6 +1690,21 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .weight-family,
+  .koburi-family {
+    grid-template-columns: 1fr;
+  }
+
+  .family-label {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .koburi-specimen {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
   .tester-toolbar {
     grid-template-columns: 1fr 1fr;
   }
@@ -2012,6 +2046,8 @@ button {
   }
 
   .weight-specimen strong {
+    grid-template-columns: 1fr;
+    gap: 2px;
     font-size: clamp(25px, 7.7vw, 30px);
   }
 
