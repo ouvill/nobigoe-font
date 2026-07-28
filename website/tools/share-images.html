@@ -57,8 +57,27 @@
         justify-content: center;
       }
       .artboard {
+        position: relative;
         overflow: hidden;
         background: var(--paper);
+      }
+      .slide-number {
+        position: absolute;
+        right: 22px;
+        bottom: 18px;
+        z-index: 2;
+        display: grid;
+        width: 54px;
+        height: 54px;
+        place-items: center;
+        color: var(--paper-light);
+        background: var(--sage);
+        border: 1px solid rgba(255, 255, 255, 0.36);
+        border-radius: 50%;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
       }
       .eyebrow,
       .feature-label,
@@ -75,166 +94,190 @@
         display: grid;
         width: 1200px;
         height: 675px;
-        grid-template-columns: 760px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) 88px;
         border: 1px solid var(--line);
+      }
+      .share-stage {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: 810px minmax(0, 1fr);
       }
       .share-main {
         display: flex;
         min-width: 0;
         flex-direction: column;
-        padding: 52px 56px 40px;
+        padding: 45px 52px 30px;
         background: var(--paper-light);
       }
       .share-main .eyebrow {
+        align-self: flex-start;
         margin: 0;
-        color: var(--sage);
-        font-size: 13px;
+        padding: 8px 12px 7px;
+        color: var(--paper-light);
+        background: var(--sage);
+        font-size: 12px;
+        letter-spacing: 0.08em;
       }
       .share-title {
-        margin: 28px 0 14px;
-        font-size: 88px;
-        font-weight: 400;
-        letter-spacing: -0.06em;
-        line-height: 1.06;
+        margin: 25px 0 10px;
+        font-family: "Nobigoe Weight", var(--serif);
+        font-size: 66px;
+        font-weight: 700;
+        letter-spacing: -0.055em;
+        line-height: 1.14;
       }
       .share-lead {
         margin: 0;
         color: var(--soft);
-        font-size: 22px;
-        line-height: 1.7;
+        font-size: 21px;
+        line-height: 1.6;
       }
-      .share-glyphs {
-        display: grid;
-        gap: 4px;
-        margin-top: 28px;
-        font-feature-settings:
-          "ccmp" 1,
-          "calt" 1;
-        font-size: 46px;
-        line-height: 1.34;
+      .share-primary {
+        margin: auto 0 0;
+        font-feature-settings: "calt" 1;
+        font-size: 78px;
         letter-spacing: 0;
+        line-height: 1.12;
         white-space: nowrap;
       }
-      .share-glyphs p {
-        margin: 0;
-      }
-      .share-glyphs p:nth-child(2) {
-        margin-left: 0.8em;
-      }
-      .share-glyphs p:last-child {
-        margin-left: 1.6em;
-      }
-      .share-footer {
+      .share-side {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        margin-top: auto;
-        padding-top: 24px;
-        border-top: 1px solid var(--line);
-        font-size: 11px;
-        letter-spacing: 0.08em;
-      }
-      .share-footer strong {
-        display: block;
-        margin-top: 7px;
-        font-family: var(--serif);
-        font-size: 22px;
-        font-weight: 400;
-        letter-spacing: 0;
-      }
-      .share-footer span:last-child strong {
-        font-family: "Nobigoe Koburi", var(--serif);
-        font-size: 20px;
-      }
-      .share-koburi {
-        position: relative;
-        display: flex;
         min-width: 0;
-        flex-direction: column;
-        padding: 50px 42px 36px;
+        grid-template-rows: auto repeat(3, 1fr);
+        padding: 38px 36px 26px;
         background: var(--sage-light);
         border-left: 1px solid var(--line);
       }
-      .share-koburi .eyebrow {
-        margin: 0;
+      .share-side-kicker {
+        margin: 0 0 10px;
         color: var(--sage);
+        font-family: var(--sans);
         font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
       }
-      .share-koburi h2 {
-        margin: 14px 0 0;
-        font-family: "Nobigoe Koburi", var(--serif);
-        font-size: 28px;
-        font-weight: 400;
-        line-height: 1.4;
-        white-space: nowrap;
+      .share-feature {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        justify-content: center;
+        border-top: 1px solid var(--line);
       }
-      .share-vertical {
-        align-self: center;
-        height: 390px;
-        margin: 28px 0 14px;
-        font-family: "Nobigoe Koburi", var(--serif);
+      .share-feature span {
+        color: var(--muted);
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+      .share-feature p {
+        margin: 8px 0 0;
         font-feature-settings:
           "ccmp" 1,
           "calt" 1;
-        font-size: 30px;
+        font-size: 45px;
         letter-spacing: 0;
-        line-height: 1.85;
-        writing-mode: vertical-rl;
-      }
-      .share-vertical span {
+        line-height: 1.15;
         white-space: nowrap;
       }
-      .family-meta {
-        margin: auto 0 0;
-        color: var(--soft);
-        font-size: 11px;
-        letter-spacing: 0.07em;
+      .share-feature:nth-child(3) p {
+        font-size: 48px;
+      }
+      .share-feature:last-child p {
+        font-size: 44px;
+      }
+      .share-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 32px;
+        padding: 18px 110px 18px 52px;
+        color: var(--paper-light);
+        background: var(--ink);
+      }
+      .share-footer strong {
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: 0;
+      }
+      .share-footer span {
+        color: #d3dbd4;
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
       }
 
       .readme-card {
         display: grid;
         width: 1400px;
         height: 900px;
-        grid-template-rows: 142px 1fr;
+        grid-template-rows: 154px minmax(0, 1fr);
         border: 1px solid var(--line);
       }
       .readme-header {
-        display: grid;
-        grid-template-columns: 1fr auto;
+        display: flex;
         align-items: center;
-        gap: 40px;
-        padding: 30px 44px;
-        background: var(--ink);
+        justify-content: space-between;
+        gap: 56px;
+        padding: 30px 46px;
         color: var(--paper-light);
+        background: var(--ink);
       }
       .readme-header h2 {
-        margin: 4px 0 0;
-        font-size: 38px;
-        font-weight: 400;
-        letter-spacing: 0.01em;
+        margin: 6px 0 0;
+        font-family: "Nobigoe Weight", var(--serif);
+        font-size: 48px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        line-height: 1.1;
       }
       .readme-kicker {
         margin: 0;
         color: #bfc9c0;
         font-size: 11px;
       }
-      .readme-note {
-        margin: 0;
-        color: #dce2dc;
-        font-size: 11px;
-        line-height: 1.8;
+      .readme-family-title {
+        display: grid;
+        grid-template-columns: auto auto auto;
+        align-items: baseline;
+        justify-content: end;
+        gap: 10px;
         text-align: right;
+      }
+      .readme-family-title strong {
+        font-size: 24px;
+        font-weight: 400;
+      }
+      .readme-family-title strong:last-of-type {
+        font-family: "Nobigoe Koburi", var(--serif);
+        font-size: 22px;
+      }
+      .readme-family-title > span {
+        color: #9eaaa0;
+        font-family: var(--sans);
+        font-size: 15px;
+      }
+      .readme-family-title small {
+        grid-column: 1 / -1;
+        margin-top: 4px;
+        color: #cbd4cc;
+        font-family: var(--sans);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
       }
       .glyph-overview {
         display: grid;
-        grid-template-columns: 1.12fr 0.88fr;
-        grid-template-rows: 1fr 1fr;
+        min-height: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: 0.92fr 1.08fr;
         background: var(--line);
         gap: 1px;
       }
       .feature-panel {
         min-width: 0;
-        padding: 30px 38px;
+        padding: 28px 38px;
         background: var(--paper-light);
       }
       .feature-panel:nth-child(2),
@@ -244,47 +287,89 @@
       .feature-panel:nth-child(4) {
         background: var(--sage-light);
       }
-      .feature-label {
-        margin: 0 0 20px;
-        color: var(--sage);
-        font-size: 11px;
+      .feature-heading {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 20px;
       }
-      .feature-label strong {
-        margin-right: 12px;
-        color: var(--ink);
-        font-size: 13px;
-      }
-      .extension-list {
+      .feature-heading > span {
         display: grid;
-        gap: 7px;
-        font-feature-settings: "calt" 1;
-        font-size: 43px;
+        width: 36px;
+        height: 36px;
+        flex: 0 0 auto;
+        place-items: center;
+        color: var(--paper-light);
+        background: var(--sage);
+        font-family: var(--sans);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .feature-heading h3 {
+        margin: 0;
+        font-family: var(--sans);
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
         line-height: 1.25;
+      }
+      .feature-heading small {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-family: var(--sans);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+      .readme-extension-list {
+        display: grid;
+        gap: 4px;
+        font-feature-settings: "calt" 1;
+        font-size: 47px;
+        line-height: 1.22;
         letter-spacing: 0;
         white-space: nowrap;
       }
-      .extension-list p {
+      .readme-extension-list p {
         margin: 0;
       }
-      .extension-list p:nth-child(2) {
-        margin-left: 0.45em;
+      .readme-extension-list p:nth-child(2) {
+        margin-left: 0.55em;
       }
-      .extension-list p:nth-child(3) {
-        margin-left: 0.9em;
+      .readme-extension-list p:nth-child(3) {
+        margin-left: 1.1em;
       }
-      .mark-glyphs {
-        margin: 30px 0 24px;
-        font-feature-settings: "ccmp" 1;
-        font-size: 72px;
-        letter-spacing: 0;
-        line-height: 1.2;
-        white-space: nowrap;
-      }
-      .feature-copy {
-        margin: 0;
+      .extension-meta {
+        margin: 15px 0 0;
         color: var(--soft);
-        font-size: 16px;
-        line-height: 1.8;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      .readme-mark-glyphs {
+        margin: 26px 0 28px;
+        font-feature-settings: "ccmp" 1;
+        font-size: 76px;
+        letter-spacing: 0;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+      .mark-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .mark-stats span {
+        padding: 7px 10px 6px;
+        color: var(--sage);
+        background: rgba(70, 92, 80, 0.09);
+        font-family: var(--sans);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
       }
       .punctuation-grid {
         display: grid;
@@ -297,54 +382,70 @@
       .punctuation-grid span {
         display: grid;
         min-width: 0;
-        height: 82px;
+        height: 91px;
         place-items: center;
         background: var(--paper-light);
         font-feature-settings: "ccmp" 1;
         font-size: 40px;
         line-height: 1;
       }
-      .family-comparison {
-        display: grid;
-        gap: 18px;
+      .punctuation-note {
+        margin: 14px 0 0;
+        color: var(--soft);
+        font-family: var(--sans);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
       }
-      .family-row {
+      .readme-family-comparison {
         display: grid;
-        grid-template-columns: 120px 1fr;
+        gap: 12px;
+      }
+      .readme-family-row {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
         align-items: center;
-        gap: 18px;
-        padding-bottom: 17px;
+        gap: 20px;
+        min-height: 112px;
+        padding: 0 4px 12px;
         border-bottom: 1px solid var(--line);
       }
-      .family-row:last-child {
+      .readme-family-row:last-child {
         padding-bottom: 0;
         border-bottom: 0;
       }
-      .family-row > span {
+      .readme-family-row > span {
         color: var(--sage);
         font-family: var(--sans);
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.08em;
       }
-      .family-row strong {
+      .readme-family-row strong {
         display: block;
-        font-size: 32px;
+        font-size: 34px;
         font-weight: 400;
-        line-height: 1.4;
+        line-height: 1.3;
       }
-      .family-row:last-child strong {
+      .readme-family-row:first-child strong {
+        font-family: "Nobigoe Weight", var(--serif);
+        font-weight: 700;
+      }
+      .readme-family-row:last-child strong {
         font-family: "Nobigoe Koburi", var(--serif);
-        font-size: 29px;
+        font-size: 31px;
       }
-      .family-row small {
+      .readme-family-row small {
+        display: block;
+        margin-top: 4px;
         color: var(--soft);
         font-family: var(--sans);
-        font-size: 13px;
+        font-size: 12px;
+        font-weight: 700;
       }
-
       .extension-card,
-      .bilingual-card {
+      .combining-card,
+      .family-card {
         width: 1200px;
         height: 675px;
         border: 1px solid var(--line);
@@ -360,26 +461,27 @@
         grid-template-columns: 1fr auto;
         align-items: end;
         gap: 40px;
-        padding: 34px 52px 30px;
+        padding: 32px 52px 28px;
         border-bottom: 1px solid var(--line);
       }
       .extension-header .eyebrow {
-        margin: 0 0 12px;
+        margin: 0 0 10px;
         color: var(--sage);
-        font-size: 11px;
+        font-size: 12px;
       }
       .extension-header h2 {
         margin: 0;
-        font-size: 56px;
-        font-weight: 400;
-        letter-spacing: -0.04em;
+        font-family: "Nobigoe Weight", var(--serif);
+        font-size: 58px;
+        font-weight: 700;
+        letter-spacing: -0.045em;
         line-height: 1.12;
       }
       .extension-header p:last-child {
-        margin: 0 0 8px;
+        margin: 0 0 6px;
         color: var(--soft);
-        font-size: 17px;
-        line-height: 1.8;
+        font-size: 19px;
+        line-height: 1.65;
         text-align: right;
       }
       .length-board {
@@ -443,10 +545,226 @@
         white-space: nowrap;
       }
 
+      .combining-card {
+        display: grid;
+        grid-template-rows: 176px minmax(0, 1fr) 84px;
+        background: var(--paper-light);
+      }
+      .feature-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 40px;
+        padding: 30px 52px 28px;
+        border-bottom: 1px solid var(--line);
+      }
+      .feature-header .eyebrow {
+        margin: 0 0 10px;
+        color: var(--sage);
+        font-size: 12px;
+      }
+      .feature-header h2 {
+        margin: 0;
+        font-family: "Nobigoe Weight", var(--serif);
+        font-size: 60px;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        line-height: 1.1;
+      }
+      .feature-header > p {
+        margin: 0 0 5px;
+        color: var(--soft);
+        font-size: 18px;
+        line-height: 1.65;
+        text-align: right;
+      }
+      .combining-board {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: 1.42fr 0.9fr;
+        background: var(--line);
+        gap: 1px;
+      }
+      .mark-showcase {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        justify-content: center;
+        padding: 34px 52px;
+        background: var(--sage-light);
+      }
+      .mark-showcase p {
+        margin: 0;
+        font-feature-settings: "ccmp" 1;
+        font-size: 98px;
+        letter-spacing: 0;
+        line-height: 1.18;
+        white-space: nowrap;
+      }
+      .mark-showcase small {
+        margin-top: 22px;
+        color: var(--soft);
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+      .punctuation-showcase {
+        display: grid;
+        min-width: 0;
+        grid-template-rows: repeat(2, 1fr);
+        background: var(--line);
+        gap: 1px;
+      }
+      .punctuation-feature {
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+        justify-content: center;
+        padding: 24px 38px;
+        background: var(--paper);
+      }
+      .punctuation-feature:last-child {
+        background: var(--paper-light);
+      }
+      .punctuation-feature span {
+        color: var(--sage);
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+      .punctuation-feature p {
+        margin: 12px 0 0;
+        font-feature-settings: "ccmp" 1;
+        font-size: 54px;
+        letter-spacing: 0;
+        line-height: 1.1;
+        white-space: nowrap;
+      }
+      .card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 32px;
+        padding: 17px 110px 17px 52px;
+        color: var(--paper-light);
+        background: var(--ink);
+      }
+      .card-footer strong {
+        font-size: 26px;
+        font-weight: 400;
+      }
+      .card-footer span {
+        color: #d3dbd4;
+        font-family: var(--sans);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+
+      .family-card {
+        display: grid;
+        grid-template-rows: 176px minmax(0, 1fr) 100px;
+        background: var(--paper-light);
+      }
+      .family-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 42px;
+        padding: 30px 52px 28px;
+        color: var(--paper-light);
+        background: var(--ink);
+      }
+      .family-header h2 {
+        margin: 0;
+        font-family: "Nobigoe Weight", var(--serif);
+        font-size: 61px;
+        font-weight: 700;
+        letter-spacing: -0.05em;
+        line-height: 1.08;
+      }
+      .family-header p {
+        margin: 0 0 5px;
+        color: #cbd4cc;
+        font-size: 18px;
+        line-height: 1.6;
+        text-align: right;
+      }
+      .family-board {
+        display: grid;
+        min-height: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        background: var(--line);
+        gap: 1px;
+      }
+      .family-panel {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        justify-content: center;
+        padding: 30px 50px;
+        background: var(--paper-light);
+      }
+      .family-panel:last-child {
+        background: var(--sage-light);
+      }
+      .family-use {
+        margin: 0;
+        color: var(--sage);
+        font-family: var(--sans);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+      }
+      .family-panel h3 {
+        margin: 14px 0 10px;
+        font-size: 42px;
+        font-weight: 400;
+        line-height: 1.3;
+      }
+      .family-panel:first-child h3 {
+        font-family: "Nobigoe Weight", var(--serif);
+        font-weight: 700;
+      }
+      .family-panel:last-child h3 {
+        font-family: "Nobigoe Koburi", var(--serif);
+        font-size: 38px;
+      }
+      .family-panel p:last-child {
+        margin: 0;
+        color: var(--soft);
+        font-size: 21px;
+        line-height: 1.55;
+      }
+      .download-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 30px;
+        padding: 20px 110px 20px 52px;
+        color: var(--paper-light);
+        background: var(--sage);
+      }
+      .download-footer span {
+        font-family: var(--sans);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+      }
+      .download-footer strong {
+        font-size: 31px;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+      }
       .bilingual-card {
         display: grid;
+        width: 1200px;
+        height: 675px;
         grid-template-rows: 138px minmax(0, 1fr) 86px;
         background: var(--paper-light);
+        border: 1px solid var(--line);
       }
       .bilingual-header {
         display: flex;
@@ -459,24 +777,22 @@
       }
       .bilingual-header h2 {
         margin: 0;
+        font-family: "Nobigoe Weight", var(--serif);
         font-size: 52px;
-        font-weight: 400;
+        font-weight: 700;
         letter-spacing: -0.035em;
       }
       .bilingual-header p {
         margin: 0;
         color: #c6cfc7;
-        font-family: var(--sans);
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.1em;
-        line-height: 1.8;
+        font-size: 18px;
+        line-height: 1.6;
         text-align: right;
       }
       .language-board {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
         min-height: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         background: var(--line);
         gap: 1px;
       }
@@ -547,30 +863,38 @@
         id="x-card"
         aria-label="X投稿用のびごえ明朝紹介画像"
       >
-        <div class="share-main">
-          <p class="eyebrow">NOBIGOE TYPE PROJECT · TWO FAMILIES</p>
-          <h1 class="share-title">声を、つなぐ。</h1>
-          <p class="share-lead">伸びる記号と、声のための二つの明朝体。</p>
-          <div class="share-glyphs" aria-label="伸長記号と結合文字の見本">
-            <p>余韻ーーーーー</p>
-            <p>ざわ〜〜〜〜</p>
-            <p>あ゙　ま゚　♡゙　！？</p>
+        <div class="share-stage">
+          <div class="share-main">
+            <p class="eyebrow">長音・波線がつながる明朝体</p>
+            <h1 class="share-title">
+              「あーーーーっ」が、<br />ちゃんとつながる。
+            </h1>
+            <p class="share-lead">
+              文字を並べるだけ。伸ばし棒が自動で一本につながります。
+            </p>
+            <p class="share-primary">あーーーーーーっ</p>
           </div>
-          <div class="share-footer">
-            <span>FAMILY A · 7 WEIGHTS<strong>のびごえ明朝</strong></span>
-            <span>FAMILY B · REGULAR<strong>のびごえこぶり明朝</strong></span>
-          </div>
+          <aside class="share-side">
+            <p class="share-side-kicker">これも入っています</p>
+            <div class="share-feature">
+              <span>波線も</span>
+              <p>ざわ〜〜〜〜</p>
+            </div>
+            <div class="share-feature">
+              <span>濁点も</span>
+              <p>あ゙　ま゚　♡゙</p>
+            </div>
+            <div class="share-feature">
+              <span>記号も</span>
+              <p>！？　！！！</p>
+            </div>
+          </aside>
         </div>
-        <aside class="share-koburi">
-          <p class="eyebrow">FOR NOVELS &amp; VERTICAL TEXT</p>
-          <h2>のびごえこぶり明朝</h2>
-          <p class="share-vertical">
-            <span>雨の音が、屋根を渡る。</span><br /><span
-              >「待ってーーーー」。</span
-            ><br /><span>呼び声は夜へ伸びていく。</span>
-          </p>
-          <p class="family-meta">小説 · 長文 · 縦組 / REGULAR</p>
-        </aside>
+        <footer class="share-footer">
+          <strong>のびごえ明朝</strong>
+          <span>無料で使える · 7ウェイト · 商用利用OK</span>
+        </footer>
+        <span class="slide-number">1 / 4</span>
       </section>
 
       <section
@@ -580,17 +904,15 @@
       >
         <header class="extension-header">
           <div>
-            <p class="eyebrow">EXTENSIBLE SYMBOLS · ー / 〜</p>
-            <h2>入力したぶんだけ、伸びる。</h2>
+            <p class="eyebrow">長さは自由</p>
+            <h2>文字を増やすだけ。</h2>
           </div>
-          <p>
-            同じ文字を続けるだけ。<br />始端・中間・終端が自動でつながります。
-          </p>
+          <p>2字でも、4字でも、6字でも。<br />勝手に一本につながります。</p>
         </header>
         <div class="length-board">
           <section class="length-column">
             <div class="length-heading">
-              <span>PROLONGED SOUND MARK</span><strong>ー</strong>
+              <span>伸ばし棒</span><strong>ー</strong>
             </div>
             <div class="length-list">
               <div class="length-row">
@@ -609,7 +931,7 @@
           </section>
           <section class="length-column">
             <div class="length-heading">
-              <span>WAVE DASH</span><strong>〜</strong>
+              <span>波線</span><strong>〜</strong>
             </div>
             <div class="length-list">
               <div class="length-row">
@@ -627,6 +949,70 @@
             </div>
           </section>
         </div>
+        <span class="slide-number">2 / 4</span>
+      </section>
+
+      <section
+        class="artboard combining-card"
+        id="combining-card"
+        aria-label="濁点と記号の紹介画像"
+      >
+        <header class="feature-header">
+          <div>
+            <p class="eyebrow">こんな声まで文字にできる</p>
+            <h2>ハートにも、濁点。</h2>
+          </div>
+          <p>普通の濁点・半濁点から、<br />ハート濁点まで入っています。</p>
+        </header>
+        <div class="combining-board">
+          <section class="mark-showcase">
+            <p>あ゙　ま゚　♡゙</p>
+            <small>濁点77列 · 半濁点114列 · ハート濁点2列</small>
+          </section>
+          <section class="punctuation-showcase">
+            <div class="punctuation-feature">
+              <span>!? も合体</span>
+              <p>！？　？！</p>
+            </div>
+            <div class="punctuation-feature">
+              <span>連打も合体</span>
+              <p>？？？　！！！</p>
+            </div>
+          </section>
+        </div>
+        <footer class="card-footer">
+          <strong>のびごえ明朝</strong>
+          <span>横組 · 縦組 · ルビに対応</span>
+        </footer>
+        <span class="slide-number">3 / 4</span>
+      </section>
+
+      <section
+        class="artboard family-card"
+        id="family-card"
+        aria-label="配布情報と二つの書体紹介画像"
+      >
+        <header class="family-header">
+          <h2>無料。商用OK。<br />今日から使える。</h2>
+          <p>幅広く使える明朝体と、<br />小説・長文向けのこぶり明朝。</p>
+        </header>
+        <div class="family-board">
+          <section class="family-panel">
+            <p class="family-use">見出し · 本文 · 横組・縦組</p>
+            <h3>のびごえ明朝</h3>
+            <p>細い字から極太まで、全7ウェイト。</p>
+          </section>
+          <section class="family-panel">
+            <p class="family-use">小説 · 長文 · 縦書き</p>
+            <h3>のびごえこぶり明朝</h3>
+            <p>小説・長文・縦書き向けのRegular。</p>
+          </section>
+        </div>
+        <footer class="download-footer">
+          <span>ここから無料ダウンロード</span>
+          <strong>nobigoe.ouvill.net</strong>
+        </footer>
+        <span class="slide-number">4 / 4</span>
       </section>
 
       <section
@@ -635,17 +1021,17 @@
         aria-label="和文と欧文の書体紹介画像"
       >
         <header class="bilingual-header">
-          <h2>日本語と、English.</h2>
-          <p>NOBIGOE MINCHO · 7 WEIGHTS<br />JAPANESE / LATIN TYPE SPECIMEN</p>
+          <h2>日本語も、英語も。</h2>
+          <p>一つのフォントで、<br />どっちもきれい。</p>
         </header>
         <div class="language-board">
           <section class="language-panel">
-            <p class="language-label">JAPANESE · NOTO SERIF JP</p>
-            <p class="japanese-display">声をつなぐ、<br />明朝体。</p>
+            <p class="language-label">日本語</p>
+            <p class="japanese-display">声を、<br />つなぐ。</p>
             <p class="japanese-line">物語の余韻を、どこまでも。</p>
           </section>
           <section class="language-panel">
-            <p class="language-label">LATIN · LIBERTINUS SERIF</p>
+            <p class="language-label">ENGLISH</p>
             <p class="latin-display">Voices<br />carry on.</p>
             <p class="latin-alphabet">
               Aa Bb Cc Dd Ee Ff Gg<br />1234567890 · &amp; ? !
@@ -654,7 +1040,7 @@
         </div>
         <footer class="bilingual-footer">
           <strong>のびごえ明朝 / Nobigoe Mincho</strong>
-          <span>NOTO SERIF JP + LIBERTINUS SERIF · OPENTYPE/CFF</span>
+          <span>無料 · 商用利用OK · 7ウェイト</span>
         </footer>
       </section>
 
@@ -665,33 +1051,55 @@
       >
         <header class="readme-header">
           <div>
-            <p class="readme-kicker">GLYPH OVERVIEW</p>
-            <h2>のびごえ明朝 / のびごえこぶり明朝</h2>
+            <p class="readme-kicker">NOBIGOE FONT FEATURES</p>
+            <h2>収録機能、ひと目で。</h2>
           </div>
-          <p class="readme-note">
-            両ファミリー共通の追加機能<br />HORIZONTAL · VERTICAL · RUBY
-          </p>
+          <div class="readme-family-title">
+            <strong>のびごえ明朝</strong>
+            <span>＋</span>
+            <strong>のびごえこぶり明朝</strong>
+            <small>両ファミリー共通 · 横組 / 縦組 / ルビ字形</small>
+          </div>
         </header>
         <div class="glyph-overview">
           <section class="feature-panel">
-            <p class="feature-label"><strong>01</strong>EXTENSIBLE SYMBOLS</p>
-            <div class="extension-list">
+            <header class="feature-heading">
+              <span>01</span>
+              <div>
+                <h3>長音・波線がつながる</h3>
+                <small>EXTENSIBLE SYMBOLS</small>
+              </div>
+            </header>
+            <div class="readme-extension-list">
               <p>あーーーーーっ</p>
               <p>ざわ〜〜〜〜</p>
               <p>ざわ〰〰〰〰</p>
             </div>
+            <p class="extension-meta">文字を続けるだけ · 長さは自由</p>
           </section>
           <section class="feature-panel">
-            <p class="feature-label"><strong>02</strong>COMBINING MARKS</p>
-            <p class="mark-glyphs">あ゙　な゙　ま゚　♡゙</p>
-            <p class="feature-copy">
-              濁点77列 · 半濁点114列 · ハート濁点2列<br />横組 · 縦組 · ルビ字形
-            </p>
+            <header class="feature-heading">
+              <span>02</span>
+              <div>
+                <h3>濁点・半濁点付き仮名</h3>
+                <small>COMBINING MARKS</small>
+              </div>
+            </header>
+            <p class="readme-mark-glyphs">あ゙　な゙　ま゚　♡゙</p>
+            <div class="mark-stats">
+              <span>濁点 77列</span>
+              <span>半濁点 114列</span>
+              <span>ハート濁点 2列</span>
+            </div>
           </section>
           <section class="feature-panel">
-            <p class="feature-label">
-              <strong>03</strong>PUNCTUATION LIGATURES · 16 COMBINATIONS
-            </p>
+            <header class="feature-heading">
+              <span>03</span>
+              <div>
+                <h3>感嘆符・疑問符合字</h3>
+                <small>16 PUNCTUATION LIGATURES</small>
+              </div>
+            </header>
             <div
               class="punctuation-grid"
               aria-label="感嘆符と疑問符の16組み合わせ"
@@ -704,24 +1112,31 @@
               <span>！？！</span><span>？！！</span><span>！！？？</span
               ><span>？？！！</span>
             </div>
+            <p class="punctuation-note">
+              明朝 · 斜体明朝 · ゴシック · 斜体ゴシックの4字形
+            </p>
           </section>
           <section class="feature-panel">
-            <p class="feature-label">
-              <strong>04</strong>TWO DISTINCT FAMILIES
-            </p>
-            <div class="family-comparison">
-              <div class="family-row">
-                <span>FAMILY A</span>
+            <header class="feature-heading">
+              <span>04</span>
+              <div>
+                <h3>用途で選べる二つの書体</h3>
+                <small>TWO FONT FAMILIES</small>
+              </div>
+            </header>
+            <div class="readme-family-comparison">
+              <div class="readme-family-row">
+                <span>7 WEIGHTS</span>
                 <div>
-                  <strong>のびごえ明朝</strong
-                  ><small>7ウェイト · 見出しから本文まで</small>
+                  <strong>のびごえ明朝</strong>
+                  <small>200–900 · 見出しから本文まで</small>
                 </div>
               </div>
-              <div class="family-row">
-                <span>FAMILY B</span>
+              <div class="readme-family-row">
+                <span>REGULAR</span>
                 <div>
-                  <strong>のびごえこぶり明朝</strong
-                  ><small>Regular · 小説、長文、縦組向け</small>
+                  <strong>のびごえこぶり明朝</strong>
+                  <small>小説 · 長文 · 縦組向け</small>
                 </div>
               </div>
             </div>
