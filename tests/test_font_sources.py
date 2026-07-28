@@ -127,11 +127,12 @@ class SourceCacheTests(unittest.TestCase):
             ResolvedSources(
                 source=self.cache_directory / self.noto.filename,
                 latin_source=self.cache_directory / self.latin.filename,
+                ruby_source=self.cache_directory / self.koburi.filename,
                 punctuation_source=self.cache_directory / self.punctuation.filename,
                 sans_source=self.cache_directory / self.sans.filename,
             ),
         )
-        self.assertEqual(retrieve.call_count, 4)
+        self.assertEqual(retrieve.call_count, 5)
         self.assertEqual(resolved.source.read_bytes(), self.noto_content)
         self.assertEqual(resolved.latin_source.read_bytes(), self.latin_content)
         self.assertEqual(
@@ -152,7 +153,7 @@ class SourceCacheTests(unittest.TestCase):
             second = cache.resolve("noto", "Regular", SourceOverrides())
 
         self.assertEqual(second, first)
-        self.assertEqual(first_call_count, 4)
+        self.assertEqual(first_call_count, 5)
         self.assertEqual(retrieve.call_count, first_call_count)
 
     def test_zip_members_are_not_reextracted_after_they_are_cached(self) -> None:
@@ -193,6 +194,7 @@ class SourceCacheTests(unittest.TestCase):
         overrides = SourceOverrides(
             source=source_directory / "base.otf",
             latin_source=source_directory / "latin.otf",
+            ruby_source=source_directory / "ruby.ttf",
             punctuation_source=source_directory / "punctuation.otf",
             sans_source=source_directory / "sans.otf",
         )
@@ -207,6 +209,7 @@ class SourceCacheTests(unittest.TestCase):
             ResolvedSources(
                 source=overrides.source,
                 latin_source=overrides.latin_source,
+                ruby_source=overrides.ruby_source,
                 punctuation_source=overrides.punctuation_source,
                 sans_source=overrides.sans_source,
             ),
@@ -225,7 +228,7 @@ class SourceCacheTests(unittest.TestCase):
 
         self.assertEqual(second.source, first.source)
         self.assertEqual(second.source.read_bytes(), self.noto_content)
-        self.assertEqual(retrieve.call_count, 5)
+        self.assertEqual(retrieve.call_count, 6)
 
     def test_corrupt_cached_archive_is_downloaded_again(self) -> None:
         cache = SourceCache(self.cache_directory)
@@ -240,7 +243,7 @@ class SourceCacheTests(unittest.TestCase):
             )
             cache.resolve("noto", "Regular", SourceOverrides())
 
-        self.assertEqual(retrieve.call_count, 5)
+        self.assertEqual(retrieve.call_count, 6)
 
     def test_koburi_resolves_without_a_latin_source(self) -> None:
         source_directory = Path(self.temporary_directory.name) / "explicit"
@@ -258,6 +261,7 @@ class SourceCacheTests(unittest.TestCase):
             )
 
         self.assertEqual(resolved.latin_source, None)
+        self.assertEqual(resolved.ruby_source, overrides.source)
         retrieve.assert_not_called()
 
     def test_failed_download_removes_its_temporary_file(self) -> None:

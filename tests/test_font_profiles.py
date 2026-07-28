@@ -8,6 +8,7 @@ from font_profiles import (
     LIBERTINUS_ARCHIVE_SHA256,
     LIBERTINUS_SCALE_FACTORS,
     LIBERTINUS_STROKE_ADJUSTMENTS,
+    KOBURI_RUBY_STROKE_ADJUSTMENTS,
     KOBURI_ARCHIVE_SHA256,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_ARCHIVE_SHA256,
@@ -153,6 +154,21 @@ class FontProfileTests(unittest.TestCase):
                 "Black": 5,
             },
         )
+
+    def test_koburi_ruby_weight_adjustments_cover_every_noto_weight(self) -> None:
+        self.assertEqual(
+            KOBURI_RUBY_STROKE_ADJUSTMENTS,
+            {
+                "ExtraLight": -4,
+                "Light": -1,
+                "Regular": 2,
+                "Medium": 7,
+                "SemiBold": 11,
+                "Bold": 17,
+                "Black": 25,
+            },
+        )
+
 
     def test_release_version_tracks_feature_change(self) -> None:
         self.assertEqual(VERSION_NUMBER, "1.025")
