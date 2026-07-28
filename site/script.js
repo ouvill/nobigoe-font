@@ -29,10 +29,10 @@ const extensionCode = document.querySelector("#extension-code");
 const extensionMode = document.querySelector("#extension-mode");
 
 const symbolDetails = {
-  "ー": { prefix: "ねえ", code: "U+30FC" },
-  "〜": { prefix: "ざわ", code: "U+301C" },
-  "〰": { prefix: "ざわ", code: "U+3030" },
-  "―": { prefix: "しん", code: "U+2015" },
+  "ー": { prefix: "余韻", code: "U+30FC" },
+  "〜": { prefix: "水面", code: "U+301C" },
+  "〰": { prefix: "波紋", code: "U+3030" },
+  "―": { prefix: "静寂", code: "U+2015" },
 };
 
 let selectedSymbol = "ー";
@@ -165,10 +165,29 @@ const catalogCount = document.querySelector("#catalog-count");
 const catalogWritingMode = document.querySelector("#catalog-writing-mode");
 const markTypeButtons = [...document.querySelectorAll("[data-mark-type]")];
 const markScriptButtons = [...document.querySelectorAll("[data-mark-script]")];
+const catalogFamilyButtons = [
+  ...document.querySelectorAll("[data-catalog-family]"),
+];
+const catalogWeightButtons = [
+  ...document.querySelectorAll("[data-catalog-weight]"),
+];
+const catalogFontStatus = document.querySelector("#catalog-font-status");
+
+const catalogWeightNames = {
+  200: "ExtraLight",
+  300: "Light",
+  400: "Regular",
+  500: "Medium",
+  600: "SemiBold",
+  700: "Bold",
+  900: "Black",
+};
 
 let catalogData = [];
 let activeMarkType = "all";
 let activeMarkScript = "all";
+let activeCatalogFamily = "noto";
+let activeNotoWeight = 400;
 
 function updatePressedButtons(buttons, activeButton) {
   for (const button of buttons) {
@@ -176,6 +195,40 @@ function updatePressedButtons(buttons, activeButton) {
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   }
+}
+
+function updateCatalogTypeface() {
+  const koburi = activeCatalogFamily === "koburi";
+  const weight = koburi ? 400 : activeNotoWeight;
+  const family = koburi ? "Nobigoe Koburi Demo" : "Nobigoe Weight";
+  const label = koburi
+    ? "のびごえこぶり明朝 Regular 400"
+    : `のびごえ明朝 ${catalogWeightNames[weight]} ${weight}`;
+
+  catalogGrid.dataset.catalogFamily = activeCatalogFamily;
+  catalogGrid.style.setProperty("--catalog-font-weight", String(weight));
+  catalogFontStatus.textContent = label;
+  catalogGrid.setAttribute(
+    "aria-label",
+    `${label}の濁点・半濁点付き仮名と記号一覧`,
+  );
+
+  for (const button of catalogFamilyButtons) {
+    const active = button.dataset.catalogFamily === activeCatalogFamily;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  for (const button of catalogWeightButtons) {
+    const buttonWeight = Number(button.dataset.catalogWeight);
+    const active = buttonWeight === weight;
+    button.disabled = koburi && buttonWeight !== 400;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+
+  document.fonts
+    .load(`${weight} 58px "${family}"`, "あ゙か゚ア゙カ゚")
+    .catch((error) => console.error(error));
 }
 
 function createCatalogBadge(text, label) {
@@ -218,7 +271,7 @@ function createCatalogItem(mark) {
     badges.append(createCatalogBadge("小", "小書き仮名"));
   }
   if (mark.vertical) {
-    badges.append(createCatalogBadge("縦", "Manga1縦組専用字形"));
+    badges.append(createCatalogBadge("縦", "Adobe-Manga1-0参照の縦組専用字形"));
   }
 
   item.append(glyph, meta, badges);
@@ -254,6 +307,20 @@ for (const button of markScriptButtons) {
     activeMarkScript = button.dataset.markScript;
     updatePressedButtons(markScriptButtons, button);
     renderCatalog();
+  });
+}
+
+for (const button of catalogFamilyButtons) {
+  button.addEventListener("click", () => {
+    activeCatalogFamily = button.dataset.catalogFamily;
+    updateCatalogTypeface();
+  });
+}
+
+for (const button of catalogWeightButtons) {
+  button.addEventListener("click", () => {
+    activeNotoWeight = Number(button.dataset.catalogWeight);
+    updateCatalogTypeface();
   });
 }
 
@@ -297,5 +364,6 @@ async function revealFont() {
 
 updateExtension();
 updateTesterSize();
+updateCatalogTypeface();
 loadCatalog();
 revealFont();

@@ -54,6 +54,7 @@ MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
+MARK_COLLISION_AREA_EPSILON = 0.01
 SHIPPORI_PRECOMPOSED_LIGATURES = {
     "!!": 0x203C,
     "??": 0x2047,
@@ -254,6 +255,28 @@ MARK_POSITION_GROUPS = (
 )
 MARK_POSITION_DIRECTORY = Path(__file__).resolve().parent / "mark_positions"
 MANGA_MISSING_SMALL_KANA = (0x1B132, 0x1B155)
+KOBURI_MARK_POSITION_FILENAME = "koburi.json"
+KOBURI_NATIVE_MARK_PAIRS = frozenset(KOBURI_PUA_MARK_PAIRS)
+KOBURI_GENERATED_MARK_PAIRS = frozenset(MANGA_MARK_PAIRS) - (
+    KOBURI_NATIVE_MARK_PAIRS
+)
+KOBURI_MARK_POSITION_SOURCE = {
+    "file": Path(KOBURI_TTF_MEMBER).name,
+    "sha256": KOBURI_TTF_SHA256,
+    "source_upem": 1024,
+    "working_upem": 1000,
+    "native_ccmp_pairs": len(KOBURI_NATIVE_MARK_PAIRS),
+    "generated_pairs": len(KOBURI_GENERATED_MARK_PAIRS),
+    "gpos_features": ["halt", "palt", "vhal", "vkrn", "vpal"],
+    "gpos_mark_to_base_lookups": 0,
+}
+KOBURI_MEASUREMENT_GROUPS = {
+    "dakuten_normal",
+    "dakuten_small",
+    "handakuten_normal",
+    "handakuten_small",
+}
+
 
 
 def small_kana_script(codepoint: int) -> str:
@@ -262,28 +285,128 @@ def small_kana_script(codepoint: int) -> str:
     return "katakana"
 
 
-def load_mark_position_overrides(
-    directory: Path = MARK_POSITION_DIRECTORY,
+def _load_mark_position_json(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise ValueError(f"{path}: missing configuration file") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{path}: invalid JSON") from error
+    if not isinstance(data, dict):
+        raise ValueError(f"{path}: root must be an object")
+    return data
+
+
+def _require_object_keys(
+    path: Path, label: str, value: object, expected_keys: set[str]
+) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError(f"{path}: {label} must be an object")
+    actual_keys = set(value)
+    if actual_keys != expected_keys:
+        missing = expected_keys - actual_keys
+        unknown = actual_keys - expected_keys
+        details = [
+            *(f"missing {key}" for key in sorted(missing)),
+            *(f"unknown {key!r}" for key in sorted(unknown)),
+        ]
+        raise ValueError(f"{path}: {label} {', '.join(details)}")
+    return value
+
+
+def _parse_mark_position_codepoint(
+    path: Path, label: str, value: object
+) -> int:
+    if not isinstance(value, str):
+        raise ValueError(f"{path}: {label} must be uppercase hexadecimal")
+    try:
+        codepoint = int(value, 16)
+    except ValueError as error:
+        raise ValueError(
+            f"{path}: {label} must be uppercase hexadecimal"
+        ) from error
+    if not 0 <= codepoint <= 0x10FFFF:
+        raise ValueError(f"{path}: {label} is outside the Unicode range")
+    if value != f"{codepoint:04X}":
+        raise ValueError(f"{path}: {label} must be uppercase hexadecimal")
+    return codepoint
+
+
+def _parse_mark_position_pair(path: Path, value: object) -> tuple[int, int]:
+    if not isinstance(value, str):
+        raise ValueError(f"{path}: pair key must be a string")
+    parts = value.split("+")
+    if len(parts) != 2:
+        raise ValueError(f"{path}: pair key {value!r} must be BASE+MARK")
+    base = _parse_mark_position_codepoint(path, "pair base", parts[0])
+    mark = _parse_mark_position_codepoint(path, "pair mark", parts[1])
+    if value != f"{base:04X}+{mark:04X}":
+        raise ValueError(f"{path}: pair key {value!r} must be BASE+MARK")
+    return base, mark
+
+
+def _finite_mark_position_values(
+    path: Path, label: str, value: object, length: int, description: str
+) -> list[float | int]:
+    if not isinstance(value, list) or len(value) != length:
+        raise ValueError(f"{path}: {label} must be {description}")
+    if any(
+        isinstance(item, bool)
+        or not isinstance(item, (int, float))
+        or not math.isfinite(item)
+        for item in value
+    ):
+        raise ValueError(
+            f"{path}: {label} must contain finite numeric values"
+        )
+    return value
+
+
+def _mark_position_transform(
+    path: Path, label: str, value: object
+) -> Transform:
+    scale, x_offset, y_offset = _finite_mark_position_values(
+        path, label, value, 3, "[scale, x, y]"
+    )
+    if scale <= 0:
+        raise ValueError(f"{path}: {label} scale must be positive")
+    return Transform(scale, 0, 0, scale, x_offset, y_offset)
+
+
+def _load_common_mark_position_overrides(
+    directory: Path,
 ) -> dict[tuple[int, int], dict[str, Transform]]:
     expected_pairs = set(MANGA_MARK_PAIRS)
     loaded: dict[tuple[int, int], dict[str, Transform]] = {}
     for filename, expected_mark, expected_script in MARK_POSITION_GROUPS:
         path = directory / filename
-        data = json.loads(path.read_text(encoding="utf-8"))
-        mark = int(data["mark"], 16)
+        data = _require_object_keys(
+            path,
+            "root",
+            _load_mark_position_json(path),
+            {"mark", "positions"},
+        )
+        mark = _parse_mark_position_codepoint(path, "mark", data["mark"])
         if mark != expected_mark:
             raise ValueError(
                 f"{path}: expected mark U+{expected_mark:04X}, "
                 f"got U+{mark:04X}"
             )
         positions = data["positions"]
+        if not isinstance(positions, dict):
+            raise ValueError(f"{path}: positions must be an object")
+        parsed_positions = {
+            _parse_mark_position_codepoint(path, "base key", base_hex):
+            orientations
+            for base_hex, orientations in positions.items()
+        }
         expected_bases = {
             base
             for base, pair_mark in expected_pairs
             if pair_mark == mark
             and small_kana_script(base) == expected_script
         }
-        actual_bases = {int(value, 16) for value in positions}
+        actual_bases = set(parsed_positions)
         if actual_bases != expected_bases:
             missing = expected_bases - actual_bases
             extra = actual_bases - expected_bases
@@ -292,33 +415,167 @@ def load_mark_position_overrides(
                 *(f"extra U+{value:04X}" for value in sorted(extra)),
             ]
             raise ValueError(f"{path}: {', '.join(details)}")
-        for base_hex, orientations in positions.items():
-            base = int(base_hex, 16)
+        for base, orientations in parsed_positions.items():
+            orientations = _require_object_keys(
+                path,
+                f"U+{base:04X}",
+                orientations,
+                {"horizontal", "vertical"},
+            )
             pair = (base, mark)
-            loaded[pair] = {}
-            for orientation in ("horizontal", "vertical"):
-                values = orientations[orientation]
-                if len(values) != 3:
-                    raise ValueError(
-                        f"{path}: U+{base:04X} {orientation} "
-                        "must be [scale, x, y]"
-                    )
-                scale, x_offset, y_offset = values
-                if scale <= 0:
-                    raise ValueError(
-                        f"{path}: U+{base:04X} {orientation} "
-                        "scale must be positive"
-                    )
-                loaded[pair][orientation] = Transform(
-                    scale,
-                    0,
-                    0,
-                    scale,
-                    x_offset,
-                    y_offset,
+            loaded[pair] = {
+                orientation: _mark_position_transform(
+                    path,
+                    f"U+{base:04X} {orientation}",
+                    orientations[orientation],
                 )
+                for orientation in ("horizontal", "vertical")
+            }
     if loaded.keys() != expected_pairs:
         raise AssertionError("Mark position files must cover all 191 sequences")
+    return loaded
+
+
+def _validate_koburi_measurement(
+    path: Path, value: object
+) -> None:
+    measurement = _require_object_keys(
+        path,
+        "measurement",
+        value,
+        {"relative_bbox_delta", "vertical_contact_clearance"},
+    )
+    deltas = _require_object_keys(
+        path,
+        "measurement.relative_bbox_delta",
+        measurement["relative_bbox_delta"],
+        {"horizontal", "vertical"},
+    )
+    for orientation in ("horizontal", "vertical"):
+        orientation_deltas = _require_object_keys(
+            path,
+            f"measurement.relative_bbox_delta.{orientation}",
+            deltas[orientation],
+            KOBURI_MEASUREMENT_GROUPS,
+        )
+        for group, values in orientation_deltas.items():
+            _finite_mark_position_values(
+                path,
+                (
+                    "measurement.relative_bbox_delta."
+                    f"{orientation}.{group}"
+                ),
+                values,
+                4,
+                "[center_x, center_y, width, height]",
+            )
+    clearance = measurement["vertical_contact_clearance"]
+    if not isinstance(clearance, dict):
+        raise ValueError(
+            f"{path}: measurement.vertical_contact_clearance "
+            "must be an object"
+        )
+    for pair_key, offsets in clearance.items():
+        pair = _parse_mark_position_pair(path, pair_key)
+        if pair not in KOBURI_GENERATED_MARK_PAIRS:
+            raise ValueError(
+                f"{path}: measurement.vertical_contact_clearance "
+                f"has unknown pair {pair_key!r}"
+            )
+        offsets = _finite_mark_position_values(
+            path,
+            f"measurement.vertical_contact_clearance.{pair_key}",
+            offsets,
+            2,
+            "[x, y]",
+        )
+        if any(value < 0 for value in offsets):
+            raise ValueError(
+                f"{path}: measurement.vertical_contact_clearance."
+                f"{pair_key} must be nonnegative"
+            )
+
+
+def _load_koburi_mark_position_overrides(
+    directory: Path,
+) -> dict[tuple[int, int], dict[str, Transform]]:
+    path = directory / KOBURI_MARK_POSITION_FILENAME
+    data = _require_object_keys(
+        path,
+        "root",
+        _load_mark_position_json(path),
+        {"source", "measurement", "positions"},
+    )
+    source = _require_object_keys(
+        path,
+        "source",
+        data["source"],
+        set(KOBURI_MARK_POSITION_SOURCE),
+    )
+    if source != KOBURI_MARK_POSITION_SOURCE:
+        raise ValueError(
+            f"{path}: source metadata does not match GenEi Koburi Mincho "
+            "v6.1"
+        )
+    _validate_koburi_measurement(path, data["measurement"])
+    positions = data["positions"]
+    if not isinstance(positions, dict):
+        raise ValueError(f"{path}: positions must be an object")
+    parsed_positions = {
+        _parse_mark_position_pair(path, pair_key): orientations
+        for pair_key, orientations in positions.items()
+    }
+    actual_pairs = set(parsed_positions)
+    if actual_pairs != KOBURI_GENERATED_MARK_PAIRS:
+        native = actual_pairs & KOBURI_NATIVE_MARK_PAIRS
+        missing = KOBURI_GENERATED_MARK_PAIRS - actual_pairs
+        extra = actual_pairs - KOBURI_GENERATED_MARK_PAIRS
+        details = [
+            *(
+                f"native ccmp pair U+{base:04X}+U+{mark:04X}"
+                for base, mark in sorted(native)
+            ),
+            *(
+                f"missing U+{base:04X}+U+{mark:04X}"
+                for base, mark in sorted(missing)
+            ),
+            *(
+                f"extra U+{base:04X}+U+{mark:04X}"
+                for base, mark in sorted(extra - native)
+            ),
+        ]
+        raise ValueError(f"{path}: {', '.join(details)}")
+    loaded: dict[tuple[int, int], dict[str, Transform]] = {}
+    for pair, orientations in parsed_positions.items():
+        base, mark = pair
+        orientations = _require_object_keys(
+            path,
+            f"U+{base:04X}+U+{mark:04X}",
+            orientations,
+            {"horizontal", "vertical"},
+        )
+        loaded[pair] = {
+            orientation: _mark_position_transform(
+                path,
+                f"U+{base:04X}+U+{mark:04X} {orientation}",
+                orientations[orientation],
+            )
+            for orientation in ("horizontal", "vertical")
+        }
+    return loaded
+
+
+def load_mark_position_overrides(
+    directory: Path = MARK_POSITION_DIRECTORY, *, base: str = "noto"
+) -> dict[tuple[int, int], dict[str, Transform]]:
+    if base not in {"noto", "koburi"}:
+        raise ValueError(f"Unknown mark position base {base!r}")
+    loaded = _load_common_mark_position_overrides(directory)
+    if base == "koburi":
+        for pair, orientations in _load_koburi_mark_position_overrides(
+            directory
+        ).items():
+            loaded[pair].update(orientations)
     return loaded
 
 
@@ -513,6 +770,100 @@ def centered_scaled_path(
             target_y - scale * center_y,
         ),
     )
+
+
+def mark_collision_free_transform(
+    base: pathops.Path,
+    mark: pathops.Path,
+    mark_transform: Transform,
+    maximum_y: float,
+) -> Transform:
+    """Move a combining mark by the shortest outward collision escape."""
+    placed_mark = transform_path(mark, mark_transform)
+    if placed_mark.bounds[3] > maximum_y:
+        raise ValueError("Combining mark exceeds vertical metrics")
+
+    def is_clear(outline: pathops.Path) -> bool:
+        intersection = pathops.op(
+            base, outline, pathops.PathOp.INTERSECTION
+        )
+        return (
+            not intersection.verbs
+            or abs(intersection.area) <= MARK_COLLISION_AREA_EPSILON
+        )
+
+    if is_clear(placed_mark):
+        return mark_transform
+
+    base_x_min, base_y_min, base_x_max, base_y_max = base.bounds
+    mark_x_min, mark_y_min, mark_x_max, mark_y_max = placed_mark.bounds
+    x_direction = (
+        1
+        if mark_x_min + mark_x_max >= base_x_min + base_x_max
+        else -1
+    )
+    y_direction = (
+        1
+        if mark_y_min + mark_y_max >= base_y_min + base_y_max
+        else -1
+    )
+    x_limit = max(
+        1,
+        math.ceil(
+            base_x_max - mark_x_min
+            if x_direction > 0
+            else mark_x_max - base_x_min
+        )
+        + 1,
+    )
+    y_limit = max(
+        1,
+        math.ceil(
+            base_y_max - mark_y_min
+            if y_direction > 0
+            else mark_y_max - base_y_min
+        )
+        + 1,
+    )
+    rays = (
+        (x_direction, 0, x_limit),
+        (0, y_direction, y_limit),
+        (x_direction, y_direction, min(x_limit, y_limit)),
+    )
+    candidates: list[tuple[int, int, int, Transform]] = []
+    for x_step, y_step, limit in rays:
+        for distance in range(1, limit + 1):
+            x_offset = x_step * distance
+            y_offset = y_step * distance
+            adjusted_transform = Transform(
+                mark_transform.xx,
+                mark_transform.xy,
+                mark_transform.yx,
+                mark_transform.yy,
+                mark_transform.dx + x_offset,
+                mark_transform.dy + y_offset,
+            )
+            adjusted_mark = transform_path(mark, adjusted_transform)
+            if adjusted_mark.bounds[3] > maximum_y:
+                if y_step > 0:
+                    break
+                continue
+            if is_clear(adjusted_mark):
+                candidates.append(
+                    (
+                        x_offset * x_offset + y_offset * y_offset,
+                        abs(y_offset),
+                        abs(x_offset),
+                        adjusted_transform,
+                    )
+                )
+                break
+    if not candidates:
+        raise ValueError(
+            "Could not place combining mark without collision "
+            "within vertical metrics"
+        )
+    return min(candidates, key=lambda candidate: candidate[:3])[3]
 
 
 def compose_mark_glyph(
@@ -1869,6 +2220,7 @@ def build(
     output_path: Path,
     identity: FontIdentity,
     face: int,
+    base_type: str,
 ) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
     if font["head"].unitsPerEm != 1000:
@@ -1953,6 +2305,8 @@ def build(
         raise AssertionError("Expected 88 Koburi Mincho PUA mappings")
     if not set(KOBURI_PUA_MARK_PAIRS) <= set(MANGA_MARK_PAIRS):
         raise AssertionError("Koburi Mincho PUA mappings must use Manga1 sequences")
+    if len(KOBURI_GENERATED_MARK_PAIRS) != 103:
+        raise AssertionError("Expected 103 generated Koburi mark sequences")
     if len(KOBURI_HEART_MARK_PAIRS) != 2:
         raise AssertionError("Expected two Koburi Mincho heart mappings")
     if latin_font is not None:
@@ -1964,7 +2318,6 @@ def build(
             font, latin_font, replaced_latin, weight_adjustment
         )
 
-    mark_position_overrides = load_mark_position_overrides()
     source_ccmp_ligatures = feature_ligatures(font, "ccmp")
     native_mark_outputs: dict[tuple[int, int], str] = {}
     for base, mark in MANGA_MARK_PAIRS:
@@ -1973,6 +2326,26 @@ def build(
         output = source_ccmp_ligatures.get((cmap[base], cmap[mark]))
         if output is not None:
             native_mark_outputs[(base, mark)] = output
+    if base_type == "koburi":
+        actual_native_pairs = frozenset(native_mark_outputs)
+        if actual_native_pairs != KOBURI_NATIVE_MARK_PAIRS:
+            missing = KOBURI_NATIVE_MARK_PAIRS - actual_native_pairs
+            extra = actual_native_pairs - KOBURI_NATIVE_MARK_PAIRS
+            details = [
+                *(
+                    f"missing U+{pair_base:04X}+U+{pair_mark:04X}"
+                    for pair_base, pair_mark in sorted(missing)
+                ),
+                *(
+                    f"extra U+{pair_base:04X}+U+{pair_mark:04X}"
+                    for pair_base, pair_mark in sorted(extra)
+                ),
+            ]
+            raise ValueError(
+                "GenEi Koburi Mincho ccmp mappings must contain the "
+                "expected 88 native mark sequences: " + ", ".join(details)
+            )
+    mark_position_overrides = load_mark_position_overrides(base=base_type)
     generated_mark_pairs = [
         pair for pair in MANGA_MARK_PAIRS if pair not in native_mark_outputs
     ]
@@ -2214,14 +2587,23 @@ def build(
         codepoint: glyph_path(font, cmap[codepoint])
         for codepoint in (0x3099, 0x309A)
     }
-    horizontal_mark_paths = [
-        compose_mark_glyph(
-            glyph_path(font, cmap[base]),
-            mark_paths[mark],
-            mark_position_overrides[(base, mark)]["horizontal"],
+    noto_mark_metric_ceiling = (
+        font["hhea"].ascent if base_type == "noto" else None
+    )
+    horizontal_mark_paths = []
+    for base, mark in generated_mark_pairs:
+        base_path = glyph_path(font, cmap[base])
+        mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
+        if noto_mark_metric_ceiling is not None:
+            mark_transform = mark_collision_free_transform(
+                base_path,
+                mark_paths[mark],
+                mark_transform,
+                noto_mark_metric_ceiling,
+            )
+        horizontal_mark_paths.append(
+            compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
         )
-        for base, mark in generated_mark_pairs
-    ]
     append_glyphs(
         font,
         horizontal_mark_paths,
@@ -2244,12 +2626,17 @@ def build(
             vertical_base = missing_small_glyphs[base][1]
         else:
             vertical_base = vertical_glyph_or_self(font, cmap[base])
-        vertical_mark_paths.append(
-            compose_mark_glyph(
-                glyph_path(font, vertical_base),
+        base_path = glyph_path(font, vertical_base)
+        mark_transform = mark_position_overrides[(base, mark)]["vertical"]
+        if noto_mark_metric_ceiling is not None:
+            mark_transform = mark_collision_free_transform(
+                base_path,
                 mark_paths[mark],
-                mark_position_overrides[(base, mark)]["vertical"],
+                mark_transform,
+                noto_mark_metric_ceiling,
             )
+        vertical_mark_paths.append(
+            compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
         )
     append_glyphs(
         font,
@@ -2518,6 +2905,7 @@ def main() -> None:
             output_path,
             identity,
             args.face,
+            args.base,
         )
 
 
