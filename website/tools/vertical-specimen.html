@@ -1,0 +1,513 @@
+<!DOCTYPE html><html lang="ja"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>のびごえ明朝 縦組みPDF見本</title>
+    <style>
+      @font-face {
+        font-family: "Nobigoe Mincho";
+        src: url("../src/assets/fonts/NobigoeMincho-Regular.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+
+      @page {
+        size: 182mm 257mm;
+        margin: 0;
+      }
+
+      :root {
+        --ink: #1e211e;
+        --soft: #555b55;
+        --muted: #777d77;
+        --line: #cbc9c1;
+        --paper: #fbfaf6;
+        --wash: #eeece5;
+        --accent: #40594d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: #d8d6cf;
+        color: var(--ink);
+        font-family: "Nobigoe Mincho", serif;
+        font-feature-settings:
+          "ccmp" 1,
+          "calt" 1;
+      }
+
+      body {
+        display: grid;
+        gap: 12mm;
+        justify-content: center;
+        padding: 12mm 0;
+      }
+
+      .page {
+        position: relative;
+        width: 182mm;
+        height: 257mm;
+        overflow: hidden;
+        break-after: page;
+        background: var(--paper);
+      }
+
+      .page:last-child {
+        break-after: auto;
+      }
+
+      .folio {
+        position: absolute;
+        right: 12mm;
+        bottom: 9mm;
+        left: 12mm;
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 7.5pt;
+        letter-spacing: 0.08em;
+      }
+
+      .vertical {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+      }
+
+      .join-overlap {
+        letter-spacing: -0.002em;
+      }
+
+      ruby {
+        ruby-position: over;
+      }
+
+      rt {
+        font-feature-settings:
+          "ccmp" 1,
+          "calt" 1,
+          "ruby" 1;
+      }
+
+      rt {
+        font-size: 0.5em;
+      }
+
+      .cover {
+        padding: 18mm 18mm 22mm;
+      }
+
+      .cover::after {
+        position: absolute;
+        top: 21mm;
+        right: 57mm;
+        width: 0.2mm;
+        height: 202mm;
+        background: var(--line);
+        content: "";
+      }
+
+      .cover-heading {
+        position: absolute;
+        top: 21mm;
+        right: 18mm;
+        height: 128mm;
+        margin: 0;
+        font-size: 25pt;
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        line-height: 1.5;
+      }
+
+      .cover-heading small {
+        display: block;
+        margin-left: 0.9em;
+        color: var(--accent);
+        font-size: 8pt;
+        letter-spacing: 0.14em;
+      }
+
+      .cover-copy {
+        position: absolute;
+        top: 21mm;
+        right: 65mm;
+        width: 93mm;
+        height: 202mm;
+        margin: 0;
+        font-size: 13pt;
+        letter-spacing: 0.02em;
+        line-height: 1.95;
+      }
+
+      .cover-copy p {
+        height: 100%;
+        margin: 0;
+        text-align: justify;
+        text-justify: inter-character;
+      }
+
+
+
+      .section-page {
+        padding: 17mm 17mm 23mm;
+      }
+
+      .page-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding-bottom: 5mm;
+        border-bottom: 0.3mm solid var(--ink);
+      }
+
+      .page-header h2 {
+        margin: 0;
+        font-size: 19pt;
+        font-weight: 400;
+        letter-spacing: 0.04em;
+      }
+
+      .page-header p {
+        margin: 0;
+        color: var(--soft);
+        font-size: 8pt;
+        letter-spacing: 0.06em;
+      }
+
+      .elongation-grid {
+        display: grid;
+        height: 191mm;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        margin-top: 8mm;
+        border-top: 0.2mm solid var(--line);
+        border-left: 0.2mm solid var(--line);
+      }
+
+      .elongation-item {
+        position: relative;
+        display: grid;
+        place-items: center;
+        border-right: 0.2mm solid var(--line);
+        border-bottom: 0.2mm solid var(--line);
+      }
+
+      .elongation-item:nth-child(even) {
+        background: var(--wash);
+      }
+
+      .elongation-item .sample {
+        height: 73mm;
+        margin: 0;
+        font-size: 23pt;
+        letter-spacing: 0;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .elongation-item .label {
+        position: absolute;
+        right: 4mm;
+        bottom: 4mm;
+        left: 4mm;
+        margin: 0;
+        color: var(--soft);
+        font-size: 7pt;
+        line-height: 1.55;
+        text-align: center;
+      }
+
+      .ruby-layout {
+        display: grid;
+        height: 192mm;
+        grid-template-columns: 1fr 42mm;
+        gap: 8mm;
+        margin-top: 8mm;
+      }
+
+      .ruby-prose {
+        padding: 8mm 11mm;
+        border: 0.2mm solid var(--line);
+        background: #fffefa;
+      }
+
+      .ruby-prose-text {
+        height: 174mm;
+        margin: 0 auto;
+        font-size: 14pt;
+        letter-spacing: 0.02em;
+        line-height: 2.1;
+      }
+
+      .ruby-prose-text p {
+        margin: 0 0 0 1em;
+      }
+
+      .ruby-notes {
+        display: grid;
+        align-content: start;
+        gap: 7mm;
+      }
+
+      .ruby-note {
+        padding: 5mm;
+        border-top: 0.3mm solid var(--ink);
+      }
+
+      .ruby-note h3 {
+        margin: 0 0 3mm;
+        color: var(--accent);
+        font-size: 9pt;
+        font-weight: 400;
+      }
+
+      .ruby-note p {
+        margin: 0;
+        color: var(--soft);
+        font-size: 8pt;
+        line-height: 1.8;
+      }
+
+
+      .ligature-layout {
+        display: grid;
+        height: 192mm;
+        grid-template-rows: 1fr 47mm;
+        gap: 8mm;
+        margin-top: 8mm;
+      }
+
+      .ligature-table {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        border-top: 0.2mm solid var(--line);
+        border-left: 0.2mm solid var(--line);
+      }
+
+      .ligature-cell {
+        position: relative;
+        display: grid;
+        min-width: 0;
+        place-items: center;
+        border-right: 0.2mm solid var(--line);
+        border-bottom: 0.2mm solid var(--line);
+      }
+
+      .ligature-cell:nth-child(4n + 2),
+      .ligature-cell:nth-child(4n + 3) {
+        background: var(--wash);
+      }
+
+      .ligature-cell strong {
+        height: 18mm;
+        font-size: 28pt;
+        font-weight: 400;
+        line-height: 1;
+        white-space: nowrap;
+      }
+
+      .ligature-cell span {
+        position: absolute;
+        right: 1mm;
+        bottom: 2mm;
+        left: 1mm;
+        color: var(--muted);
+        font-size: 5.5pt;
+        text-align: center;
+      }
+
+      .variant-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border-top: 0.2mm solid var(--line);
+        border-left: 0.2mm solid var(--line);
+      }
+
+      .variant {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        padding: 4mm;
+        border-right: 0.2mm solid var(--line);
+        border-bottom: 0.2mm solid var(--line);
+      }
+
+      .variant strong {
+        font-size: 23pt;
+        font-weight: 400;
+        letter-spacing: 0.05em;
+      }
+
+      .variant span {
+        color: var(--soft);
+        font-size: 6.5pt;
+      }
+
+      .ss01 {
+        font-feature-settings:
+          "ccmp" 1,
+          "calt" 1,
+          "ss01" 1;
+      }
+
+      .ss02 {
+        font-feature-settings:
+          "ccmp" 1,
+          "calt" 1,
+          "ss02" 1;
+      }
+
+      .ss03 {
+        font-feature-settings:
+          "ccmp" 1,
+          "calt" 1,
+          "ss03" 1;
+      }
+
+      @media print {
+        html,
+        body {
+          display: block;
+          background: white;
+        }
+
+        body {
+          padding: 0;
+        }
+
+        .page {
+          margin: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page cover">
+      <h1 class="cover-heading vertical">
+        <small>NOBIGOE MINCHO / REGULAR</small>
+        のびごえ明朝<br>縦組み見本
+      </h1>
+      <div class="cover-copy vertical">
+        <p>
+          　<ruby>蝉時雨<rt>せみしぐれ</rt></ruby>の向こうから、声がした。「ねえ<span class="join-overlap">ーーーーーー</span>、待ってよ！」　振り返ると、<ruby>陽炎<rt>かげろう</rt></ruby>の立つ坂道を、白い帽子が駆けてくる。追いついた彼女は、息を弾ませながら、川の方を指さした。　ざわ<span class="join-overlap">〜〜〜〜〜</span>。葉のあいだを風が渡り、雨上がりの光が細かく揺れた。「ほんとうに行くの！？」「行くよ！！　今日を逃したら、きっと来年まで見られないもの」　堤を下りると、夕立の名残が<ruby>水面<rt>みなも</rt></ruby>に細い波紋を描いていた<span class="join-overlap">〰〰〰〰</span>。濡れた石の匂い。遠くの踏切。自転車のベル。どれもが夏の終わりを知らせているようだった。　ふたりは黙って、水際に浮かぶ小さな灯りを待った。やがて草むらの奥で、ひとつ、またひとつ、淡い光が明滅した。「見えた<span class="join-overlap">――――――</span>」　声は夜の入口へ、細く長く溶けていった。
+        </p>
+      </div>
+      <footer class="folio"><span>のびごえ明朝 縦組み見本</span><span>01</span></footer>
+    </section>
+
+    <section class="page section-page">
+      <header class="page-header">
+        <h2>連続する伸長記号</h2>
+        <p>CONTEXTUAL ALTERNATES / VERTICAL</p>
+      </header>
+      <div class="elongation-grid">
+        <article class="elongation-item">
+          <p class="sample vertical">あ<span class="join-overlap">ーーーーーー</span></p>
+          <p class="label">長音記号<br>U+30FC</p>
+        </article>
+        <article class="elongation-item">
+          <p class="sample vertical">静かに<span class="join-overlap">――――――</span></p>
+          <p class="label">HORIZONTAL BAR<br>U+2015</p>
+        </article>
+        <article class="elongation-item">
+          <p class="sample vertical">ざわ<span class="join-overlap">〜〜〜〜〜</span></p>
+          <p class="label">WAVE DASH<br>U+301C</p>
+        </article>
+        <article class="elongation-item">
+          <p class="sample vertical">ふわ<span class="join-overlap">～～～～～</span></p>
+          <p class="label">FULLWIDTH TILDE<br>U+FF5E</p>
+        </article>
+        <article class="elongation-item">
+          <p class="sample vertical">波紋<span class="join-overlap">〰〰〰〰〰</span></p>
+          <p class="label">WAVY DASH<br>U+3030</p>
+        </article>
+        <article class="elongation-item">
+          <p class="sample vertical">ねえ<span class="join-overlap">ーーーー</span>！？</p>
+          <p class="label">長音＋約物合字<br>ccmp / calt</p>
+        </article>
+      </div>
+      <footer class="folio"><span>のびごえ明朝 縦組み見本</span><span>02</span></footer>
+    </section>
+
+    <section class="page section-page">
+      <header class="page-header">
+        <h2>縦組み本文</h2>
+        <p>VERTICAL PROSE / 14 PT</p>
+      </header>
+      <div class="ruby-layout">
+        <article class="ruby-prose">
+          <div class="ruby-prose-text vertical">
+            <p>
+              <ruby>薄明<rt>はくめい</rt></ruby>の空に、まだ星がひとつ残っていた。
+            </p>
+            <p>
+              <ruby>葦原<rt>あしはら</rt></ruby>を抜ける風が、<ruby>水脈<rt>みお</rt></ruby>をそっと揺らす。
+            </p>
+            <p>
+              「もうすぐ<ruby>東雲<rt>しののめ</rt></ruby>だね」と、彼女は言った。
+            </p>
+            <p>
+              遠い<ruby>山際<rt>やまぎわ</rt></ruby>から、鳥の声が細く響く。
+            </p>
+            <p>
+              <ruby>泡沫<rt>うたかた</rt></ruby>のような夜が、静かにほどけていった。
+            </p>
+          </div>
+        </article>
+        <aside class="ruby-notes">
+          <section class="ruby-note">
+            <h3>組版設定</h3>
+            <p>
+              のびごえ明朝 Regular。本文14pt、行間2.1字、ルビは親文字の二分サイズで組んでいます。
+            </p>
+          </section>
+          <section class="ruby-note">
+            <h3>本文中で確認</h3>
+            <p>
+              縦組み本文の流れの中で、約物や振り仮名の位置関係を確認できます。
+            </p>
+          </section>
+        </aside>
+      </div>
+      <footer class="folio"><span>のびごえ明朝 縦組み見本</span><span>03</span></footer>
+    </section>
+
+    <section class="page section-page">
+      <header class="page-header">
+        <h2>感嘆符・疑問符合字</h2>
+        <p>MANGA1-STYLE LIGATURES / 1 EM</p>
+      </header>
+      <div class="ligature-layout">
+        <div class="ligature-table">
+          <div class="ligature-cell"><strong class="vertical">？？</strong><span>？？</span></div>
+          <div class="ligature-cell"><strong class="vertical">？？？</strong><span>？？？</span></div>
+          <div class="ligature-cell"><strong class="vertical">！！</strong><span>！！</span></div>
+          <div class="ligature-cell"><strong class="vertical">！！！</strong><span>！！！</span></div>
+          <div class="ligature-cell"><strong class="vertical">！！！！</strong><span>！！！！</span></div>
+          <div class="ligature-cell"><strong class="vertical">！！！！！</strong><span>！！！！！</span></div>
+          <div class="ligature-cell"><strong class="vertical">？！</strong><span>？！</span></div>
+          <div class="ligature-cell"><strong class="vertical">！？</strong><span>！？</span></div>
+          <div class="ligature-cell"><strong class="vertical">？？！</strong><span>？？！</span></div>
+          <div class="ligature-cell"><strong class="vertical">？！？</strong><span>？！？</span></div>
+          <div class="ligature-cell"><strong class="vertical">！？？</strong><span>！？？</span></div>
+          <div class="ligature-cell"><strong class="vertical">！！？</strong><span>！！？</span></div>
+          <div class="ligature-cell"><strong class="vertical">！？！</strong><span>！？！</span></div>
+          <div class="ligature-cell"><strong class="vertical">？！！</strong><span>？！！</span></div>
+          <div class="ligature-cell"><strong class="vertical">！！？？</strong><span>！！？？</span></div>
+          <div class="ligature-cell"><strong class="vertical">？？！！</strong><span>？？！！</span></div>
+        </div>
+        <div class="variant-row">
+          <div class="variant"><strong>！？</strong><span>明朝<br>default</span></div>
+          <div class="variant ss01"><strong>！？</strong><span>斜体明朝<br>ss01</span></div>
+          <div class="variant ss02"><strong>！？</strong><span>ゴシック<br>ss02</span></div>
+          <div class="variant ss03"><strong>！？</strong><span>斜体ゴシック<br>ss03</span></div>
+        </div>
+      </div>
+      <footer class="folio"><span>のびごえ明朝 縦組み見本</span><span>04</span></footer>
+    </section>
+
+
+</body></html>

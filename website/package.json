@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:specimen": "node tools/generate-vertical-specimen.mjs",
     "check": "astro check",
     "format": "prettier --write 'src/**/*.{astro,ts,css}' astro.config.mjs tsconfig.json package.json tools/share-images.html",
     "format:check": "prettier --check 'src/**/*.{astro,ts,css}' astro.config.mjs tsconfig.json package.json tools/share-images.html"

@@ -148,6 +148,10 @@ jobs:
               --recommended-glyphs
           done
 
+      - name: Build vertical specimen PDF
+        working-directory: website
+        run: npm run build:specimen
+
       - name: Check and build Astro site
         working-directory: website
         run: |
@@ -160,6 +164,7 @@ jobs:
           test -f website/site-dist/tester/index.html
           test -f website/site-dist/glyphs/index.html
           test -f website/site-dist/marks-data.json
+          test -f website/site-dist/nobigoe-mincho-vertical-specimen.pdf
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"
 
       - name: Upload Pages artifact
