@@ -60,7 +60,7 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 
 ### 使用箇所と改変
 
-`Nobigoe Koburi Mincho Regular`のベースとして使用しています。既存のTrueType字形・メトリクス・OpenTypeテーブルを保持し、Noto版と同じ追加機能をTrueType輪郭で収録します。派生フォント名にはReserved Font Nameの「源暎」を使用せず、英語ファミリー名を`Nobigoe Koburi Mincho`、日本語ファミリー名を`のびごえこぶり明朝`としています。
+`Nobigoe Koburi Mincho Regular`のベースとして使用し、既存のTrueType字形・メトリクス・OpenTypeテーブルを保持して、Noto版と同じ追加機能をTrueType輪郭で収録します。また、同フォントの `ruby` が参照するルビ専用288字形を1000 units/emへ正規化し、通常仮名の輪郭面積を基準に線幅を各ウェイトへ合わせてNoto版へ移植します。派生フォント名にはReserved Font Nameの「源暎」を使用せず、英語ファミリー名を`Nobigoe Koburi Mincho`、日本語ファミリー名を`のびごえこぶり明朝`としています。
 
 ## Noto Sans JP
 
@@ -105,7 +105,7 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 
 ### 使用箇所と改変
 
-各ウェイトに収録された直立の全角感嘆符U+E000と、直立感嘆符合字U+E002、U+E007、U+E0E3、および既存合字 `⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。単独の全角感嘆符と2〜4連の感嘆符合字は該当する直立字形へ置換します。5連およびその他の3記号以上では、直立感嘆符と既存合字から構成輪郭を抽出し、全角1文字幅へ再配置します。2記号の `？？`、`？！`、`！？` は該当する既存合字の輪郭を使用します。Noto版のMedium、SemiBold、Bold、Blackには順に同名ウェイト、同名ウェイト、Bold、ExtraBoldを使用します。400未満のしっぽり明朝がないため、ExtraLightとLightはRegularです。さらに各字形を右へ12度傾けた斜体明朝異体字を生成します。Noto版ではCFF輪郭を保持し、源暎こぶり明朝版ではTrueTypeの2次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
+各ウェイトに収録された直立の全角感嘆符U+E000、全角疑問符U+FF1F、直立感嘆符合字U+E002、U+E007、U+E0E3、および既存合字 `⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。単独の全角感嘆符・疑問符と2〜4連の感嘆符合字は該当する字形へ置換します。5連およびその他の3記号以上では、直立感嘆符と既存合字から構成輪郭を抽出し、全角1文字幅へ再配置します。2記号の `？？`、`？！`、`！？` は該当する既存合字の輪郭を使用します。Noto版のMedium、SemiBold、Bold、Blackには順に同名ウェイト、同名ウェイト、Bold、ExtraBoldを使用します。400未満のしっぽり明朝がないため、ExtraLightとLightはRegularです。さらに各字形を右へ12度傾けた斜体明朝異体字を生成します。Noto版ではCFF輪郭を保持し、源暎こぶり明朝版ではTrueTypeの2次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
 
 ## Adobe-Manga1-0
 

@@ -101,6 +101,16 @@ LIBERTINUS_STROKE_ADJUSTMENTS = {
     "Bold": -3,
     "Black": 5,
 }
+# Match the regular-only Koburi ruby outlines to each Noto kana weight.
+KOBURI_RUBY_STROKE_ADJUSTMENTS = {
+    "ExtraLight": -3,
+    "Light": 0,
+    "Regular": 4,
+    "Medium": 8,
+    "SemiBold": 12,
+    "Bold": 19,
+    "Black": 28,
+}
 LIBERTINUS_OTF_SHA256 = {
     "Regular": "fcf06307a77367394fcb0ccb241e59eea70dba3d732be309647611224679c733",
     "Semibold": "a4b3f28e85881db34695c1f005e4c79233a6caf3a2bd286c9b418c025fb99308",
