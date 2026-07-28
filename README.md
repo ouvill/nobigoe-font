@@ -148,13 +148,13 @@ done
 ```
 
 ```text
-dist/NobigoeMincho-v1.025.zip
-dist/NobigoeKoburiMincho-v1.025.zip
+dist/NobigoeMincho-v1.026.zip
+dist/NobigoeKoburiMincho-v1.026.zip
 ```
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`font_profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.025`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`font_profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.026`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 

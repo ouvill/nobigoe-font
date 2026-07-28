@@ -4,7 +4,7 @@ export const SITE = {
   title: "のびごえ明朝・のびごえこぶり明朝 — 声を、つなぐ。",
   description:
     "伸びる記号や結合文字を備えた7ウェイトの明朝体と、小説・縦組向けのこぶり明朝。",
-  version: "1.025",
+  version: "1.026",
   releaseUrl: "https://github.com/ouvill/nobigoe-font/releases",
   repositoryUrl: "https://github.com/ouvill/nobigoe-font",
 } as const;

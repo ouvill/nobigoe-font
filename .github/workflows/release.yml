@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag matching font_profiles.VERSION_NUMBER (for example v1.025)"
+        description: "Release tag matching font_profiles.VERSION_NUMBER (for example v1.026)"
         required: true
         type: string
 
