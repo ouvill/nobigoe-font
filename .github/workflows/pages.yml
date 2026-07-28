@@ -29,12 +29,23 @@ jobs:
         with:
           enablement: true
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install site dependencies
+        working-directory: website
+        run: npm ci
+
       - name: Restore generated webfonts
         id: webfont-cache
         uses: actions/cache@v4
         with:
-          path: site/assets/*.woff2
-          key: site-webfonts-v2-${{ hashFiles('font_profiles.py', 'site/index.html') }}
+          path: website/src/assets/fonts/*.woff2
+          key: astro-webfonts-v1-${{ hashFiles('font_profiles.py', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json') }}
 
       - name: Set up Python
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -62,7 +73,7 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile
 
-          destination = Path("dist")
+          destination = Path("/tmp/font-release/fonts")
           destination.mkdir(exist_ok=True)
           archives = sorted(Path("/tmp/font-release").glob("*.zip"))
           if len(archives) != 2:
@@ -79,25 +90,24 @@ jobs:
       - name: Build webfonts
         if: steps.webfont-cache.outputs.cache-hit != 'true'
         run: |
+          mkdir -p website/src/assets/fonts
           python - <<'PY'
-          import html
-          import re
+          import json
           from pathlib import Path
 
-          source = Path("site/index.html").read_text(encoding="utf-8")
-          samples = re.findall(
-              r'<p class="weight-\d+">.*?<strong>(.*?)</strong>',
-              source,
+          marks = json.loads(Path("website/public/marks-data.json").read_text(encoding="utf-8"))
+          catalog_text = "".join(
+              str(mark.get(key, ""))
+              for mark in marks
+              for key in ("glyph", "base", "mark")
           )
-          if not samples:
-              raise SystemExit("No weight specimen text found in site/index.html")
           Path("/tmp/weight-showcase.txt").write_text(
-              "".join(html.unescape(re.sub(r"<[^>]+>", "", sample)) for sample in samples),
+              "声を、どこまでも。Voice, ever onward." + catalog_text,
               encoding="utf-8",
           )
           PY
-          pyftsubset dist/NobigoeMincho-Regular.otf \
-            --output-file=site/assets/NobigoeMincho-Regular.woff2 \
+          pyftsubset /tmp/font-release/fonts/NobigoeMincho-Regular.otf \
+            --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
             --flavor=woff2 \
             --glyphs='*' \
             --layout-features='*' \
@@ -106,8 +116,8 @@ jobs:
             --notdef-glyph \
             --notdef-outline \
             --recommended-glyphs
-          pyftsubset dist/NobigoeKoburiMincho-Regular.ttf \
-            --output-file=site/assets/NobigoeKoburiMincho-Regular-showcase.woff2 \
+          pyftsubset /tmp/font-release/fonts/NobigoeKoburiMincho-Regular.ttf \
+            --output-file=website/src/assets/fonts/NobigoeKoburiMincho-Regular-showcase.woff2 \
             --flavor=woff2 \
             --glyphs='*' \
             --layout-features='*' \
@@ -117,8 +127,8 @@ jobs:
             --notdef-outline \
             --recommended-glyphs
           for weight in ExtraLight Light Medium SemiBold Bold Black; do
-            pyftsubset "dist/NobigoeMincho-${weight}.otf" \
-              --output-file="site/assets/NobigoeMincho-${weight}-showcase.woff2" \
+            pyftsubset "/tmp/font-release/fonts/NobigoeMincho-${weight}.otf" \
+              --output-file="website/src/assets/fonts/NobigoeMincho-${weight}-showcase.woff2" \
               --flavor=woff2 \
               --text-file=/tmp/weight-showcase.txt \
               --layout-features='*' \
@@ -129,24 +139,24 @@ jobs:
               --recommended-glyphs
           done
 
+      - name: Check and build Astro site
+        working-directory: website
+        run: |
+          npm run check
+          npm run build
+
       - name: Verify static site
         run: |
-          test -f site/index.html
-          test -f site/marks-data.json
-          test -f site/assets/NobigoeMincho-Regular.woff2
-          test -f site/assets/NobigoeMincho-ExtraLight-showcase.woff2
-          test -f site/assets/NobigoeMincho-Light-showcase.woff2
-          test -f site/assets/NobigoeMincho-Medium-showcase.woff2
-          test -f site/assets/NobigoeMincho-SemiBold-showcase.woff2
-          test -f site/assets/NobigoeMincho-Bold-showcase.woff2
-          test -f site/assets/NobigoeMincho-Black-showcase.woff2
-          test -f site/assets/NobigoeKoburiMincho-Regular-showcase.woff2
-          python -m json.tool site/marks-data.json >/dev/null
+          test -f website/site-dist/index.html
+          test -f website/site-dist/tester/index.html
+          test -f website/site-dist/glyphs/index.html
+          test -f website/site-dist/marks-data.json
+          test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: website/site-dist
 
   deploy:
     needs: build

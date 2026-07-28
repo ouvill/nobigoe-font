@@ -1,0 +1,282 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SectionHeading from "../components/SectionHeading.astro";
+import WeightSpecimen from "../components/WeightSpecimen.astro";
+import { SITE } from "../data/site";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout pageClass="home-page">
+  <section class="home-hero" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="hero-overline">
+        無料で使える明朝体フォント <span>Version {SITE.version}</span>
+      </p>
+      <h1 id="hero-title">
+        <span>長音や波線が、</span><span>自然につながる。</span>
+      </h1>
+      <p class="hero-description">
+        長音「ー」、波線「〜」、波ダッシュ「〰」を、必要な長さまで切れ目なく伸ばせる明朝体フォントです。
+      </p>
+      <div class="hero-actions">
+        <a class="button button--solid" href={`${base}/tester/`}
+          >文章を入力して試す</a
+        >
+        <a class="button button--line" href={SITE.releaseUrl}
+          >フォントをダウンロード ↗</a
+        >
+      </div>
+    </div>
+    <div class="hero-specimen" aria-label="長音・波線・波ダッシュの見本">
+      <h2>「ー」「〜」「〰」を繰り返すだけ</h2>
+      <p class="hero-specimen-description">
+        OpenType対応アプリでは、並びに合わせた字形へ自動で置き換わります。
+      </p>
+      <div class="hero-symbols">
+        <article>
+          <span>長音</span>
+          <strong>あーーーーーー</strong>
+        </article>
+        <article class="hero-symbols__wave">
+          <span>波線</span>
+          <strong>ざわ〜〜〜〜〜</strong>
+        </article>
+        <article>
+          <span>波ダッシュ</span>
+          <strong>波紋〰〰〰〰</strong>
+        </article>
+      </div>
+      <p class="hero-specimen-note">横組・縦組の両方に対応</p>
+    </div>
+    <div class="hero-family-strip">
+      <article>
+        <span>7ウェイト</span><strong>のびごえ明朝</strong><small
+          >漫画・見出し・本文向け</small
+        >
+      </article>
+      <article>
+        <span>Regular</span><strong>のびごえこぶり明朝</strong><small
+          >小説・長文・縦組向け</small
+        >
+      </article>
+    </div>
+  </section>
+
+  <section class="capability-summary" aria-labelledby="capability-title">
+    <header>
+      <p>一番の特徴</p>
+      <h2 id="capability-title">
+        三つの伸長記号を、好きな長さまで自然につなげられます。
+      </h2>
+    </header>
+    <article class="wave-mechanism">
+      <div class="wave-mechanism__sample" aria-label="波線を6文字続けた見本">
+        <span>波線「〜」 / U+301C</span>
+        <p>〜〜〜〜〜〜</p>
+        <div
+          class="wave-parity"
+          aria-label="奇数番目と偶数番目の波形を交互に使用"
+        >
+          <span>奇数</span><span>偶数</span><span>奇数</span><span>偶数</span
+          ><span>奇数</span><span>偶数</span>
+        </div>
+      </div>
+      <div class="wave-mechanism__copy">
+        <p>波線がつながる仕組み</p>
+        <h3>「〜」は一文字に3半波。奇数番目と偶数番目で波の形が変わります。</h3>
+        <p>
+          3半波は奇数なので、同じ字形をそのまま並べると波がつながりません。文字の並びに応じて二つの字形を交互に使い、切れ目のない波へ自動で置き換えます。
+        </p>
+      </div>
+    </article>
+    <div class="extension-notes">
+      <article>
+        <p class="capability-glyph">あーーーー</p>
+        <div>
+          <h3>長音「ー」</h3><p>
+            始端・中間・終端の字形を使い分け、一本の線として伸ばします。
+          </p>
+        </div>
+      </article>
+      <article>
+        <p class="capability-glyph">波紋〰〰〰</p>
+        <div>
+          <h3>波ダッシュ「〰」</h3><p>
+            一文字に4半波を収めた細かな波が、そのまま連続します。
+          </p>
+        </div>
+      </article>
+    </div>
+    <h3 class="other-features-title">そのほかの収録機能</h3>
+    <div class="capability-list">
+      <article>
+        <p class="capability-glyph">が　き゚</p>
+        <div>
+          <h3>濁点・半濁点を合成</h3><p>
+            かなの後ろに結合文字を入力すると、一体の字形になります。
+          </p>
+        </div>
+      </article>
+      <article>
+        <p class="capability-glyph">！？　？？？</p>
+        <div>
+          <h3>連続する約物を一文字幅に</h3><p>
+            感嘆符と疑問符の組み合わせを、全角一文字へ収めます。
+          </p>
+        </div>
+      </article>
+      <article>
+        <p class="capability-glyph capability-glyph--vertical">縦組</p>
+        <div>
+          <h3>横組・縦組・ルビに対応</h3><p>
+            漫画のセリフから、小説や電子書籍の縦組まで使えます。
+          </p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="home-intro content-section" aria-labelledby="intro-title">
+    <SectionHeading
+      eyebrow="書体を選ぶ"
+      id="intro-title"
+      description="収録機能は共通です。幅広い用途に使える「のびごえ明朝」と、小説や長文向けの「のびごえこぶり明朝」から選べます。"
+    >
+      用途に合わせて、二つの書体から選べます。
+    </SectionHeading>
+    <div class="family-cards">
+      <article class="family-card family-card--standard">
+        <header>
+          <p>標準ファミリー</p>
+          <h3>のびごえ明朝</h3>
+          <span>Noto Serif JP ＋ Libertinus Serif</span>
+        </header>
+        <p>
+          Noto Serif JPの和文と、各ウェイトへ太さを合わせたLibertinus
+          Serifの欧文。見出しから本文まで7段階で使えます。
+        </p>
+        <dl>
+          <div><dt>ウェイト</dt><dd>200–900 / 7 weights</dd></div><div>
+            <dt>形式</dt><dd>OpenType / CFF</dd>
+          </div>
+        </dl>
+      </article>
+      <article class="family-card family-card--koburi">
+        <header>
+          <p>小説・長文向け</p>
+          <h3>のびごえこぶり明朝</h3>
+          <span>源暎こぶり明朝ベース</span>
+        </header>
+        <p>
+          小ぶりな仮名と漢字との抑揚を活かした、小説・長文向けの本文書体。物語を静かに読み進める縦組に向いています。
+        </p>
+        <dl>
+          <div><dt>ウェイト</dt><dd>Regular 400</dd></div><div>
+            <dt>形式</dt><dd>TrueType</dd>
+          </div>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <section
+    class="weight-section content-section"
+    aria-labelledby="weight-title"
+  >
+    <SectionHeading
+      eyebrow="のびごえ明朝"
+      id="weight-title"
+      description="ExtraLight 200からBlack 900まで。日本語と欧文の濃さを揃えた7ウェイトを収録しています。"
+    >
+      7段階の太さがあります。
+    </SectionHeading>
+    <WeightSpecimen />
+  </section>
+
+  <section
+    class="reading-section content-section"
+    aria-labelledby="reading-title"
+  >
+    <SectionHeading
+      eyebrow="のびごえこぶり明朝"
+      id="reading-title"
+      description="小ぶりな仮名と漢字の抑揚を活かした、小説・長文向けの本文書体です。"
+    >
+      小説や長文を、縦組で読みやすく。
+    </SectionHeading>
+    <div class="reading-showcase">
+      <div class="reading-notes">
+        <article>
+          <span>01</span><h3>受け継ぐ仮名</h3><p>
+            ベース書体が持つ小ぶりな仮名を受け継ぎ、漢字へ穏やかに寄り添います。
+          </p>
+        </article>
+        <article>
+          <span>02</span><h3>漢字との抑揚</h3><p>
+            漢字を大きく、仮名を小さく見せる字面が、文節に自然なリズムを生みます。
+          </p>
+        </article>
+        <article>
+          <span>03</span><h3>長文の密度</h3><p>
+            小説や電子書籍の長い段落でも、ゆったり見える本文設計です。
+          </p>
+        </article>
+      </div>
+      <figure class="vertical-specimen">
+        <p>
+          雨の音が、遠くの屋根を静かに渡っていた。<br /><span
+            >「待ってーーーー」。</span
+          ><br
+          />呼び声は夜の奥へ細く伸び、やがて風の気配に溶けていく。頁をめくったあとにも、物語の余韻だけが残っていた。
+        </p>
+        <figcaption>のびごえこぶり明朝 Regular / 縦組</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="explore-section" aria-labelledby="explore-title">
+    <header>
+      <p>試す・確認する</p>
+      <h2 id="explore-title">まずはブラウザで確認できます。</h2>
+    </header>
+    <div class="explore-links">
+      <a class="explore-card" href={`${base}/tester/`}>
+        <span>文章を入力する</span><h3>文字テスター</h3><p>
+          二つの書体と横組・縦組を切り替えて、実際の文章で確認できます。
+        </p><strong>テスターを開く →</strong>
+      </a>
+      <a class="explore-card" href={`${base}/glyphs/`}>
+        <span>収録字形を探す</span><h3>全194字形の一覧</h3><p>
+          濁点・半濁点の字形を、文字種・書体・ウェイトで絞り込めます。
+        </p><strong>字形一覧を開く →</strong>
+      </a>
+    </div>
+  </section>
+
+  <section
+    class="download-section"
+    id="download"
+    aria-labelledby="download-title"
+  >
+    <div>
+      <p>無料で利用できます / SIL OFL 1.1</p><h2 id="download-title">
+        フォントをダウンロード
+      </h2><a class="button button--paper" href={SITE.releaseUrl}
+        >GitHub Releasesを開く ↗</a
+      >
+    </div>
+    <div class="package-list">
+      <article>
+        <span>標準ファミリー</span><h3>のびごえ明朝</h3><p>
+          7 weights · OpenType/CFF
+        </p><code>NobigoeMincho-v{SITE.version}.zip</code>
+      </article>
+      <article>
+        <span>小説・長文向け</span><h3>のびごえこぶり明朝</h3><p>
+          Regular · TrueType
+        </p><code>NobigoeKoburiMincho-v{SITE.version}.zip</code>
+      </article>
+    </div>
+  </section>
+</BaseLayout>

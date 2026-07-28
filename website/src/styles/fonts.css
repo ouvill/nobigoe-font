@@ -1,0 +1,75 @@
+@font-face {
+  font-family: "Nobigoe";
+  src: url("../assets/fonts/NobigoeMincho-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-ExtraLight-showcase.woff2")
+    format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-Light-showcase.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-Medium-showcase.woff2")
+    format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-SemiBold-showcase.woff2")
+    format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-Bold-showcase.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Weight";
+  src: url("../assets/fonts/NobigoeMincho-Black-showcase.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Nobigoe Koburi";
+  src: url("../assets/fonts/NobigoeKoburiMincho-Regular-showcase.woff2")
+    format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

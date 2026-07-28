@@ -1,0 +1,27 @@
+---
+import { WEIGHTS } from "../data/site";
+---
+
+<div
+  class="weight-table"
+  aria-label="のびごえ明朝、7ウェイトの日本語と英語の文字見本"
+>
+  {
+    WEIGHTS.map((weight) => (
+      <div class="weight-row" style={`--weight: ${weight.value}`}>
+        <p class="weight-label">
+          <>
+            <strong>{weight.name}</strong>
+            <span>{weight.value}</span>
+          </>
+        </p>
+        <p class="weight-japanese" lang="ja">
+          声を、どこまでも。
+        </p>
+        <p class="weight-latin" lang="en">
+          Voice, ever onward.
+        </p>
+      </div>
+    ))
+  }
+</div>

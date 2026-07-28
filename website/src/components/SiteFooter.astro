@@ -1,0 +1,28 @@
+---
+import { SITE } from "../data/site";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<footer class="site-footer">
+  <div class="footer-lead">
+    <span class="footer-mark" aria-hidden="true">の</span>
+    <p>
+      <strong>文字の流れを、静かにつなぐ。</strong><small
+        >{SITE.name} ＋ {SITE.companion}</small
+      >
+    </p>
+  </div>
+  <nav class="footer-nav" aria-label="フッターナビゲーション">
+    <a href={`${base}/`}>紹介</a>
+    <a href={`${base}/tester/`}>文字を試す</a>
+    <a href={`${base}/glyphs/`}>字形一覧</a>
+    <a href={`${SITE.repositoryUrl}#readme`}>README ↗</a>
+    <a href={`${SITE.repositoryUrl}/blob/main/OFL.txt`}>License ↗</a>
+    <a href={SITE.releaseUrl}>Releases ↗</a>
+  </nav>
+  <p class="footer-credit">
+    Independent type project. Not an official Adobe, Google, Noto, Libertinus,
+    GenEi, or Shippori Mincho release.
+  </p>
+</footer>

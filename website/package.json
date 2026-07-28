@@ -1,0 +1,34 @@
+{
+  "name": "nobigoe-font-site",
+  "version": "1.025.0",
+  "private": true,
+  "type": "module",
+  "description": "のびごえ明朝・のびごえこぶり明朝の公式サイト",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "check": "astro check",
+    "format": "prettier --write 'src/**/*.{astro,ts,css}' astro.config.mjs tsconfig.json package.json tools/share-images.html",
+    "format:check": "prettier --check 'src/**/*.{astro,ts,css}' astro.config.mjs tsconfig.json package.json tools/share-images.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ouvill/nobigoe-font.git"
+  },
+  "keywords": [
+    "font",
+    "japanese",
+    "mincho",
+    "astro"
+  ],
+  "author": "Ouvill",
+  "license": "UNLICENSED",
+  "homepage": "https://ouvill.github.io/nobigoe-font/",
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "astro": "^7.1.4",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^0.14.1",
+    "typescript": "^6.0.3"
+  }
+}

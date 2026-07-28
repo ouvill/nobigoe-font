@@ -1,0 +1,26 @@
+---
+import FontTester from "../components/FontTester.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE } from "../data/site";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout
+  title={`文字テスター — ${SITE.name}`}
+  description="のびごえ明朝とのびごえこぶり明朝を、横組・縦組やOpenType機能を切り替えながら試せます。"
+  pageClass="tool-page"
+>
+  <section class="page-hero page-hero--tester">
+    <p class="page-index">文字テスター</p>
+    <h1>文章を入力して、<br />フォントを試す</h1>
+    <p>
+      例文を選ぶか、試字欄へ文章を入力してください。書体・横組と縦組・文字サイズを切り替えて比較できます。
+    </p>
+  </section>
+  <FontTester />
+  <aside class="next-page">
+    <p>全194字形を確認する</p>
+    <a href={`${base}/glyphs/`}>字形一覧へ <span aria-hidden="true">→</span></a>
+  </aside>
+</BaseLayout>

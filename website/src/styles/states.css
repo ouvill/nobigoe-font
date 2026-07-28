@@ -1,0 +1,21 @@
+.fonts-loading .hero-specimen,
+.fonts-loading .weight-table,
+.fonts-loading .vertical-specimen > p,
+.fonts-loading .tester-editor,
+.fonts-loading .glyph-grid {
+  opacity: 0;
+}
+
+.fonts-ready .hero-specimen,
+.fonts-ready .weight-table,
+.fonts-ready .vertical-specimen > p,
+.fonts-ready .tester-editor,
+.fonts-ready .glyph-grid {
+  opacity: 1;
+  transition: opacity 240ms ease;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

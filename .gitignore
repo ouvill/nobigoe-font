@@ -1,6 +1,9 @@
 .venv/
 .cache/
 dist/
+site-dist/
+node_modules/
+.astro/
 __pycache__/
 *.py[cod]
 *.woff2

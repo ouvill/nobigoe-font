@@ -4,7 +4,7 @@ Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号�
 
 Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7ウェイト、源暎こぶり明朝版は別ファミリー`Nobigoe Koburi Mincho`（`のびごえこぶり明朝`）のRegularとして配布します。Noto版はOpenType/CFF、源暎こぶり明朝版は元フォントと同じTrueType形式です。
 
-![のびごえ明朝とのびごえこぶり明朝の字形一覧。伸長記号、結合濁点・半濁点、感嘆符・疑問符合字、二つのファミリーを掲載](site/assets/readme-glyphs.png)
+![のびごえ明朝とのびごえこぶり明朝の字形一覧。伸長記号、結合濁点・半濁点、感嘆符・疑問符合字、二つのファミリーを掲載](website/public/assets/readme-glyphs.png)
 
 ## 配布構成
 
@@ -212,19 +212,23 @@ Noto Serif JPに既存一体字形がある24列は元の輪郭と縦組字形�
 
 ## 紹介サイト
 
-`site/`に静的な紹介ページと文字テスターがあります。リポジトリ直下でHTTPサーバーを起動し、`http://localhost:8000/site/`を開いてください。
+紹介サイトのコードと開発設定は`website/`にまとめています。リポジトリ直下のフォント生成処理とは独立しています。
 
 ```sh
-python3 -m http.server 8000
+cd website
+npm ci
+npm run dev
 ```
 
-公開サイトは <https://ouvill.github.io/nobigoe-font/> です。`.github/workflows/pages.yml`が`main`へのpushごとにPagesを有効化し、`site/`を配信します。
+`website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
 
-配信用Webfont（`site/assets/*.woff2`）は生成物のためGit管理に含めません。Pagesワークフローが固定取得元から全書体を生成し、Webfontへ変換してキャッシュします。ローカルで標準版Regularを更新する場合は、次のコマンドを使用します。
+公開サイトは <https://ouvill.github.io/nobigoe-font/> です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
+
+配信用Webfont（`website/src/assets/fonts/*.woff2`）は生成物のためGit管理に含めません。リポジトリ直下から標準版Regularを更新する場合は、次のコマンドを使用します。
 
 ```sh
 .venv/bin/pyftsubset dist/NobigoeMincho-Regular.otf \
-  --output-file=site/assets/NobigoeMincho-Regular.woff2 \
+  --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
   --flavor=woff2 \
   --glyphs='*' \
   --layout-features='*' \

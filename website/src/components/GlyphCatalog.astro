@@ -1,0 +1,271 @@
+---
+import { WEIGHTS } from "../data/site";
+---
+
+<section class="catalog-app" aria-label="字形一覧">
+  <div class="catalog-toolbar">
+    <fieldset>
+      <legend>濁点の種類</legend>
+      <div class="filter-buttons" data-filter="type">
+        <button
+          class="is-active"
+          type="button"
+          data-value="all"
+          aria-pressed="true">すべて</button
+        >
+        <button type="button" data-value="dakuten" aria-pressed="false"
+          >濁点</button
+        >
+        <button type="button" data-value="handakuten" aria-pressed="false"
+          >半濁点</button
+        >
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>文字種</legend>
+      <div class="filter-buttons" data-filter="script">
+        <button
+          class="is-active"
+          type="button"
+          data-value="all"
+          aria-pressed="true">すべて</button
+        >
+        <button type="button" data-value="hiragana" aria-pressed="false"
+          >ひらがな</button
+        >
+        <button type="button" data-value="katakana" aria-pressed="false"
+          >カタカナ</button
+        >
+        <button type="button" data-value="symbol" aria-pressed="false"
+          >記号</button
+        >
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>書体</legend>
+      <div class="filter-buttons" data-filter="family">
+        <button
+          class="is-active"
+          type="button"
+          data-value="noto"
+          aria-pressed="true">のびごえ明朝</button
+        >
+        <button type="button" data-value="koburi" aria-pressed="false"
+          >のびごえこぶり明朝</button
+        >
+      </div>
+    </fieldset>
+    <fieldset class="catalog-weight-control">
+      <legend>ウェイト（太さ）</legend>
+      <div class="filter-buttons filter-buttons--weights" data-filter="weight">
+        {
+          WEIGHTS.map((weight) => (
+            <button
+              class:list={{ "is-active": weight.value === 400 }}
+              type="button"
+              data-value={weight.value}
+              aria-label={`${weight.name} ${weight.value}`}
+              aria-pressed={weight.value === 400 ? "true" : "false"}
+            >
+              {weight.value}
+            </button>
+          ))
+        }
+      </div>
+    </fieldset>
+    <button
+      class="mode-toggle"
+      type="button"
+      data-catalog-mode
+      aria-pressed="false">縦組字形を見る</button
+    >
+  </div>
+
+  <div class="catalog-summary">
+    <p><strong data-catalog-count>194</strong><span>字形</span></p>
+    <p data-catalog-font>のびごえ明朝 Regular 400</p>
+  </div>
+  <div
+    class="glyph-grid"
+    data-glyph-grid
+    role="list"
+    aria-label="濁点・半濁点付き仮名と記号一覧"
+  >
+  </div>
+  <noscript><p>一覧を表示するにはJavaScriptを有効にしてください。</p></noscript>
+</section>
+
+<script>
+  type Mark = {
+    glyph: string;
+    codepoints: string;
+    base: string;
+    mark: string;
+    type: string;
+    script: string;
+    koburiPua?: string;
+    small?: boolean;
+    vertical?: boolean;
+  };
+
+  const grid = document.querySelector<HTMLElement>("[data-glyph-grid]");
+
+  if (grid) {
+    const count = document.querySelector<HTMLElement>("[data-catalog-count]")!;
+    const fontStatus = document.querySelector<HTMLElement>(
+      "[data-catalog-font]",
+    )!;
+    const mode = document.querySelector<HTMLButtonElement>(
+      "[data-catalog-mode]",
+    )!;
+    const groups = new Map(
+      [...document.querySelectorAll<HTMLElement>("[data-filter]")].map(
+        (group) => [
+          group.dataset.filter!,
+          [...group.querySelectorAll<HTMLButtonElement>("button")],
+        ],
+      ),
+    );
+    const weightNames: Record<number, string> = {
+      200: "ExtraLight",
+      300: "Light",
+      400: "Regular",
+      500: "Medium",
+      600: "SemiBold",
+      700: "Bold",
+      900: "Black",
+    };
+    const params = new URLSearchParams(location.search);
+    let marks: Mark[] = [];
+    let activeType = params.get("mark") || "all";
+    let activeScript = params.get("script") || "all";
+    let activeFamily = params.get("family") || "noto";
+    let activeWeight = Number(params.get("weight")) || 400;
+
+    const badge = (text: string, label: string) => {
+      const element = document.createElement("span");
+      element.className = "glyph-badge";
+      element.textContent = text;
+      element.title = label;
+      return element;
+    };
+
+    const createItem = (mark: Mark) => {
+      const item = document.createElement("article");
+      item.className = "glyph-card";
+      item.setAttribute("role", "listitem");
+      item.setAttribute("aria-label", `${mark.glyph}、${mark.codepoints}`);
+
+      const glyph = document.createElement("span");
+      glyph.className = "glyph-character";
+      glyph.textContent = mark.glyph;
+
+      const meta = document.createElement("span");
+      meta.className = "glyph-meta";
+      const construction = document.createElement("span");
+      construction.textContent = `${mark.base} + ${mark.mark}`;
+      const codes = document.createElement("span");
+      codes.textContent = mark.koburiPua
+        ? `${mark.codepoints} / 外字 ${mark.koburiPua}`
+        : mark.codepoints;
+      meta.append(construction, codes);
+
+      const badges = document.createElement("span");
+      badges.className = "glyph-badges";
+      if (mark.koburiPua)
+        badges.append(badge("外", `源暎こぶり明朝外字 ${mark.koburiPua}`));
+      if (mark.small) badges.append(badge("小", "小書き仮名"));
+      if (mark.vertical) badges.append(badge("縦", "縦組専用字形"));
+      item.append(glyph, meta, badges);
+      return item;
+    };
+
+    const syncButtons = () => {
+      const values: Record<string, string> = {
+        type: activeType,
+        script: activeScript,
+        family: activeFamily,
+        weight: String(activeFamily === "koburi" ? 400 : activeWeight),
+      };
+      for (const [name, buttons] of groups) {
+        for (const button of buttons) {
+          const active = button.dataset.value === values[name];
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", String(active));
+          if (name === "weight")
+            button.disabled =
+              activeFamily === "koburi" && button.dataset.value !== "400";
+        }
+      }
+    };
+
+    const render = () => {
+      const visible = marks.filter(
+        (mark) =>
+          (activeType === "all" || mark.type === activeType) &&
+          (activeScript === "all" || mark.script === activeScript),
+      );
+      const fragment = document.createDocumentFragment();
+      for (const mark of visible) fragment.append(createItem(mark));
+      grid.replaceChildren(fragment);
+      count.textContent = String(visible.length);
+
+      const koburi = activeFamily === "koburi";
+      const weight = koburi ? 400 : activeWeight;
+      grid.dataset.family = activeFamily;
+      grid.style.setProperty("--catalog-weight", String(weight));
+      fontStatus.textContent = koburi
+        ? "のびごえこぶり明朝 Regular 400"
+        : `のびごえ明朝 ${weightNames[weight]} ${weight}`;
+      syncButtons();
+
+      const next = new URLSearchParams();
+      if (activeType !== "all") next.set("mark", activeType);
+      if (activeScript !== "all") next.set("script", activeScript);
+      if (activeFamily !== "noto") next.set("family", activeFamily);
+      if (!koburi && activeWeight !== 400)
+        next.set("weight", String(activeWeight));
+      history.replaceState(
+        null,
+        "",
+        `${location.pathname}${next.size ? `?${next}` : ""}`,
+      );
+    };
+
+    for (const [name, buttons] of groups) {
+      for (const button of buttons) {
+        button.addEventListener("click", () => {
+          const value = button.dataset.value!;
+          if (name === "type") activeType = value;
+          if (name === "script") activeScript = value;
+          if (name === "family") activeFamily = value;
+          if (name === "weight") activeWeight = Number(value);
+          render();
+        });
+      }
+    }
+
+    mode.addEventListener("click", () => {
+      const vertical = !grid.classList.contains("is-vertical");
+      grid.classList.toggle("is-vertical", vertical);
+      mode.setAttribute("aria-pressed", String(vertical));
+      mode.textContent = vertical ? "横組字形を見る" : "縦組字形を見る";
+    });
+
+    fetch(`${import.meta.env.BASE_URL}marks-data.json`)
+      .then((response) => {
+        if (!response.ok)
+          throw new Error(`Glyph catalog: HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((data: Mark[]) => {
+        marks = data;
+        render();
+      })
+      .catch((error) => {
+        count.textContent = "0";
+        grid.textContent = "字形データを読み込めませんでした。";
+        console.error(error);
+      });
+  }
+</script>
