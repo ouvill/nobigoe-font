@@ -12,6 +12,7 @@ from font_profiles import (
     KOBURI_ARCHIVE_SHA256,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_ARCHIVE_SHA256,
+    SHIPPORI_STROKE_ADJUSTMENTS,
     VERSION_NUMBER,
     ZipMemberSource,
     default_output_path,
@@ -147,13 +148,30 @@ class FontProfileTests(unittest.TestCase):
             {
                 "ExtraLight": -9,
                 "Light": -6,
-                "Regular": -3,
+                "Regular": -4,
                 "Medium": 1,
-                "SemiBold": -4,
+                "SemiBold": -5,
                 "Bold": -3,
                 "Black": 5,
             },
         )
+
+    def test_shippori_punctuation_adjustments_cover_every_noto_weight(
+        self,
+    ) -> None:
+        self.assertEqual(
+            SHIPPORI_STROKE_ADJUSTMENTS,
+            {
+                "ExtraLight": -13,
+                "Light": -10,
+                "Regular": -7,
+                "Medium": -4,
+                "SemiBold": -1,
+                "Bold": 4,
+                "Black": 11,
+            },
+        )
+
 
     def test_koburi_ruby_weight_adjustments_cover_every_noto_weight(self) -> None:
         self.assertEqual(

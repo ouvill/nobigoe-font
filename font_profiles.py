@@ -95,9 +95,9 @@ LIBERTINUS_SCALE_FACTORS = {
 LIBERTINUS_STROKE_ADJUSTMENTS = {
     "ExtraLight": -9,
     "Light": -6,
-    "Regular": -3,
+    "Regular": -4,
     "Medium": 1,
-    "SemiBold": -4,
+    "SemiBold": -5,
     "Bold": -3,
     "Black": 5,
 }
@@ -139,6 +139,17 @@ SHIPPORI_WEIGHTS = {
     "SemiBold": "SemiBold",
     "Bold": "Bold",
     "Black": "ExtraBold",
+}
+# Match Shippori punctuation to Noto Serif JP's fullwidth !/? stroke weight.
+# Values minimize the mean 2 * ink area / outline perimeter difference.
+SHIPPORI_STROKE_ADJUSTMENTS = {
+    "ExtraLight": -13,
+    "Light": -10,
+    "Regular": -7,
+    "Medium": -4,
+    "SemiBold": -1,
+    "Bold": 4,
+    "Black": 11,
 }
 SHIPPORI_OTF_SHA256 = {
     "Regular": "f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804",

@@ -40,7 +40,6 @@ from font_geometry import (
     bounds,
     adjust_outline_weight,
     centered_transform,
-    mark_collision_free_transform,
     transform_path,
 )
 
@@ -488,63 +487,6 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(font.getBestCmap()[0xE064], "pua.heart")
         self.assertEqual(font.getBestCmap()[0xE065], "unicode.heart")
 
-    def test_mark_collision_transform_preserves_clear_placement(self) -> None:
-        base = rectangle_path()
-        mark = transform_path(
-            rectangle_path(), Transform(0.2, 0, 0, 0.2, 680, 430)
-        )
-
-        adjusted = mark_collision_free_transform(
-            base, mark, Transform(), 1000
-        )
-        intersection = pathops.op(
-            base,
-            transform_path(mark, adjusted),
-            pathops.PathOp.INTERSECTION,
-        )
-        clear_transform = Transform(1, 0, 0, 1, 0, 100)
-
-        self.assertGreater(adjusted.dy, 0)
-        self.assertLessEqual(
-            transform_path(mark, adjusted).bounds[3], 1000
-        )
-        self.assertFalse(intersection.verbs)
-        self.assertEqual(
-            mark_collision_free_transform(
-                base, mark, clear_transform, 1000
-            ),
-            clear_transform,
-        )
-
-    def test_mark_collision_transform_uses_shorter_horizontal_escape(
-        self,
-    ) -> None:
-        base = rectangle_path()
-        mark = transform_path(
-            rectangle_path(), Transform(0.2, 0, 0, 0.2, 830, 200)
-        )
-
-        adjusted = mark_collision_free_transform(
-            base, mark, Transform(), 1000
-        )
-        intersection = pathops.op(
-            base,
-            transform_path(mark, adjusted),
-            pathops.PathOp.INTERSECTION,
-        )
-
-        self.assertGreater(adjusted.dx, 0)
-        self.assertEqual(adjusted.dy, 0)
-        self.assertFalse(intersection.verbs)
-
-    def test_mark_collision_transform_rejects_metric_overflow(self) -> None:
-        base = rectangle_path()
-        mark = transform_path(
-            rectangle_path(), Transform(0.2, 0, 0, 0.2, 680, 430)
-        )
-
-        with self.assertRaisesRegex(ValueError, "vertical metrics"):
-            mark_collision_free_transform(base, mark, Transform(), 500)
 
 
     def test_appended_glyph_has_unique_order_and_survives_round_trip(self) -> None:

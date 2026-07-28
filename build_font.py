@@ -17,6 +17,7 @@ from font_profiles import (
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_COPYRIGHT,
+    SHIPPORI_STROKE_ADJUSTMENTS,
     VERSION,
     VERSION_NUMBER,
     default_output_path,
@@ -1243,8 +1244,6 @@ def build(
     upright_punctuation = shippori_upright_punctuation_paths(
         punctuation_font
     )
-    upright_exclamation = upright_punctuation["!"]
-    upright_question = upright_punctuation["?"]
     if (
         punctuation_font["head"].unitsPerEm
         != font["head"].unitsPerEm
@@ -1399,7 +1398,10 @@ def build(
                     "GenEi Koburi Mincho heart PUA mappings must remain "
                     f"compatible for U+{base_pua:04X} and U+{output_pua:04X}"
                 )
-    mark_position_overrides = _mark_positioning.load_mark_position_overrides(base=base_type)
+    mark_position_overrides = _mark_positioning.load_mark_position_overrides(
+        base=base_type,
+        weight=identity.style,
+    )
     generated_mark_pairs = [
         pair for pair in supported_mark_pairs if pair not in native_mark_outputs
     ]
@@ -1498,6 +1500,29 @@ def build(
         font["vmtx"].metrics[cmap[0xFF01]][1]
         + _font_geometry.bounds(font, cmap[0xFF01])[3]
     )
+    shippori_punctuation_paths = {
+        "!": upright_punctuation["!"],
+        "?": upright_punctuation["?"],
+        **dict(
+            zip(
+                MANGA_PUNCTUATION_SEQUENCES,
+                (
+                    make_punctuation_ligature(punctuation_font, sequence)
+                    for sequence in MANGA_PUNCTUATION_SEQUENCES
+                ),
+                strict=True,
+            )
+        ),
+    }
+    mincho_punctuation_paths = {
+        sequence: _font_geometry.adjust_outline_weight(
+            outline,
+            SHIPPORI_STROKE_ADJUSTMENTS[identity.style],
+        )
+        for sequence, outline in shippori_punctuation_paths.items()
+    }
+    upright_exclamation = mincho_punctuation_paths["!"]
+    upright_question = mincho_punctuation_paths["?"]
     _font_operations.replace_glyph(
         font,
         cmap[0xFF01],
@@ -1513,7 +1538,7 @@ def build(
         advance_override=1000,
     )
     punctuation_paths = [
-        make_punctuation_ligature(punctuation_font, sequence)
+        mincho_punctuation_paths[sequence]
         for sequence in MANGA_PUNCTUATION_SEQUENCES
     ]
     _font_operations.append_glyphs(
@@ -1537,8 +1562,8 @@ def build(
         ),
     }
     default_punctuation_paths = {
-        "!": _font_geometry.glyph_path(font, cmap[0xFF01]),
-        "?": _font_geometry.glyph_path(font, cmap[0xFF1F]),
+        "!": upright_exclamation,
+        "?": upright_question,
         **dict(
             zip(
                 MANGA_PUNCTUATION_SEQUENCES,
@@ -1646,9 +1671,6 @@ def build(
         codepoint: _font_geometry.glyph_path(font, cmap[codepoint])
         for codepoint in (0x3099, 0x309A)
     }
-    noto_mark_metric_ceiling = (
-        font["hhea"].ascent if base_type == "noto" else None
-    )
     horizontal_mark_paths = []
     for base, mark in generated_mark_pairs:
         base_path = _font_geometry.glyph_path(font, cmap[base])
@@ -1661,11 +1683,6 @@ def build(
             )
         else:
             mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
-        if noto_mark_metric_ceiling is not None:
-            mark_transform = _font_geometry.mark_collision_free_transform(base_path,
-            mark_paths[mark],
-            mark_transform,
-            noto_mark_metric_ceiling,)
         horizontal_mark_paths.append(
             _font_geometry.compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
         )
@@ -1701,11 +1718,6 @@ def build(
             )
         else:
             mark_transform = mark_position_overrides[(base, mark)]["vertical"]
-        if noto_mark_metric_ceiling is not None:
-            mark_transform = _font_geometry.mark_collision_free_transform(base_path,
-            mark_paths[mark],
-            mark_transform,
-            noto_mark_metric_ceiling,)
         vertical_mark_paths.append(
             _font_geometry.compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
         )

@@ -25,6 +25,46 @@ def transform_values(transform: object) -> tuple[float, float, float, float, flo
     )
 
 
+class NotoWeightMarkPositionOverrideTests(unittest.TestCase):
+    def test_every_nonregular_weight_has_explicit_optical_overrides(self) -> None:
+        regular = load_mark_position_overrides(weight="Regular")
+        for weight in (
+            "ExtraLight",
+            "Light",
+            "Medium",
+            "SemiBold",
+            "Bold",
+            "Black",
+        ):
+            with self.subTest(weight=weight):
+                weighted = load_mark_position_overrides(weight=weight)
+                self.assertEqual(set(weighted), set(regular))
+                self.assertTrue(
+                    any(
+                        transform_values(weighted[pair][orientation])
+                        != transform_values(regular[pair][orientation])
+                        for pair in regular
+                        for orientation in ("horizontal", "vertical")
+                    )
+                )
+
+    def test_black_ke_handakuten_uses_its_reviewed_position(self) -> None:
+        black = load_mark_position_overrides(weight="Black")
+        pair = (0x3051, 0x309A)
+        self.assertEqual(
+            transform_values(black[pair]["horizontal"]),
+            (0.929, 0, 0, 0.929, 1016, 75),
+        )
+        self.assertEqual(
+            transform_values(black[pair]["vertical"]),
+            (0.929, 0, 0, 0.929, 1005, 79),
+        )
+
+    def test_unknown_noto_weight_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unknown Noto mark position weight"):
+            load_mark_position_overrides(weight="Unknown")
+
+
 class KoburiMarkPositionOverrideTests(unittest.TestCase):
     def test_koburi_overrides_only_generated_sequences(self) -> None:
         noto = load_mark_position_overrides()

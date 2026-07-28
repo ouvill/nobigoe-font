@@ -1,0 +1,13 @@
+{
+  "weight": "ExtraLight",
+  "positions": {
+    "3041+3099": {
+      "horizontal": [0.806, 880, -107],
+      "vertical": [0.806, 1002, 85]
+    },
+    "3051+309A": {
+      "horizontal": [0.929, 975, 24],
+      "vertical": [0.929, 957, 15]
+    }
+  }
+}

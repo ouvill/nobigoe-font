@@ -9,7 +9,12 @@ from typing import Literal, TypeAlias, TypedDict, cast
 
 from fontTools.misc.transform import Transform
 
-from font_profiles import BaseType, KOBURI_TTF_MEMBER, KOBURI_TTF_SHA256
+from font_profiles import (
+    BaseType,
+    KOBURI_TTF_MEMBER,
+    KOBURI_TTF_SHA256,
+    NOTO_WEIGHT_CLASSES,
+)
 
 
 Orientation: TypeAlias = Literal["horizontal", "vertical"]
@@ -171,6 +176,8 @@ MARK_POSITION_GROUPS: tuple[tuple[str, int, KanaScript], ...] = (
 MARK_POSITION_DIRECTORY = Path(__file__).resolve().parent / "mark_positions"
 MANGA_MISSING_SMALL_KANA = (0x1B132, 0x1B155)
 KOBURI_MARK_POSITION_FILENAME = "koburi.json"
+NOTO_WEIGHT_POSITION_DIRECTORY = "weights"
+NOTO_WEIGHT_POSITION_STYLES = frozenset(NOTO_WEIGHT_CLASSES)
 KOBURI_NATIVE_MARK_PAIRS: frozenset[MarkPair] = frozenset(
     KOBURI_PUA_MARK_PAIRS
 )
@@ -481,15 +488,62 @@ def _load_koburi_mark_position_overrides(directory: Path) -> MarkPositionMap:
     return loaded
 
 
+def _load_noto_weight_mark_position_overrides(
+    directory: Path,
+    weight: str,
+) -> MarkPositionMap:
+    if weight not in NOTO_WEIGHT_POSITION_STYLES:
+        raise ValueError(f"Unknown Noto mark position weight {weight!r}")
+    if weight == "Regular":
+        return {}
+
+    path = directory / NOTO_WEIGHT_POSITION_DIRECTORY / f"{weight}.json"
+    data = _require_object_keys(
+        path,
+        "root",
+        _load_mark_position_json(path),
+        {"weight", "positions"},
+    )
+    if data["weight"] != weight:
+        raise ValueError(f"{path}: expected weight {weight!r}")
+    positions = _require_json_object(path, "positions", data["positions"])
+    parsed_positions: dict[MarkPair, object] = {
+        _parse_mark_position_pair(path, pair_key): orientations
+        for pair_key, orientations in positions.items()
+    }
+    unknown = set(parsed_positions) - set(MANGA_MARK_PAIRS)
+    if unknown:
+        details = ", ".join(
+            f"U+{base:04X}+U+{mark:04X}" for base, mark in sorted(unknown)
+        )
+        raise ValueError(f"{path}: unknown mark pairs {details}")
+    return {
+        pair: _parse_mark_position(
+            path,
+            f"U+{pair[0]:04X}+U+{pair[1]:04X}",
+            raw_orientations,
+        )
+        for pair, raw_orientations in parsed_positions.items()
+    }
+
+
 def load_mark_position_overrides(
     directory: Path = MARK_POSITION_DIRECTORY,
     *,
     base: BaseType = "noto",
+    weight: str = "Regular",
 ) -> MarkPositionMap:
     if base not in {"noto", "koburi"}:
         raise ValueError(f"Unknown mark position base {base!r}")
     loaded = _load_common_mark_position_overrides(directory)
-    if base == "koburi":
+    if base == "noto":
+        for pair, orientations in _load_noto_weight_mark_position_overrides(
+            directory, weight
+        ).items():
+            loaded[pair].update(orientations)
+    else:
+        if weight != "Regular":
+            raise ValueError("GenEi Koburi Mincho mark positions are Regular only")
         for pair, orientations in _load_koburi_mark_position_overrides(
             directory
         ).items():

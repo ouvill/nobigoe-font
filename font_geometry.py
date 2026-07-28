@@ -18,7 +18,6 @@ from mark_positioning import (
 )
 
 
-MARK_COLLISION_AREA_EPSILON = 0.01
 
 
 def rectangle(
@@ -107,94 +106,6 @@ def centered_scaled_path(
     )
 
 
-def mark_collision_free_transform(
-    base: pathops.Path,
-    mark: pathops.Path,
-    mark_transform: Transform,
-    maximum_y: float,
-) -> Transform:
-    """Move a combining mark by the shortest outward collision escape."""
-    placed_mark = transform_path(mark, mark_transform)
-    if placed_mark.bounds[3] > maximum_y:
-        raise ValueError("Combining mark exceeds vertical metrics")
-
-    def is_clear(outline: pathops.Path) -> bool:
-        intersection = pathops.op(
-            base, outline, pathops.PathOp.INTERSECTION
-        )
-        return (
-            not intersection.verbs
-            or abs(intersection.area) <= MARK_COLLISION_AREA_EPSILON
-        )
-
-    if is_clear(placed_mark):
-        return mark_transform
-
-    base_x_min, base_y_min, base_x_max, base_y_max = base.bounds
-    mark_x_min, mark_y_min, mark_x_max, mark_y_max = placed_mark.bounds
-    x_direction = (
-        1 if mark_x_min + mark_x_max >= base_x_min + base_x_max else -1
-    )
-    y_direction = (
-        1 if mark_y_min + mark_y_max >= base_y_min + base_y_max else -1
-    )
-    x_limit = max(
-        1,
-        math.ceil(
-            base_x_max - mark_x_min
-            if x_direction > 0
-            else mark_x_max - base_x_min
-        )
-        + 1,
-    )
-    y_limit = max(
-        1,
-        math.ceil(
-            base_y_max - mark_y_min
-            if y_direction > 0
-            else mark_y_max - base_y_min
-        )
-        + 1,
-    )
-    rays = (
-        (x_direction, 0, x_limit),
-        (0, y_direction, y_limit),
-        (x_direction, y_direction, min(x_limit, y_limit)),
-    )
-    candidates: list[tuple[int, int, int, Transform]] = []
-    for x_step, y_step, limit in rays:
-        for distance in range(1, limit + 1):
-            x_offset = x_step * distance
-            y_offset = y_step * distance
-            adjusted_transform = Transform(
-                mark_transform.xx,
-                mark_transform.xy,
-                mark_transform.yx,
-                mark_transform.yy,
-                mark_transform.dx + x_offset,
-                mark_transform.dy + y_offset,
-            )
-            adjusted_mark = transform_path(mark, adjusted_transform)
-            if adjusted_mark.bounds[3] > maximum_y:
-                if y_step > 0:
-                    break
-                continue
-            if is_clear(adjusted_mark):
-                candidates.append(
-                    (
-                        x_offset * x_offset + y_offset * y_offset,
-                        abs(y_offset),
-                        abs(x_offset),
-                        adjusted_transform,
-                    )
-                )
-                break
-    if not candidates:
-        raise ValueError(
-            "Could not place combining mark without collision "
-            "within vertical metrics"
-        )
-    return min(candidates, key=lambda candidate: candidate[:3])[3]
 
 
 def compose_mark_glyph(
