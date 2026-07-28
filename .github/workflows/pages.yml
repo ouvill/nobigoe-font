@@ -1,0 +1,151 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Restore generated webfonts
+        id: webfont-cache
+        uses: actions/cache@v4
+        with:
+          path: site/assets/*.woff2
+          key: site-webfonts-v1-${{ hashFiles('build_font.py', 'font_*.py', 'mark_positioning.py', 'site/index.html', 'site/script.js', 'site/marks-data.json') }}
+
+      - name: Set up Python
+        if: steps.webfont-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache pinned font sources
+        if: steps.webfont-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: .cache/font-sources
+          key: font-sources-${{ runner.os }}-${{ hashFiles('font_profiles.py', 'font_sources.py') }}
+          restore-keys: |
+            font-sources-${{ runner.os }}-
+
+      - name: Install font build dependencies
+        if: steps.webfont-cache.outputs.cache-hit != 'true'
+        run: python -m pip install -r requirements.txt
+
+      - name: Build source fonts
+        if: steps.webfont-cache.outputs.cache-hit != 'true'
+        run: |
+          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+            python build_font.py --weight "$weight"
+          done
+          python build_font.py --base koburi
+
+      - name: Build webfonts
+        if: steps.webfont-cache.outputs.cache-hit != 'true'
+        run: |
+          python - <<'PY'
+          import html
+          import re
+          from pathlib import Path
+
+          source = Path("site/index.html").read_text(encoding="utf-8")
+          samples = re.findall(
+              r'<p class="weight-\d+">.*?<strong>(.*?)</strong>',
+              source,
+          )
+          if not samples:
+              raise SystemExit("No weight specimen text found in site/index.html")
+          Path("/tmp/weight-showcase.txt").write_text(
+              "".join(html.unescape(sample) for sample in samples),
+              encoding="utf-8",
+          )
+          PY
+          pyftsubset dist/NobigoeMincho-Regular.otf \
+            --output-file=site/assets/NobigoeMincho-Regular.woff2 \
+            --flavor=woff2 \
+            --glyphs='*' \
+            --layout-features='*' \
+            --name-IDs='*' \
+            --name-languages='*' \
+            --notdef-glyph \
+            --notdef-outline \
+            --recommended-glyphs
+          pyftsubset dist/NobigoeKoburiMincho-Regular.ttf \
+            --output-file=site/assets/NobigoeKoburiMincho-Regular-showcase.woff2 \
+            --flavor=woff2 \
+            --glyphs='*' \
+            --layout-features='*' \
+            --name-IDs='*' \
+            --name-languages='*' \
+            --notdef-glyph \
+            --notdef-outline \
+            --recommended-glyphs
+          for weight in ExtraLight Light Medium SemiBold Bold Black; do
+            pyftsubset "dist/NobigoeMincho-${weight}.otf" \
+              --output-file="site/assets/NobigoeMincho-${weight}-showcase.woff2" \
+              --flavor=woff2 \
+              --text-file=/tmp/weight-showcase.txt \
+              --layout-features='*' \
+              --name-IDs='*' \
+              --name-languages='*' \
+              --notdef-glyph \
+              --notdef-outline \
+              --recommended-glyphs
+          done
+
+      - name: Verify static site
+        run: |
+          test -f site/index.html
+          test -f site/marks-data.json
+          test -f site/assets/NobigoeMincho-Regular.woff2
+          test -f site/assets/NobigoeMincho-ExtraLight-showcase.woff2
+          test -f site/assets/NobigoeMincho-Light-showcase.woff2
+          test -f site/assets/NobigoeMincho-Medium-showcase.woff2
+          test -f site/assets/NobigoeMincho-SemiBold-showcase.woff2
+          test -f site/assets/NobigoeMincho-Bold-showcase.woff2
+          test -f site/assets/NobigoeMincho-Black-showcase.woff2
+          test -f site/assets/NobigoeKoburiMincho-Regular-showcase.woff2
+          python -m json.tool site/marks-data.json >/dev/null
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -137,7 +137,7 @@ done
 
 出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
-公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布する予定です。
+公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。
 
 ### 配布ZIPを作成
 
@@ -151,6 +151,10 @@ done
 dist/NobigoeMincho-v1.025.zip
 dist/NobigoeKoburiMincho-v1.025.zip
 ```
+
+### GitHub Releaseを公開
+
+`.github/workflows/release.yml`は`font_profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.025`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 
@@ -214,7 +218,9 @@ Noto Serif JPに既存一体字形がある24列は元の輪郭と縦組字形�
 python3 -m http.server 8000
 ```
 
-配信用Webfontは`site/assets/NobigoeMincho-Regular.woff2`です。生成フォントを更新した場合は、次のコマンドでWebfontも更新します。
+公開サイトは <https://ouvill.github.io/nobigoe-font/> です。`.github/workflows/pages.yml`が`main`へのpushごとにPagesを有効化し、`site/`を配信します。
+
+配信用Webfont（`site/assets/*.woff2`）は生成物のためGit管理に含めません。Pagesワークフローが固定取得元から全書体を生成し、Webfontへ変換してキャッシュします。ローカルで標準版Regularを更新する場合は、次のコマンドを使用します。
 
 ```sh
 .venv/bin/pyftsubset dist/NobigoeMincho-Regular.otf \

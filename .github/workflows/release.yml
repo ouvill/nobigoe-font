@@ -1,0 +1,104 @@
+name: Build and publish release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag matching font_profiles.VERSION_NUMBER (for example v1.025)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache pinned font sources
+        uses: actions/cache@v4
+        with:
+          path: .cache/font-sources
+          key: font-sources-${{ runner.os }}-${{ hashFiles('font_profiles.py', 'font_sources.py') }}
+          restore-keys: |
+            font-sources-${{ runner.os }}-
+
+      - name: Install font validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libharfbuzz-bin opentype-sanitizer
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Validate release tag
+        run: |
+          python - <<'PY'
+          import os
+          from font_profiles import VERSION_NUMBER
+
+          expected = f"v{VERSION_NUMBER}"
+          actual = os.environ["RELEASE_TAG"]
+          if actual != expected:
+              raise SystemExit(
+                  f"Release tag {actual!r} does not match VERSION_NUMBER {expected!r}"
+              )
+          print(f"Building {actual}")
+          PY
+
+      - name: Run tests
+        run: python -m unittest discover -s tests
+
+      - name: Build both font families
+        run: |
+          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+            python build_font.py --weight "$weight"
+          done
+          python build_font.py --base koburi
+
+      - name: Validate generated fonts
+        run: |
+          for font in dist/*.otf dist/*.ttf; do
+            ots-sanitize "$font" "/tmp/$(basename "$font")"
+          done
+          hb-shape dist/NobigoeMincho-Regular.otf "あーーー" --features=calt >/dev/null
+          hb-shape dist/NobigoeKoburiMincho-Regular.ttf "待ってーーー。" --direction=ttb >/dev/null
+
+      - name: Package release archives
+        run: |
+          python package_release.py
+          cd dist
+          sha256sum NobigoeMincho-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --generate-notes \
+            dist/NobigoeMincho-v*.zip \
+            dist/NobigoeKoburiMincho-v*.zip \
+            dist/SHA256SUMS
