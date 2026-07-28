@@ -10,7 +10,7 @@ from fontTools.misc.transform import Transform
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
-from build_font import feature_source
+from build_font import feature_source, make_punctuation_ligature
 from mark_positioning import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
@@ -148,6 +148,39 @@ class TrueTypeBuildTests(unittest.TestCase):
             adjust_outline_weight(outline, -10).bounds,
             (110.0, 110.0, 890.0, 490.0),
         )
+
+    def test_exclamation_sequences_use_shippori_upright_pua_ligatures(
+        self,
+    ) -> None:
+        source_ligature = pathops.Path()
+        pen = source_ligature.getPen()
+        for x_min, y_min, x_max, y_max in (
+            (100, 200, 200, 800),
+            (600, 200, 700, 800),
+            (120, 0, 180, 100),
+            (620, 0, 680, 100),
+        ):
+            pen.moveTo((x_min, y_min))
+            pen.lineTo((x_max, y_min))
+            pen.lineTo((x_max, y_max))
+            pen.lineTo((x_min, y_max))
+            pen.closePath()
+
+        font = minimal_true_type_font()
+        font["glyf"]["base"] = tt_glyph(source_ligature, 1000)
+        for codepoint in (0xE002, 0xE007, 0xE0E3):
+            add_unicode_mapping_if_missing(font, codepoint, "base")
+
+        pair = make_punctuation_ligature(font, "!!")
+        triple = make_punctuation_ligature(font, "!!!")
+        quadruple = make_punctuation_ligature(font, "!!!!")
+        five = make_punctuation_ligature(font, "!!!!!")
+
+        self.assertEqual(pair.bounds, source_ligature.bounds)
+        self.assertEqual(triple.bounds, source_ligature.bounds)
+        self.assertEqual(quadruple.bounds, source_ligature.bounds)
+        self.assertEqual(len(list(pair.contours)), 4)
+        self.assertEqual(len(list(five.contours)), 10)
 
     def test_choon_dakuten_uses_koburi_mark_centers(self) -> None:
         mark = transform_path(

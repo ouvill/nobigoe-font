@@ -44,8 +44,14 @@ SHIPPORI_PRECOMPOSED_LIGATURES = {
     "?!": 0x2048,
     "!?": 0x2049,
 }
+SHIPPORI_UPRIGHT_EXCLAMATIONS = {
+    "!": 0xE000,
+    "!!": 0xE002,
+    "!!!": 0xE007,
+    "!!!!": 0xE0E3,
+}
 SHIPPORI_COMPONENT_LIGATURES = {
-    "!": 0x203C,
+    "!": SHIPPORI_UPRIGHT_EXCLAMATIONS["!!"],
     "?": 0x2047,
 }
 MANGA_PUNCTUATION_SEQUENCES = (
@@ -467,6 +473,8 @@ def make_manga_wave_parts(
     return horizontal_isolated, added
 
 
+
+
 def make_punctuation_ligature(
     font: TTFont, sequence: str, advance: int = 1000
 ) -> pathops.Path:
@@ -474,6 +482,9 @@ def make_punctuation_ligature(
     components: list[tuple[pathops.Path, float, float]] = []
     total_width = gap * (len(sequence) - 1)
     cmap = font.getBestCmap()
+    upright_codepoint = SHIPPORI_UPRIGHT_EXCLAMATIONS.get(sequence)
+    if upright_codepoint is not None:
+        return _font_geometry.glyph_path(font, cmap[upright_codepoint])
     precomposed_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES.get(
         sequence
     )
@@ -481,10 +492,7 @@ def make_punctuation_ligature(
         return _font_geometry.glyph_path(font, cmap[precomposed_codepoint])
 
     for mark in sequence:
-        if mark == "!" and "?" in sequence:
-            source_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES["!?"]
-        else:
-            source_codepoint = SHIPPORI_COMPONENT_LIGATURES[mark]
+        source_codepoint = SHIPPORI_COMPONENT_LIGATURES[mark]
         source = _font_geometry.glyph_path(font, cmap[source_codepoint])
         contours = list(source.contours)
         if len(contours) != 4:
@@ -991,7 +999,10 @@ def build(
     sans_cmap = sans_font.getBestCmap()
     punctuation_missing = [
         f"U+{codepoint:04X}"
-        for codepoint in SHIPPORI_PRECOMPOSED_LIGATURES.values()
+        for codepoint in (
+            *SHIPPORI_UPRIGHT_EXCLAMATIONS.values(),
+            *SHIPPORI_PRECOMPOSED_LIGATURES.values(),
+        )
         if codepoint not in punctuation_cmap
     ]
     if punctuation_missing:
@@ -999,6 +1010,10 @@ def build(
             "The punctuation source does not contain "
             + ", ".join(punctuation_missing)
         )
+    upright_exclamation = _font_geometry.glyph_path(
+        punctuation_font,
+        punctuation_cmap[SHIPPORI_UPRIGHT_EXCLAMATIONS["!"]],
+    )
     if (
         punctuation_font["head"].unitsPerEm
         != font["head"].unitsPerEm
@@ -1240,14 +1255,21 @@ def build(
         punctuation_start : punctuation_start
         + len(MANGA_PUNCTUATION_SEQUENCES)
     ]
-    punctuation_paths = [
-        make_punctuation_ligature(punctuation_font, sequence)
-        for sequence in MANGA_PUNCTUATION_SEQUENCES
-    ]
     punctuation_vertical_origin = round(
         font["vmtx"].metrics[cmap[0xFF01]][1]
         + _font_geometry.bounds(font, cmap[0xFF01])[3]
     )
+    _font_operations.replace_glyph(
+        font,
+        cmap[0xFF01],
+        upright_exclamation,
+        punctuation_vertical_origin,
+        advance_override=1000,
+    )
+    punctuation_paths = [
+        make_punctuation_ligature(punctuation_font, sequence)
+        for sequence in MANGA_PUNCTUATION_SEQUENCES
+    ]
     _font_operations.append_glyphs(
         font,
         punctuation_paths,
