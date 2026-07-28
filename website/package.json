@@ -23,7 +23,7 @@
   ],
   "author": "Ouvill",
   "license": "UNLICENSED",
-  "homepage": "https://ouvill.github.io/nobigoe-font/",
+  "homepage": "https://nobigoe.ouvill.net/",
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "astro": "^7.1.4",

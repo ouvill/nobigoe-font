@@ -2,6 +2,8 @@
 
 Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号、感嘆符・疑問符合字と異体字、濁点・半濁点付き仮名を追加するフォント生成プロジェクトです。Noto版の欧文はLibertinus Serifの字形とメトリクスを使用します。
 
+制作: [Ouvill](https://blog.ouvill.net) · [X / @ouvill](https://twitter.com/ouvill) · [GitHub](https://github.com/ouvill) · [開発を支援](https://github.com/sponsors/ouvill)
+
 Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7ウェイト、源暎こぶり明朝版は別ファミリー`Nobigoe Koburi Mincho`（`のびごえこぶり明朝`）のRegularとして配布します。Noto版はOpenType/CFF、源暎こぶり明朝版は元フォントと同じTrueType形式です。
 
 ![のびごえ明朝とのびごえこぶり明朝の字形一覧。伸長記号、結合濁点・半濁点、感嘆符・疑問符合字、二つのファミリーを掲載](website/public/assets/readme-glyphs.png)
@@ -222,7 +224,7 @@ npm run dev
 
 `website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
 
-公開サイトは <https://ouvill.github.io/nobigoe-font/> です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
+公開サイトは <https://nobigoe.ouvill.net/> です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
 
 配信用Webfont（`website/src/assets/fonts/*.woff2`）は生成物のためGit管理に含めません。リポジトリ直下から標準版Regularを更新する場合は、次のコマンドを使用します。
 

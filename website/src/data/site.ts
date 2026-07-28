@@ -4,9 +4,16 @@ export const SITE = {
   title: "のびごえ明朝・のびごえこぶり明朝 — 声を、つなぐ。",
   description:
     "伸びる記号や結合文字を備えた7ウェイトの明朝体と、小説・縦組向けのこぶり明朝。",
+  author: {
+    name: "Ouvill",
+    url: "https://blog.ouvill.net",
+    socialHandle: "@ouvill",
+    socialUrl: "https://twitter.com/ouvill",
+  },
   version: "1.026",
   releaseUrl: "https://github.com/ouvill/nobigoe-font/releases",
   repositoryUrl: "https://github.com/ouvill/nobigoe-font",
+  supportUrl: "https://github.com/sponsors/ouvill",
 } as const;
 
 export const WEIGHTS = [

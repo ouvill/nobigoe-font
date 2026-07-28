@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+  release:
+    types:
+      - published
+  workflow_run:
+    workflows:
+      - Build and publish release
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -15,6 +23,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read

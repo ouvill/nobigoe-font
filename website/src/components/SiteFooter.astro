@@ -17,11 +17,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <a href={`${base}/`}>紹介</a>
     <a href={`${base}/tester/`}>文字を試す</a>
     <a href={`${base}/glyphs/`}>字形一覧</a>
+    <a href={SITE.author.url}>作者 Ouvill ↗</a>
+    <a href={SITE.author.socialUrl}>X / @ouvill ↗</a>
     <a href={`${SITE.repositoryUrl}#readme`}>README ↗</a>
     <a href={`${SITE.repositoryUrl}/blob/main/OFL.txt`}>License ↗</a>
+    <a href={SITE.supportUrl}>開発を支援 ↗</a>
     <a href={SITE.releaseUrl}>Releases ↗</a>
   </nav>
   <p class="footer-credit">
+    Designed and built by <a href={SITE.author.url}>{SITE.author.name}</a>.
     Independent type project. Not an official Adobe, Google, Noto, Libertinus,
     GenEi, or Shippori Mincho release.
   </p>

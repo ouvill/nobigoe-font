@@ -132,6 +132,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
           <h3>横組・縦組・ルビに対応</h3><p>
             漫画のセリフから、小説や電子書籍の縦組まで使えます。
           </p>
+          <a
+            class="specimen-link"
+            href={`${base}/nobigoe-mincho-vertical-specimen.pdf`}
+            >縦組みPDF見本を見る</a
+          >
         </div>
       </article>
     </div>
@@ -262,9 +267,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <div>
       <p>無料で利用できます / SIL OFL 1.1</p><h2 id="download-title">
         フォントをダウンロード
-      </h2><a class="button button--paper" href={SITE.releaseUrl}
-        >GitHub Releasesを開く ↗</a
-      >
+      </h2>
+      <div class="download-actions">
+        <a class="button button--paper" href={SITE.releaseUrl}
+          >GitHub Releasesを開く ↗</a
+        >
+        <a class="button button--paper-line" href={SITE.supportUrl}
+          >開発を支援する ↗</a
+        >
+      </div>
     </div>
     <div class="package-list">
       <article>

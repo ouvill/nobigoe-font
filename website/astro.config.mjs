@@ -1,8 +1,7 @@
 import { defineConfig } from "astro/config";
 
 export default defineConfig({
-  site: "https://ouvill.github.io",
-  base: "/nobigoe-font",
+  site: "https://nobigoe.ouvill.net",
   output: "static",
   outDir: "./site-dist",
   trailingSlash: "always",
