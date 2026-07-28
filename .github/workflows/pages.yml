@@ -34,7 +34,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: site/assets/*.woff2
-          key: site-webfonts-v1-${{ hashFiles('build_font.py', 'font_*.py', 'mark_positioning.py', 'site/index.html', 'site/script.js', 'site/marks-data.json') }}
+          key: site-webfonts-v2-${{ hashFiles('font_profiles.py', 'site/index.html') }}
 
       - name: Set up Python
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -43,26 +43,38 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Cache pinned font sources
-        if: steps.webfont-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: .cache/font-sources
-          key: font-sources-${{ runner.os }}-${{ hashFiles('font_profiles.py', 'font_sources.py') }}
-          restore-keys: |
-            font-sources-${{ runner.os }}-
-
-      - name: Install font build dependencies
+      - name: Install webfont dependencies
         if: steps.webfont-cache.outputs.cache-hit != 'true'
         run: python -m pip install -r requirements.txt
 
-      - name: Build source fonts
+      - name: Download released fonts
         if: steps.webfont-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            python build_font.py --weight "$weight"
-          done
-          python build_font.py --base koburi
+          version=$(python -c 'from font_profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          mkdir -p /tmp/font-release
+          gh release download "v${version}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.zip' \
+            --dir /tmp/font-release
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          destination = Path("dist")
+          destination.mkdir(exist_ok=True)
+          archives = sorted(Path("/tmp/font-release").glob("*.zip"))
+          if len(archives) != 2:
+              raise SystemExit(f"Expected two release ZIPs, found {len(archives)}")
+          for archive in archives:
+              with ZipFile(archive) as release:
+                  for member in release.infolist():
+                      path = Path(member.filename)
+                      if "Fonts" not in path.parts or path.suffix not in {".otf", ".ttf"}:
+                          continue
+                      (destination / path.name).write_bytes(release.read(member))
+          PY
 
       - name: Build webfonts
         if: steps.webfont-cache.outputs.cache-hit != 'true'
