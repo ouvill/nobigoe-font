@@ -1075,15 +1075,26 @@ def build(
         )
 
     source_ccmp_ligatures = _font_operations.feature_ligatures(font, "ccmp")
+    supported_mark_pairs = (
+        *_mark_positioning.MANGA_MARK_PAIRS,
+        _mark_positioning.CHOON_DAKUTEN_PAIR,
+    )
     native_mark_outputs: dict[tuple[int, int], str] = {}
-    for base, mark in _mark_positioning.MANGA_MARK_PAIRS:
+    for base, mark in supported_mark_pairs:
         if base not in cmap:
             continue
         output = source_ccmp_ligatures.get((cmap[base], cmap[mark]))
         if output is not None:
             native_mark_outputs[(base, mark)] = output
+    native_heart_outputs: dict[tuple[int, int], str] = {}
+    for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS:
+        output = source_ccmp_ligatures.get((cmap[base], cmap[mark]))
+        if output is not None:
+            native_heart_outputs[(base, mark)] = output
     if base_type == "koburi":
-        actual_native_pairs = frozenset(native_mark_outputs)
+        actual_native_pairs = frozenset(native_mark_outputs) & frozenset(
+            _mark_positioning.MANGA_MARK_PAIRS
+        )
         if actual_native_pairs != _mark_positioning.KOBURI_NATIVE_MARK_PAIRS:
             missing = _mark_positioning.KOBURI_NATIVE_MARK_PAIRS - actual_native_pairs
             extra = actual_native_pairs - _mark_positioning.KOBURI_NATIVE_MARK_PAIRS
@@ -1101,11 +1112,49 @@ def build(
                 "GenEi Koburi Mincho ccmp mappings must contain the "
                 "expected 88 native mark sequences: " + ", ".join(details)
             )
+        if _mark_positioning.CHOON_DAKUTEN_PAIR not in native_mark_outputs:
+            raise ValueError(
+                "GenEi Koburi Mincho ccmp mappings must contain "
+                "U+30FC+U+3099"
+            )
+        if set(native_heart_outputs) != set(
+            _mark_positioning.KOBURI_HEART_MARK_PAIRS
+        ):
+            raise ValueError(
+                "GenEi Koburi Mincho ccmp mappings must contain its "
+                "two native heart-dakuten sequences"
+            )
+        for base_pua, output_pua, pair in zip(
+            _mark_positioning.KOBURI_HEART_BASE_PUA,
+            _mark_positioning.KOBURI_HEART_OUTPUT_PUA,
+            _mark_positioning.KOBURI_HEART_MARK_PAIRS,
+            strict=True,
+        ):
+            _, mark = pair
+            native_output = native_heart_outputs[pair]
+            if (
+                base_pua not in cmap
+                or output_pua not in cmap
+                or source_ccmp_ligatures.get(
+                    (cmap[base_pua], cmap[mark])
+                )
+                != native_output
+                or cmap[output_pua] != native_output
+            ):
+                raise ValueError(
+                    "GenEi Koburi Mincho heart PUA mappings must remain "
+                    f"compatible for U+{base_pua:04X} and U+{output_pua:04X}"
+                )
     mark_position_overrides = _mark_positioning.load_mark_position_overrides(base=base_type)
     generated_mark_pairs = [
-        pair for pair in _mark_positioning.MANGA_MARK_PAIRS if pair not in native_mark_outputs
+        pair for pair in supported_mark_pairs if pair not in native_mark_outputs
     ]
     generated_vertical_mark_pairs = list(generated_mark_pairs)
+    generated_heart_pairs = [
+        pair
+        for pair in _mark_positioning.KOBURI_HEART_MARK_PAIRS
+        if pair not in native_heart_outputs
+    ]
 
     allocated_names = _font_operations.allocate_cid_names(
         font,
@@ -1117,7 +1166,7 @@ def build(
         + 2 * len(_mark_positioning.MANGA_MISSING_SMALL_KANA)
         + len(generated_mark_pairs)
         + len(generated_vertical_mark_pairs)
-        + len(_mark_positioning.KOBURI_HEART_MARK_PAIRS)
+        + len(generated_heart_pairs)
         + _mark_positioning.RUBY_GLYPH_COUNT,
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
@@ -1335,7 +1384,15 @@ def build(
     horizontal_mark_paths = []
     for base, mark in generated_mark_pairs:
         base_path = _font_geometry.glyph_path(font, cmap[base])
-        mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
+        if (base, mark) == _mark_positioning.CHOON_DAKUTEN_PAIR:
+            target_x, target_y = (
+                _mark_positioning.CHOON_DAKUTEN_MARK_CENTERS["horizontal"]
+            )
+            mark_transform = _font_geometry.centered_transform(
+                mark_paths[mark], 1, target_x, target_y
+            )
+        else:
+            mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
         if noto_mark_metric_ceiling is not None:
             mark_transform = _font_geometry.mark_collision_free_transform(base_path,
             mark_paths[mark],
@@ -1367,7 +1424,15 @@ def build(
         else:
             vertical_base = _font_operations.vertical_glyph_or_self(font, cmap[base])
         base_path = _font_geometry.glyph_path(font, vertical_base)
-        mark_transform = mark_position_overrides[(base, mark)]["vertical"]
+        if (base, mark) == _mark_positioning.CHOON_DAKUTEN_PAIR:
+            target_x, target_y = (
+                _mark_positioning.CHOON_DAKUTEN_MARK_CENTERS["vertical"]
+            )
+            mark_transform = _font_geometry.centered_transform(
+                mark_paths[mark], 1, target_x, target_y
+            )
+        else:
+            mark_transform = mark_position_overrides[(base, mark)]["vertical"]
         if noto_mark_metric_ceiling is not None:
             mark_transform = _font_geometry.mark_collision_free_transform(base_path,
             mark_paths[mark],
@@ -1401,34 +1466,47 @@ def build(
 
     heart_start = mark_vertical_start + len(generated_vertical_mark_pairs)
     heart_names = allocated_names[
-        heart_start : heart_start + len(_mark_positioning.KOBURI_HEART_MARK_PAIRS)
+        heart_start : heart_start + len(generated_heart_pairs)
     ]
     heart_paths = [
-        _font_geometry.compose_heart_dakuten_glyph(_font_geometry.glyph_path(font, cmap[base]),
-        mark_paths[mark],)
-        for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
+        _font_geometry.compose_heart_dakuten_glyph(
+            _font_geometry.glyph_path(font, cmap[base]),
+            mark_paths[mark],
+        )
+        for base, mark in generated_heart_pairs
     ]
-    _font_operations.append_glyphs(
-        font,
-        heart_paths,
-        heart_names,
-        cmap[0x2661],
-        880,
-        add_stem_hints=False,
+    if heart_paths:
+        _font_operations.append_glyphs(
+            font,
+            heart_paths,
+            heart_names,
+            cmap[0x2661],
+            880,
+            add_stem_hints=False,
+        )
+    heart_outputs = dict(native_heart_outputs)
+    heart_outputs.update(
+        zip(generated_heart_pairs, heart_names, strict=True)
     )
     for codepoint, (base, _) in zip(
         _mark_positioning.KOBURI_HEART_BASE_PUA,
         _mark_positioning.KOBURI_HEART_MARK_PAIRS,
         strict=True,
     ):
-        _font_operations.add_unicode_mapping(font, codepoint, cmap[base])
-    for codepoint, output in zip(
-        _mark_positioning.KOBURI_HEART_OUTPUT_PUA, heart_names, strict=True
+        _font_operations.add_unicode_mapping_if_missing(
+            font, codepoint, cmap[base]
+        )
+    for codepoint, pair in zip(
+        _mark_positioning.KOBURI_HEART_OUTPUT_PUA,
+        _mark_positioning.KOBURI_HEART_MARK_PAIRS,
+        strict=True,
     ):
-        _font_operations.add_unicode_mapping(font, codepoint, output)
+        output = heart_outputs[pair]
+        if cmap.get(codepoint) != output:
+            _font_operations.add_unicode_mapping(font, codepoint, output)
 
     mark_outputs = native_mark_outputs | generated_mark_outputs
-    ruby_start = heart_start + len(_mark_positioning.KOBURI_HEART_MARK_PAIRS)
+    ruby_start = heart_start + len(generated_heart_pairs)
     ruby_names = allocated_names[
         ruby_start : ruby_start + _mark_positioning.RUBY_GLYPH_COUNT
     ]
@@ -1466,15 +1544,18 @@ def build(
             _mark_positioning.KOBURI_PUA_START + offset,
             mark_outputs[pair],
         )
+    _font_operations.add_unicode_mapping(
+        font,
+        _mark_positioning.CHOON_DAKUTEN_PUA,
+        mark_outputs[_mark_positioning.CHOON_DAKUTEN_PAIR],
+    )
     kana_marks = [
         (cmap[base], cmap[mark], mark_outputs[(base, mark)])
-        for base, mark in _mark_positioning.MANGA_MARK_PAIRS
+        for base, mark in supported_mark_pairs
     ]
     kana_marks.extend(
-        (cmap[base], cmap[mark], output)
-        for (base, mark), output in zip(
-            _mark_positioning.KOBURI_HEART_MARK_PAIRS, heart_names, strict=True
-        )
+        (cmap[base], cmap[mark], heart_outputs[(base, mark)])
+        for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
     )
 
     latin_copyright = (

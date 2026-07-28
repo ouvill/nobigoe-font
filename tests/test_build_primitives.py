@@ -10,7 +10,14 @@ from fontTools.misc.transform import Transform
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
+from build_font import feature_source
+from mark_positioning import (
+    CHOON_DAKUTEN_MARK_CENTERS,
+    CHOON_DAKUTEN_PAIR,
+)
+
 from font_operations import (
+    add_unicode_mapping_if_missing,
     append_ttf_glyphs,
     feature_ligatures,
     feature_single_substitutions,
@@ -20,6 +27,7 @@ from font_operations import (
 )
 from font_geometry import (
     adjust_outline_weight,
+    centered_transform,
     mark_collision_free_transform,
     transform_path,
 )
@@ -49,6 +57,26 @@ def minimal_true_type_font() -> TTFont:
     builder.setupHorizontalMetrics({".notdef": (1000, 0), "base": (1000, 100)})
     builder.setupHorizontalHeader(ascent=880, descent=-120)
     builder.setupCharacterMap({0x25A1: "base"})
+    builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
+    builder.setupOS2()
+    builder.setupPost()
+    return builder.font
+
+
+def named_true_type_font(
+    glyph_order: list[str], cmap: dict[int, str]
+) -> TTFont:
+    builder = FontBuilder(1000, isTTF=True)
+    builder.setupGlyphOrder(glyph_order)
+    glyphs = {}
+    metrics = {}
+    for name in glyph_order:
+        glyphs[name] = TTGlyphPen(None).glyph()
+        metrics[name] = (1000, 0)
+    builder.setupGlyf(glyphs)
+    builder.setupHorizontalMetrics(metrics)
+    builder.setupHorizontalHeader(ascent=880, descent=-120)
+    builder.setupCharacterMap(cmap)
     builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
     builder.setupOS2()
     builder.setupPost()
@@ -120,6 +148,101 @@ class TrueTypeBuildTests(unittest.TestCase):
             adjust_outline_weight(outline, -10).bounds,
             (110.0, 110.0, 890.0, 490.0),
         )
+
+    def test_choon_dakuten_uses_koburi_mark_centers(self) -> None:
+        mark = transform_path(
+            rectangle_path(), Transform(0.2, 0, 0, 0.2, -300, 500)
+        )
+        for orientation, (target_x, target_y) in (
+            CHOON_DAKUTEN_MARK_CENTERS.items()
+        ):
+            placed = transform_path(
+                mark,
+                centered_transform(mark, 1, target_x, target_y),
+            )
+            x_min, y_min, x_max, y_max = placed.bounds
+            with self.subTest(orientation=orientation):
+                self.assertAlmostEqual(
+                    (x_min + x_max) / 2, target_x, places=3
+                )
+                self.assertAlmostEqual(
+                    (y_min + y_max) / 2, target_y, places=3
+                )
+
+    def test_feature_source_builds_choon_dakuten_substitutions(self) -> None:
+        base_codepoint, mark_codepoint = CHOON_DAKUTEN_PAIR
+        base = f"uni{base_codepoint:04X}"
+        mark = f"uni{mark_codepoint:04X}"
+        output = "choon.dakuten"
+        vertical_output = f"{output}.vert"
+        wave_names = [f"wave.{index}" for index in range(10)]
+        manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
+        punctuation_variants = [
+            ("!", ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3")),
+            ("?", ("question", "question.a1", "question.a2", "question.a3")),
+        ]
+        glyph_order = list(
+            dict.fromkeys(
+                [
+                    ".notdef",
+                    base,
+                    mark,
+                    output,
+                    vertical_output,
+                    "wave.base",
+                    "wave.vert",
+                    *wave_names,
+                    "manga-wave.base",
+                    *manga_wave_names,
+                    *(
+                        name
+                        for _, names in punctuation_variants
+                        for name in names
+                    ),
+                ]
+            )
+        )
+        font = named_true_type_font(
+            glyph_order,
+            {base_codepoint: base, mark_codepoint: mark},
+        )
+        source = feature_source(
+            [],
+            ("wave", "wave.base", "wave.vert", wave_names),
+            ("manga-wave", "manga-wave.base", manga_wave_names),
+            punctuation_variants,
+            [(base, mark, output)],
+            [(output, vertical_output)],
+            [],
+        )
+
+        addOpenTypeFeaturesFromString(font, source, tables={"GSUB"})
+
+        self.assertEqual(feature_ligatures(font, "ccmp")[(base, mark)], output)
+        self.assertEqual(
+            feature_single_substitutions(font, "vert")[output],
+            vertical_output,
+        )
+
+    def test_fallback_unicode_mapping_preserves_a_native_pua_glyph(
+        self,
+    ) -> None:
+        font = named_true_type_font(
+            [".notdef", "unicode.heart", "pua.heart"],
+            {0x2661: "unicode.heart", 0xE064: "pua.heart"},
+        )
+
+        existing = add_unicode_mapping_if_missing(
+            font, 0xE064, "unicode.heart"
+        )
+        added = add_unicode_mapping_if_missing(
+            font, 0xE065, "unicode.heart"
+        )
+
+        self.assertEqual(existing, "pua.heart")
+        self.assertEqual(added, "unicode.heart")
+        self.assertEqual(font.getBestCmap()[0xE064], "pua.heart")
+        self.assertEqual(font.getBestCmap()[0xE065], "unicode.heart")
 
     def test_mark_collision_transform_preserves_clear_placement(self) -> None:
         base = rectangle_path()

@@ -134,6 +134,16 @@ def add_unicode_mapping(font: TTFont, codepoint: int, name: str) -> None:
         raise ValueError(f"No cmap subtable supports U+{codepoint:04X}")
 
 
+def add_unicode_mapping_if_missing(
+    font: TTFont, codepoint: int, fallback_name: str
+) -> str:
+    existing_name = font.getBestCmap().get(codepoint)
+    if existing_name is not None:
+        return existing_name
+    add_unicode_mapping(font, codepoint, fallback_name)
+    return fallback_name
+
+
 def allocate_cid_names(font: TTFont, count: int) -> list[str]:
     existing = set(font.getGlyphOrder())
     available = [

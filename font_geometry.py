@@ -76,25 +76,34 @@ def adjust_outline_weight(outline: pathops.Path, amount: float) -> pathops.Path:
     return adjusted
 
 
+def centered_transform(
+    outline: pathops.Path,
+    scale: float,
+    target_x: float,
+    target_y: float,
+) -> Transform:
+    x_min, y_min, x_max, y_max = outline.bounds
+    center_x = (x_min + x_max) / 2
+    center_y = (y_min + y_max) / 2
+    return Transform(
+        scale,
+        0,
+        0,
+        scale,
+        target_x - scale * center_x,
+        target_y - scale * center_y,
+    )
+
+
 def centered_scaled_path(
     outline: pathops.Path,
     scale: float,
     target_x: float,
     target_y: float,
 ) -> pathops.Path:
-    x_min, y_min, x_max, y_max = outline.bounds
-    center_x = (x_min + x_max) / 2
-    center_y = (y_min + y_max) / 2
     return transform_path(
         outline,
-        Transform(
-            scale,
-            0,
-            0,
-            scale,
-            target_x - scale * center_x,
-            target_y - scale * center_y,
-        ),
+        centered_transform(outline, scale, target_x, target_y),
     )
 
 

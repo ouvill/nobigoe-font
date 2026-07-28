@@ -86,6 +86,14 @@ MANGA_MARK_PAIRS: tuple[MarkPair, ...] = tuple(
     [(base, 0x3099) for base in MANGA_DAKUTEN_BASES]
     + [(base, 0x309A) for base in MANGA_HANDAKUTEN_BASES]
 )
+CHOON_DAKUTEN_PAIR: MarkPair = (0x30FC, 0x3099)
+CHOON_DAKUTEN_PUA = 0xE0DB
+# Mark centers measured from GenEi Koburi Mincho's native U+E0DB
+# horizontal and vertical glyphs, normalized from 1024 to 1000 units/em.
+CHOON_DAKUTEN_MARK_CENTERS: dict[Orientation, tuple[float, float]] = {
+    "horizontal": (792.480, 689.453),
+    "vertical": (782.715, 660.156),
+}
 KOBURI_PUA_START = 0xE082
 KOBURI_PUA_MARK_PAIRS: tuple[MarkPair, ...] = tuple(
     [
