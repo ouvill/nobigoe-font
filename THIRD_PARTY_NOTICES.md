@@ -1,60 +1,111 @@
 # Third-Party Notices
 
-`Nobigoe Mincho Regular`（のびごえ明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。
+`Nobigoe Mincho`（のびごえ明朝）と`Nobigoe Koburi Mincho`（のびごえこぶり明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。
 
-## Noto Serif JP Regular
+## Noto Serif JP
 
 - Project: [Noto CJK](https://github.com/notofonts/noto-cjk)
-- Source file: `Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf`
 - Version: `2.003`
 - Commit: [`9b0f1436e455d902de067a2501422e5dc71ad16b`](https://github.com/notofonts/noto-cjk/commit/9b0f1436e455d902de067a2501422e5dc71ad16b)
-- Download: <https://raw.githubusercontent.com/notofonts/noto-cjk/9b0f1436e455d902de067a2501422e5dc71ad16b/Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf>
-- SHA-256: `2c9a12dbd4f2408c4610c7ee84a108b62d7236c3775baed618c64d9cb44b2f04`
+- Source directory: `Serif/SubsetOTF/JP/`
 - Copyright: `Copyright 2017-2024 Adobe (http://www.adobe.com/). Noto is a trademark of Google Inc.`
 - License: SIL Open Font License 1.1
 
+| Source file | SHA-256 |
+|---|---|
+| `NotoSerifJP-ExtraLight.otf` | `a5056bf9b22a624b62115e9ad242879492179fe6f0b45ce5932967eb20295d5e` |
+| `NotoSerifJP-Light.otf` | `54e6b0fa70430987a6c12001f128812f37fc315d899cb1d964395ab6450bb977` |
+| `NotoSerifJP-Regular.otf` | `2c9a12dbd4f2408c4610c7ee84a108b62d7236c3775baed618c64d9cb44b2f04` |
+| `NotoSerifJP-Medium.otf` | `f3a906cadd27f812a8b4b18618fa750928e65339fb372bd3f825f24e3271180b` |
+| `NotoSerifJP-SemiBold.otf` | `116d06c2b11ceba33ccb3f8c9eb1c86aba3d5761a1199fd37f74e83365e7a53d` |
+| `NotoSerifJP-Bold.otf` | `1e03488a0d5e819f07fcd74f54703a7961ba466d3ae900f8a2a730541e6d4543` |
+| `NotoSerifJP-Black.otf` | `b7197366b775ccb6cd3473b7b09f2c5759a2fdfdbfedf975029203828d0ad386` |
+
 ### 使用箇所と改変
 
-Noto Serif JP Regularを生成フォントのベースとして使用しています。既存字形・メトリクス・OpenTypeテーブルを保持し、次を追加または変更しています。
+各ウェイトを対応する`Nobigoe Mincho`の和文ベースとして使用しています。欧文字形とそのメトリクスはLibertinus Serifへ置換し、それ以外の既存字形・メトリクス・OpenTypeテーブルを保持しています。伸長記号、Manga1方式の感嘆符・疑問符合字、濁点・半濁点付き仮名、ルビ、小書きコを追加し、ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータを元フォントと区別できる名前へ変更しています。
 
-- `ー`、`―`、`〜`、`～`、`〰`の横組・縦組用連結字形と文脈置換
-- Manga1方式の全角感嘆符・疑問符合字と斜体明朝異体字
-- Manga1方式の濁点・半濁点付き仮名、半濁点付きルビ、小書きコ
-- ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータ
 
-元フォントと区別するため、生成フォントのファミリー名は `Nobigoe Mincho`（のびごえ明朝）です。
+## Libertinus Serif
 
-## Noto Sans JP Regular
+- Project: [Libertinus](https://github.com/alerque/libertinus)
+- Version: `7.051`
+- Archive: `Libertinus-7.051.zip`
+- Download: <https://github.com/alerque/libertinus/releases/download/v7.051/Libertinus-7.051.zip>
+- Archive SHA-256: `4d9be29b5cb380c35af8ba967abcc752ad1e07be1f738a9789c33e0dd7478c92`
+- Copyright: `Copyright © 2012-2024 The Libertinus Project Authors.`
+- License: SIL Open Font License 1.1（アーカイブ内の`OFL.txt`）
+
+| Source file | Used for | SHA-256 |
+|---|---|---|
+| `LibertinusSerif-Regular.otf` | ExtraLight / Light / Regular / Medium | `fcf06307a77367394fcb0ccb241e59eea70dba3d732be309647611224679c733` |
+| `LibertinusSerif-Semibold.otf` | SemiBold | `a4b3f28e85881db34695c1f005e4c79233a6caf3a2bd286c9b418c025fb99308` |
+| `LibertinusSerif-Bold.otf` | Bold / Black | `0264914210ed51b3231ebc92ce529e9f2e166ba9eebf0cd4a579558690a27b64` |
+
+### 使用箇所と改変
+
+Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended Additionalと、英文で使用するダッシュ、引用符、省略記号などの字形・水平メトリクスを使用します。標準の `fi`・`fl`・`ffi`・`ffl` 合字と、Noto Serif JPの `locl` が既定で選ぶ引用符・数字にも対応するLibertinus Serif字形を移植します。Libertinus Serifにない文字はNoto Serif JPの字形を保持します。Libertinus Serifが提供する3ウェイトを上表の対応で使用し、ExtraLight・Light・Medium・BlackではNoto Serif JPのウェイト推移に合うよう輪郭を細らせ、または太らせます。Noto Serif JP側のグリフ名とOpenTypeテーブルへ調整後の輪郭と水平メトリクスを移植します。源暎こぶり明朝版には取り込みません。
+
+## 源暎こぶり明朝
+
+- Project: [源暎フォント](https://okoneya.jp/font/genei-koburimin.html)
+- Archive: `GenEiKoburiMin_v6.1.zip`
+- Source file in archive: `GenEiKoburiMin_v6.1a/GenEiKoburiMin6-R.ttf`
+- Version: `6.1`
+- Download: <https://okoneya.jp/font/GenEiKoburiMin_v6.1.zip>
+- Archive SHA-256: `b17d4def22c048e704955912423c7bac8a03a3dbf1acaa722f254a7e9ece148a`
+- TTF SHA-256: `c27fb4039ac9fae19152716992b5b9d07558e24f6cccea7b0c1abd0109235166`
+- Copyright: `Copyright (c) 2017-2018, おたもん (http://okoneya.jp/font/), with Reserved Font Name '源暎'.`
+- License: SIL Open Font License 1.1（アーカイブ内の`OFLicense.txt`）
+
+### 使用箇所と改変
+
+`Nobigoe Koburi Mincho Regular`のベースとして使用しています。既存のTrueType字形・メトリクス・OpenTypeテーブルを保持し、Noto版と同じ追加機能をTrueType輪郭で収録します。派生フォント名にはReserved Font Nameの「源暎」を使用せず、英語ファミリー名を`Nobigoe Koburi Mincho`、日本語ファミリー名を`のびごえこぶり明朝`としています。
+
+## Noto Sans JP
 
 - Project: [Noto CJK](https://github.com/notofonts/noto-cjk)
-- Source file: `Sans/SubsetOTF/JP/NotoSansJP-Regular.otf`
 - Version: `2.004`
 - Commit: [`9b0f1436e455d902de067a2501422e5dc71ad16b`](https://github.com/notofonts/noto-cjk/commit/9b0f1436e455d902de067a2501422e5dc71ad16b)
-- Download: <https://raw.githubusercontent.com/notofonts/noto-cjk/9b0f1436e455d902de067a2501422e5dc71ad16b/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf>
-- SHA-256: `dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073`
+- Source directory: `Sans/SubsetOTF/JP/`
 - Copyright: `Copyright 2017-2024 Adobe (http://www.adobe.com/). Noto is a trademark of Google Inc.`
 - License: SIL Open Font License 1.1
 
+| Source file | Used for | SHA-256 |
+|---|---|---|
+| `NotoSansJP-Thin.otf` | ExtraLight | `1d8462eb0050bf6f8ee8dc0a34f11185839e155b0fce8ec2f14427b28d4d134f` |
+| `NotoSansJP-Light.otf` | Light | `e358dcfa7970805300a953bb71209c3efcbcc17a00a5e4101f8cf94a3870ad93` |
+| `NotoSansJP-Regular.otf` | Regular / Koburi | `dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073` |
+| `NotoSansJP-Medium.otf` | Medium | `f396a3b57256e4515be9cb41f7aac54766d654890082a9f1b5c2451b5c093d8a` |
+| `NotoSansJP-Bold.otf` | SemiBold / Bold | `1b0edfb500b73a4fa8a4fcaae1bbbd403994e08e73e3e0da37e70d3853f42c5f` |
+| `NotoSansJP-Black.otf` | Black | `3aa30b0956510f4205f759ab3079a5b658310ebcda2577f290466ea51c948819` |
+
 ### 使用箇所と改変
 
-Noto Sans JP Regularの全角感嘆符 `！`（U+FF01）と全角疑問符 `？`（U+FF1F）の輪郭を使用しています。単独字形とManga1方式の16シーケンスを全角1文字幅へ再配置し、ゴシック異体字を生成します。さらに右へ12度傾けた斜体ゴシック異体字を生成します。Noto Sans JPの本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
+対応ウェイトの全角感嘆符`！`（U+FF01）と全角疑問符`？`（U+FF1F）の輪郭を使用しています。単独字形とManga1方式の16シーケンスを全角1文字幅へ再配置してゴシック異体字を生成し、さらに右へ12度傾けた異体字を生成します。Noto Sans JPの本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
 
-## Shippori Mincho Regular（しっぽり明朝）
+## Shippori Mincho（しっぽり明朝）
 
 - Project: [Shippori Mincho](https://github.com/fontdasu/ShipporiMincho)
 - Official distribution: [しっぽり明朝](https://fontdasu.com/shippori-mincho/)
 - Archive: `shippori3.zip`
-- Source file in archive: `ShipporiMincho-OTF-Regular.otf`
 - Version: `3.300`
 - Download: <https://fontdasu.com/download/shippori3.zip>
 - Archive SHA-256: `dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e`
-- OTF SHA-256: `f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804`
 - Copyright in bundled OFL: `Copyright (c) 2021, The Shippori Mincho Project Authors (https://github.com/fontdasu/ShipporiMincho)`
 - License: SIL Open Font License 1.1（アーカイブ内の `OFL.txt`）
 
+| Source file | Used for | SHA-256 |
+|---|---|---|
+| `ShipporiMincho-OTF-Regular.otf` | ExtraLight / Light / Regular / Koburi | `f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804` |
+| `ShipporiMincho-OTF-Medium.otf` | Medium | `f2791831f662ad4de127eaef7e86a1ff6deb2e7a404330747729abc565821e06` |
+| `ShipporiMincho-OTF-SemiBold.otf` | SemiBold | `52c424195a4b47bdacb3ea5cf4ced699846dfbe8a3287272fdbb8c10bcc3215d` |
+| `ShipporiMincho-OTF-Bold.otf` | Bold | `1d890e64150ea8db1b593aa5ba78150a1db6156a6c566d00cf45bfe13526399f` |
+| `ShipporiMincho-OTF-ExtraBold.otf` | Black | `1ff1f3d462b1d37d69995ececced9011f89d15a56a4e94db923e982125b7f768` |
+
 ### 使用箇所と改変
 
-しっぽり明朝Regularに収録された既存合字 `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。2記号の組み合わせには該当する既存合字のCFF輪郭を直接使用し、3記号以上では `‼`、`⁇`、`⁉` の構成輪郭を抽出して全角1文字幅へ再配置します。さらに各字形を右へ12度傾けた斜体明朝異体字を生成します。OTF版から直接流用する2記号合字では、既定の明朝字形の曲線形状を変更しません。利用者がTTF版を指定した場合に限り、TrueTypeの2次ベジェ曲線をOpenType/CFFの3次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
+各ウェイトに収録された既存合字 `‼`（U+203C）、`⁇`（U+2047）、`⁈`（U+2048）、`⁉`（U+2049）の輪郭を使用しています。2記号の組み合わせには該当する既存合字の輪郭を使用し、3記号以上では構成輪郭を抽出して全角1文字幅へ再配置します。Noto版のMedium、SemiBold、Bold、Blackには順に同名ウェイト、同名ウェイト、Bold、ExtraBoldを使用します。400未満のしっぽり明朝がないため、ExtraLightとLightはRegularです。さらに各字形を右へ12度傾けた斜体明朝異体字を生成します。Noto版ではCFF輪郭を保持し、源暎こぶり明朝版ではTrueTypeの2次ベジェ曲線へ変換します。しっぽり明朝の本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
 
 ## Adobe-Manga1-0
 
@@ -65,4 +116,4 @@ Adobe-Manga1-0は、伸長記号、感嘆符・疑問符シーケンス、濁点
 
 ## License Distribution
 
-Noto Serif JP、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。
+Noto Serif JP、Libertinus Serif、源暎こぶり明朝、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。

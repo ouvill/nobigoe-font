@@ -13,52 +13,45 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from font_profiles import (
+    FontIdentity,
+    LIBERTINUS_ARCHIVE_SHA256,
+    LIBERTINUS_ARCHIVE_URL,
+    LIBERTINUS_COPYRIGHT,
+    LIBERTINUS_STROKE_ADJUSTMENTS,
+    KOBURI_ARCHIVE_SHA256,
+    KOBURI_ARCHIVE_URL,
+    KOBURI_TTF_MEMBER,
+    KOBURI_TTF_SHA256,
+    NOTO_WEIGHT_CLASSES,
+    SHIPPORI_ARCHIVE_SHA256,
+    SHIPPORI_ARCHIVE_URL,
+    SHIPPORI_COPYRIGHT,
+    VERSION,
+    VERSION_NUMBER,
+    default_output_path,
+    font_identity,
+    libertinus_serif_source,
+    shippori_source,
+    noto_sans_source,
+    noto_serif_source,
+)
+
 import pathops
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.misc.transform import Transform
 from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.cu2quPen import Cu2QuPen
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.transformPen import TransformPen
+from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.scaleUpem import scale_upem
 
-NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
-NOTO_SOURCE_URL = (
-    "https://raw.githubusercontent.com/notofonts/noto-cjk/"
-    f"{NOTO_COMMIT}/Serif/SubsetOTF/JP/NotoSerifJP-Regular.otf"
-)
-NOTO_SOURCE_SHA256 = (
-    "2c9a12dbd4f2408c4610c7ee84a108b62d7236c3775baed618c64d9cb44b2f04"
-)
-NOTO_SANS_SOURCE_URL = (
-    "https://raw.githubusercontent.com/notofonts/noto-cjk/"
-    f"{NOTO_COMMIT}/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf"
-)
-NOTO_SANS_SOURCE_SHA256 = (
-    "dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073"
-)
-SHIPPORI_ARCHIVE_URL = "https://fontdasu.com/download/shippori3.zip"
-SHIPPORI_ARCHIVE_SHA256 = (
-    "dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e"
-)
-SHIPPORI_OTF_MEMBER = "ShipporiMincho-OTF-Regular.otf"
-SHIPPORI_OTF_SHA256 = (
-    "f597e65ce1e686ad36b63e0c82e4931e9d815187ff2311705dcf1b751ecae804"
-)
-SHIPPORI_COPYRIGHT = (
-    "Copyright (c) 2021, The Shippori Mincho Project Authors "
-    "(https://github.com/fontdasu/ShipporiMincho)"
-)
-DEFAULT_OUTPUT = Path("dist/NobigoeMincho-Regular.otf")
-FAMILY = "Nobigoe Mincho"
-JAPANESE_FAMILY = "のびごえ明朝"
-FULL_NAME = f"{FAMILY} Regular"
-JAPANESE_FULL_NAME = f"{JAPANESE_FAMILY} Regular"
-POSTSCRIPT_NAME = "NobigoeMincho-Regular"
-VERSION_NUMBER = "1.020"
+
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
-VERSION = f"Version {VERSION_NUMBER}"
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
 SHIPPORI_PRECOMPOSED_LIGATURES = {
@@ -95,6 +88,33 @@ PUNCTUATION_VARIANT_SEQUENCES = (
     *MANGA_PUNCTUATION_SEQUENCES,
 )
 PUNCTUATION_ALTERNATE_COUNT = 3 * len(PUNCTUATION_VARIANT_SEQUENCES)
+LATIN_REPLACEMENT_RANGES = (
+    (0x0020, 0x024F),
+    (0x1E00, 0x1EFF),
+)
+LATIN_TYPOGRAPHIC_CODEPOINTS = (
+    0x2010,
+    0x2011,
+    0x2012,
+    0x2013,
+    0x2014,
+    0x2018,
+    0x2019,
+    0x201A,
+    0x201B,
+    0x201C,
+    0x201D,
+    0x201E,
+    0x201F,
+    0x2020,
+    0x2021,
+    0x2022,
+    0x2026,
+    0x2030,
+    0x2031,
+    0x2039,
+    0x203A,
+)
 PUNCTUATION_SLANT_ANGLE = 12
 MANGA_RUBY_HANDAKUTEN_BASES = (
     0x31F7,
@@ -306,34 +326,48 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Add automatically joining ー, ―, 〜, ～, and 〰 glyphs to "
-            "Noto Serif JP. Consecutive marks join through the calt feature."
+            "Noto Serif JP or GenEi Koburi Mincho."
         )
+    )
+    parser.add_argument(
+        "--base",
+        choices=("noto", "koburi"),
+        default="noto",
+        help="base typeface; Koburi is available in Regular only",
+    )
+    parser.add_argument(
+        "--weight",
+        choices=tuple(NOTO_WEIGHT_CLASSES),
+        default="Regular",
+        help="Noto Serif JP weight",
     )
     parser.add_argument(
         "--source",
         type=Path,
-        help=(
-            "Noto Serif JP OTF/TTC source "
-            "(the official JP SubsetOTF is recommended)"
-        ),
+        help="local Noto Serif JP OTF/TTC or GenEi Koburi Mincho TTF",
+    )
+    parser.add_argument(
+        "--latin-source",
+        type=Path,
+        help="local Libertinus Serif OTF used for Noto-based Latin glyphs",
     )
     parser.add_argument(
         "--punctuation-source",
         type=Path,
         help=(
-            "Shippori Mincho Regular OTF/TTF used for Manga1 "
-            "exclamation/question ligatures (OTF is recommended)"
+            "Shippori Mincho OTF/TTF used for Manga1 "
+            "exclamation/question ligatures (matching OTF weight by default)"
         ),
     )
     parser.add_argument(
         "--sans-source",
         type=Path,
-        help="Noto Sans JP OTF source used for sans punctuation variants",
+        help="local Noto Sans JP OTF used for sans punctuation variants",
     )
     parser.add_argument(
         "--face", type=int, default=0, help="TTC face index"
     )
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
 
@@ -392,6 +426,26 @@ def find_vertical_glyph(font: TTFont, base_name: str) -> str:
             if mapping and base_name in mapping:
                 return mapping[base_name]
     raise ValueError(f"The source font has no vertical substitution for {base_name}")
+
+
+def feature_single_substitutions(
+    font: TTFont, feature_tag: str
+) -> dict[str, str]:
+    lookup_indices: list[int] = []
+    for record in font["GSUB"].table.FeatureList.FeatureRecord:
+        if record.FeatureTag == feature_tag:
+            lookup_indices.extend(record.Feature.LookupListIndex)
+
+    substitutions: dict[str, str] = {}
+    for index in dict.fromkeys(lookup_indices):
+        lookup = font["GSUB"].table.LookupList.Lookup[index]
+        for subtable in lookup.SubTable:
+            if lookup.LookupType == 7:
+                subtable = subtable.ExtSubTable
+            mapping = getattr(subtable, "mapping", None)
+            if mapping is not None:
+                substitutions.update(mapping)
+    return substitutions
 
 
 def vertical_glyph_or_self(font: TTFont, base_name: str) -> str:
@@ -1060,6 +1114,9 @@ def replace_cff_glyph(
     name: str,
     outline: pathops.Path,
     vertical_origin: int,
+    *,
+    advance_override: int | None = None,
+    left_side_bearing_override: int | None = None,
 ) -> None:
     cff = font["CFF "].cff
     top = cff.topDictIndex[0]
@@ -1067,7 +1124,11 @@ def replace_cff_glyph(
     glyph_id = font.getGlyphID(name)
     fd_index = top.FDSelect[glyph_id]
     private = top.FDArray[fd_index].Private
-    advance = font["hmtx"].metrics[name][0]
+    advance = (
+        font["hmtx"].metrics[name][0]
+        if advance_override is None
+        else advance_override
+    )
     pen = T2CharStringPen(advance, None)
     outline.draw(pen)
     char_string = pen.getCharString(
@@ -1075,12 +1136,322 @@ def replace_cff_glyph(
     )
     char_strings.charStringsIndex[char_strings.charStrings[name]] = char_string
     x_min, _, _, y_max = outline.bounds
-    font["hmtx"].metrics[name] = (advance, math.floor(x_min))
+    left_side_bearing = (
+        math.floor(x_min)
+        if left_side_bearing_override is None
+        else left_side_bearing_override
+    )
+    font["hmtx"].metrics[name] = (advance, left_side_bearing)
     if "vmtx" in font:
         font["vmtx"].metrics[name] = (
             font["vmtx"].metrics[name][0],
             math.floor(vertical_origin - y_max),
         )
+
+
+def tt_glyph(outline: pathops.Path, units_per_em: int):
+    pen = TTGlyphPen(None)
+    outline.draw(Cu2QuPen(pen, max_err=units_per_em / 1000))
+    return pen.glyph()
+
+
+def append_ttf_glyphs(
+    font: TTFont,
+    paths: list[pathops.Path],
+    names: list[str],
+    source_glyph: str,
+    vertical_origin: int,
+    advance_override: int | None = None,
+) -> None:
+    if len(font.getGlyphOrder()) + len(names) > 65535:
+        raise ValueError("The source already fills the OpenType glyph limit")
+    glyph_order = font.getGlyphOrder() + names
+    advance = (
+        font["hmtx"].metrics[source_glyph][0]
+        if advance_override is None
+        else advance_override
+    )
+    glyf = font["glyf"]
+    units_per_em = font["head"].unitsPerEm
+    for name, outline in zip(names, paths, strict=True):
+        glyf[name] = tt_glyph(outline, units_per_em)
+        x_min, _, _, y_max = outline.bounds
+        font["hmtx"].metrics[name] = (advance, math.floor(x_min))
+        if "vmtx" in font:
+            font["vmtx"].metrics[name] = (
+                advance,
+                math.floor(vertical_origin - y_max),
+            )
+
+    font.setGlyphOrder(glyph_order)
+    glyf.glyphOrder = glyph_order
+    font["maxp"].numGlyphs = len(glyph_order)
+
+
+def replace_ttf_glyph(
+    font: TTFont,
+    name: str,
+    outline: pathops.Path,
+    vertical_origin: int,
+    *,
+    advance_override: int | None = None,
+    left_side_bearing_override: int | None = None,
+) -> None:
+    font["glyf"][name] = tt_glyph(outline, font["head"].unitsPerEm)
+    advance = (
+        font["hmtx"].metrics[name][0]
+        if advance_override is None
+        else advance_override
+    )
+    x_min, _, _, y_max = outline.bounds
+    left_side_bearing = (
+        math.floor(x_min)
+        if left_side_bearing_override is None
+        else left_side_bearing_override
+    )
+    font["hmtx"].metrics[name] = (advance, left_side_bearing)
+    if "vmtx" in font:
+        font["vmtx"].metrics[name] = (
+            font["vmtx"].metrics[name][0],
+            math.floor(vertical_origin - y_max),
+        )
+
+
+def append_glyphs(
+    font: TTFont,
+    paths: list[pathops.Path],
+    names: list[str],
+    source_glyph: str,
+    vertical_origin: int,
+    add_stem_hints: bool = True,
+    advance_override: int | None = None,
+) -> None:
+    if "CFF " in font:
+        append_cff_glyphs(
+            font,
+            paths,
+            names,
+            source_glyph,
+            vertical_origin,
+            add_stem_hints,
+            advance_override,
+        )
+        return
+    if "glyf" in font:
+        append_ttf_glyphs(
+            font,
+            paths,
+            names,
+            source_glyph,
+            vertical_origin,
+            advance_override,
+        )
+        return
+    raise ValueError("Only OpenType/CFF and TrueType outlines are supported")
+
+
+def replace_glyph(
+    font: TTFont,
+    name: str,
+    outline: pathops.Path,
+    vertical_origin: int,
+    *,
+    advance_override: int | None = None,
+    left_side_bearing_override: int | None = None,
+) -> None:
+    replace = replace_cff_glyph if "CFF " in font else replace_ttf_glyph
+    if "CFF " not in font and "glyf" not in font:
+        raise ValueError("Only OpenType/CFF and TrueType outlines are supported")
+    replace(
+        font,
+        name,
+        outline,
+        vertical_origin,
+        advance_override=advance_override,
+        left_side_bearing_override=left_side_bearing_override,
+    )
+
+
+def adjust_outline_weight(
+    outline: pathops.Path, amount: float
+) -> pathops.Path:
+    if amount == 0 or not outline.verbs:
+        return outline
+    boundary = pathops.Path()
+    boundary.addPath(outline)
+    boundary.stroke(
+        2 * abs(amount),
+        pathops.LineCap.BUTT_CAP,
+        pathops.LineJoin.MITER_JOIN,
+        4,
+    )
+    operation = (
+        pathops.PathOp.UNION
+        if amount > 0
+        else pathops.PathOp.DIFFERENCE
+    )
+    adjusted = pathops.op(outline, boundary, operation)
+    if outline.verbs and not adjusted.verbs:
+        raise ValueError("Latin weight adjustment removed an entire glyph")
+    return adjusted
+
+
+def replace_glyph_from_source(
+    font: TTFont,
+    target_name: str,
+    source_font: TTFont,
+    source_name: str,
+    weight_adjustment: float = 0,
+) -> None:
+    try:
+        _, _, _, target_y_max = bounds(font, target_name)
+    except ValueError:
+        target_y_max = 0
+    vertical_origin = (
+        font["vmtx"].metrics[target_name][1] + target_y_max
+        if "vmtx" in font
+        else 0
+    )
+    source_advance, source_lsb = source_font["hmtx"].metrics[source_name]
+    outline = adjust_outline_weight(
+        glyph_path(source_font, source_name), weight_adjustment
+    )
+    left_side_bearing = (
+        math.floor(outline.bounds[0])
+        if weight_adjustment and outline.verbs
+        else source_lsb
+    )
+    replace_glyph(
+        font,
+        target_name,
+        outline,
+        round(vertical_origin),
+        advance_override=source_advance,
+        left_side_bearing_override=left_side_bearing,
+    )
+
+
+def replace_latin_glyphs(
+    font: TTFont,
+    latin_font: TTFont,
+    weight_adjustment: float = 0,
+) -> tuple[int, ...]:
+    target_cmap = font.getBestCmap()
+    latin_cmap = latin_font.getBestCmap()
+    required = range(0x0020, 0x007F)
+    missing = [
+        f"U+{codepoint:04X}"
+        for codepoint in required
+        if codepoint not in target_cmap or codepoint not in latin_cmap
+    ]
+    if missing:
+        raise ValueError(
+            "The base and Latin sources must contain Basic Latin: "
+            + ", ".join(missing)
+        )
+
+    candidates = {
+        codepoint
+        for start, end in LATIN_REPLACEMENT_RANGES
+        for codepoint in range(start, end + 1)
+    }
+    candidates.update(LATIN_TYPOGRAPHIC_CODEPOINTS)
+    replaced: list[int] = []
+    replaced_names: set[str] = set()
+    for codepoint in sorted(candidates):
+        if codepoint not in target_cmap or codepoint not in latin_cmap:
+            continue
+        target_name = target_cmap[codepoint]
+        if target_name in replaced_names:
+            continue
+        source_name = latin_cmap[codepoint]
+        replace_glyph_from_source(
+            font,
+            target_name,
+            latin_font,
+            source_name,
+            weight_adjustment,
+        )
+        replaced.append(codepoint)
+        replaced_names.add(target_name)
+    return tuple(replaced)
+
+
+def replace_latin_gsub_glyphs(
+    font: TTFont,
+    latin_font: TTFont,
+    replaced_codepoints: tuple[int, ...],
+    weight_adjustment: float = 0,
+) -> tuple[str, ...]:
+    target_cmap = font.getBestCmap()
+    latin_cmap = latin_font.getBestCmap()
+    replaced_outputs: set[str] = set()
+    replaced_set = set(replaced_codepoints)
+    protected_names = {
+        glyph_name
+        for codepoint, glyph_name in target_cmap.items()
+        if codepoint not in replaced_set
+    }
+
+    target_defaults: dict[str, str] = {}
+    for feature_tag in ("ccmp", "locl"):
+        target_defaults.update(
+            feature_single_substitutions(font, feature_tag)
+        )
+        target_defaults.update(
+            {
+                components[0]: output
+                for components, output in feature_ligatures(
+                    font, feature_tag
+                ).items()
+                if len(components) == 1
+            }
+        )
+    for codepoint in replaced_codepoints:
+        target_name = target_cmap[codepoint]
+        source_name = latin_cmap[codepoint]
+        while target_name in target_defaults:
+            replacement_name = target_defaults[target_name]
+            if replacement_name in protected_names:
+                break
+            target_name = replacement_name
+            if target_name in replaced_outputs:
+                break
+            replace_glyph_from_source(
+                font,
+                target_name,
+                latin_font,
+                source_name,
+                weight_adjustment,
+            )
+            replaced_outputs.add(target_name)
+
+    source_codepoints = {
+        glyph_name: codepoint
+        for codepoint, glyph_name in latin_cmap.items()
+        if codepoint in replaced_codepoints
+    }
+    target_ligatures = feature_ligatures(font, "liga")
+    source_ligatures = feature_ligatures(latin_font, "liga")
+    for source_components, source_output in source_ligatures.items():
+        if not all(component in source_codepoints for component in source_components):
+            continue
+        codepoints = tuple(
+            source_codepoints[component] for component in source_components
+        )
+        target_components = tuple(target_cmap[codepoint] for codepoint in codepoints)
+        target_output = target_ligatures.get(target_components)
+        if target_output is None or target_output in replaced_outputs:
+            continue
+        replace_glyph_from_source(
+            font,
+            target_output,
+            latin_font,
+            source_output,
+            weight_adjustment,
+        )
+        replaced_outputs.add(target_output)
+    return tuple(sorted(replaced_outputs))
 
 
 def add_linear_extension(
@@ -1106,7 +1477,7 @@ def add_linear_extension(
     vertical_parts = make_vertical_parts(
         glyph_path(font, vertical), advance, vertical_origin
     )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         list(horizontal_parts + vertical_parts),
         names,
@@ -1447,37 +1818,64 @@ def set_japanese_name(font: TTFont, name_id: int, value: str) -> None:
 
 
 def rename_font(
-    font: TTFont, copyright_notice: str, font_notice: str
+    font: TTFont,
+    copyright_notice: str,
+    font_notice: str,
+    identity: FontIdentity,
 ) -> None:
+    legacy_style = "Bold" if identity.style == "Bold" else "Regular"
     set_name(font, 0, copyright_notice)
-    set_name(font, 1, FAMILY)
-    set_name(font, 2, "Regular")
-    set_name(font, 3, f"{VERSION_NUMBER};NOBIGOE;{POSTSCRIPT_NAME}")
-    set_name(font, 4, FULL_NAME)
+    set_name(font, 1, identity.legacy_family)
+    set_name(font, 2, legacy_style)
+    set_name(
+        font,
+        3,
+        f"{VERSION_NUMBER};NOBIGOE;{identity.postscript_name}",
+    )
+    set_name(font, 4, identity.full_name)
     set_name(font, 5, VERSION)
-    set_name(font, 6, POSTSCRIPT_NAME)
-    set_name(font, 16, FAMILY)
-    set_name(font, 17, "Regular")
-    set_japanese_name(font, 1, JAPANESE_FAMILY)
-    set_japanese_name(font, 4, JAPANESE_FULL_NAME)
-    set_japanese_name(font, 16, JAPANESE_FAMILY)
+    set_name(font, 6, identity.postscript_name)
+    set_name(font, 16, identity.family)
+    set_name(font, 17, identity.style)
+    set_japanese_name(font, 1, identity.japanese_legacy_family)
+    set_japanese_name(font, 4, identity.japanese_full_name)
+    set_japanese_name(font, 16, identity.japanese_family)
+    set_japanese_name(font, 17, identity.style)
 
-    cff = font["CFF "].cff
-    cff.fontNames = [POSTSCRIPT_NAME]
-    top = cff.topDictIndex[0]
-    top.Notice = font_notice
-    top.FamilyName = FAMILY
-    top.FullName = FULL_NAME
+    font["OS/2"].usWeightClass = identity.weight_class
+    font["OS/2"].fsSelection &= ~((1 << 5) | (1 << 6))
+    if identity.style == "Regular":
+        font["OS/2"].fsSelection |= 1 << 6
+    elif identity.style == "Bold":
+        font["OS/2"].fsSelection |= 1 << 5
+    font["head"].macStyle &= ~1
+    if identity.style == "Bold":
+        font["head"].macStyle |= 1
+
+    if "CFF " in font:
+        cff = font["CFF "].cff
+        cff.fontNames = [identity.postscript_name]
+        top = cff.topDictIndex[0]
+        top.Notice = font_notice
+        top.FamilyName = identity.family
+        top.FullName = identity.full_name
 
 
 def build(
     source_path: Path,
+    latin_source_path: Path | None,
     punctuation_source_path: Path,
     sans_source_path: Path,
     output_path: Path,
+    identity: FontIdentity,
     face: int,
 ) -> None:
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
+    if font["head"].unitsPerEm != 1000:
+        scale_upem(font, 1000)
+    latin_font = TTFont(latin_source_path) if latin_source_path else None
+    if latin_font and latin_font["head"].unitsPerEm != 1000:
+        scale_upem(latin_font, 1000)
     punctuation_font = TTFont(punctuation_source_path)
     sans_font = TTFont(sans_source_path)
     cmap = font.getBestCmap()
@@ -1557,6 +1955,15 @@ def build(
         raise AssertionError("Koburi Mincho PUA mappings must use Manga1 sequences")
     if len(KOBURI_HEART_MARK_PAIRS) != 2:
         raise AssertionError("Expected two Koburi Mincho heart mappings")
+    if latin_font is not None:
+        weight_adjustment = LIBERTINUS_STROKE_ADJUSTMENTS[identity.style]
+        replaced_latin = replace_latin_glyphs(
+            font, latin_font, weight_adjustment
+        )
+        replace_latin_gsub_glyphs(
+            font, latin_font, replaced_latin, weight_adjustment
+        )
+
     mark_position_overrides = load_mark_position_overrides()
     source_ccmp_ligatures = feature_ligatures(font, "ccmp")
     native_mark_outputs: dict[tuple[int, int], str] = {}
@@ -1610,7 +2017,7 @@ def build(
     wave_parts = make_wave_parts(
         glyph_path(font, wave_base), 1000, wave_vertical_origin
     )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         list(wave_parts),
         wave_names,
@@ -1634,13 +2041,13 @@ def build(
         1000,
         manga_wave_vertical_origin,
     )
-    replace_cff_glyph(
+    replace_glyph(
         font,
         manga_wave_base,
         manga_wave_isolated,
         manga_wave_vertical_origin,
     )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         list(manga_wave_parts),
         manga_wave_names,
@@ -1663,7 +2070,7 @@ def build(
         font["vmtx"].metrics[cmap[0xFF01]][1]
         + bounds(font, cmap[0xFF01])[3]
     )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         punctuation_paths,
         punctuation_names,
@@ -1735,7 +2142,7 @@ def build(
                 ),
             )
         )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         punctuation_alternate_paths,
         punctuation_alternate_names,
@@ -1757,7 +2164,7 @@ def build(
     )
     small_hiragana_vertical = centered_scaled_path(
         glyph_path(
-            font, find_vertical_glyph(font, cmap[0x3053])
+            font, vertical_glyph_or_self(font, cmap[0x3053])
         ),
         0.78,
         654,
@@ -1765,13 +2172,13 @@ def build(
     )
     small_katakana_vertical = centered_scaled_path(
         glyph_path(
-            font, find_vertical_glyph(font, cmap[0x30B3])
+            font, vertical_glyph_or_self(font, cmap[0x30B3])
         ),
         0.78,
         654,
         397,
     )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         [
             small_hiragana,
@@ -1815,7 +2222,7 @@ def build(
         )
         for base, mark in generated_mark_pairs
     ]
-    append_cff_glyphs(
+    append_glyphs(
         font,
         horizontal_mark_paths,
         generated_mark_names,
@@ -1844,7 +2251,7 @@ def build(
                 mark_position_overrides[(base, mark)]["vertical"],
             )
         )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         vertical_mark_paths,
         generated_vertical_mark_names,
@@ -1864,7 +2271,7 @@ def build(
     )
     for horizontal in native_mark_outputs.values():
         kana_vertical_maps.append(
-            (horizontal, find_vertical_glyph(font, horizontal))
+            (horizontal, vertical_glyph_or_self(font, horizontal))
         )
 
     heart_start = mark_vertical_start + len(generated_vertical_mark_pairs)
@@ -1878,7 +2285,7 @@ def build(
         )
         for base, mark in KOBURI_HEART_MARK_PAIRS
     ]
-    append_cff_glyphs(
+    append_glyphs(
         font,
         heart_paths,
         heart_names,
@@ -1917,7 +2324,7 @@ def build(
         glyph_path(font, ruby_vertical_source),
         Transform(RUBY_SCALE, 0, 0, RUBY_SCALE, 0, 0),
     )
-    append_cff_glyphs(
+    append_glyphs(
         font,
         [*ruby_paths, ruby_vertical_path],
         ruby_names,
@@ -1951,19 +2358,34 @@ def build(
         )
     )
 
+    latin_copyright = (
+        (latin_font["name"].getDebugName(0) or LIBERTINUS_COPYRIGHT)
+        if latin_font
+        else None
+    )
+    latin_license = (
+        latin_font["name"].getDebugName(13) if latin_font else None
+    )
     copyright_notices = [
         notice
         for notice in (
             font["name"].getDebugName(0),
+            latin_copyright,
             SHIPPORI_COPYRIGHT,
         )
         if notice
     ]
     copyright_notice = " / ".join(dict.fromkeys(copyright_notices))
+    source_notice = (
+        font["CFF "].cff.topDictIndex[0].Notice
+        if "CFF " in font
+        else font["name"].getDebugName(13)
+    )
     font_notices = [
         notice
         for notice in (
-            font["CFF "].cff.topDictIndex[0].Notice,
+            source_notice,
+            latin_license,
             SHIPPORI_COPYRIGHT,
         )
         if notice
@@ -1982,7 +2404,7 @@ def build(
             ruby_substitutions,
         ),
     )
-    rename_font(font, copyright_notice, font_notice)
+    rename_font(font, copyright_notice, font_notice, identity)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path, reorderTables=True)
@@ -1990,39 +2412,90 @@ def build(
 
 def main() -> None:
     args = parse_args()
+    if args.base == "koburi" and args.weight != "Regular":
+        raise ValueError("GenEi Koburi Mincho is available in Regular only")
+    if args.base == "koburi" and args.latin_source is not None:
+        raise ValueError("--latin-source is available for the Noto base only")
+    identity = font_identity(args.base, args.weight)
+    output_path = args.output or default_output_path(identity, args.base)
+
     with tempfile.TemporaryDirectory(
-        prefix="noto-serif-choon-"
+        prefix="nobigoe-mincho-"
     ) as directory:
         temporary_directory = Path(directory)
         source_path = args.source
-        if source_path is None:
-            source_path = (
-                temporary_directory / "NotoSerifJP-Regular.otf"
+        if source_path is None and args.base == "noto":
+            source_filename, source_url, source_sha256 = (
+                noto_serif_source(args.weight)
             )
-            print(f"Downloading {NOTO_SOURCE_URL}")
-            urllib.request.urlretrieve(NOTO_SOURCE_URL, source_path)
-            verify_sha256(source_path, NOTO_SOURCE_SHA256)
-        sans_source_path = args.sans_source
-        if sans_source_path is None:
-            sans_source_path = (
-                temporary_directory / "NotoSansJP-Regular.otf"
+            source_path = temporary_directory / source_filename
+            print(f"Downloading {source_url}")
+            urllib.request.urlretrieve(source_url, source_path)
+            verify_sha256(source_path, source_sha256)
+        elif source_path is None:
+            source_archive_path = (
+                temporary_directory / "GenEiKoburiMin_v6.1.zip"
             )
-            print(f"Downloading {NOTO_SANS_SOURCE_URL}")
+            source_path = temporary_directory / "GenEiKoburiMin6-R.ttf"
+            print(f"Downloading {KOBURI_ARCHIVE_URL}")
             urllib.request.urlretrieve(
-                NOTO_SANS_SOURCE_URL, sans_source_path
+                KOBURI_ARCHIVE_URL, source_archive_path
             )
             verify_sha256(
-                sans_source_path, NOTO_SANS_SOURCE_SHA256
+                source_archive_path, KOBURI_ARCHIVE_SHA256
             )
+            with zipfile.ZipFile(source_archive_path) as archive:
+                source_path.write_bytes(
+                    archive.read(KOBURI_TTF_MEMBER)
+                )
+            verify_sha256(source_path, KOBURI_TTF_SHA256)
 
+        latin_source_path = args.latin_source
+        if args.base == "noto" and latin_source_path is None:
+            latin_archive_path = (
+                temporary_directory / "Libertinus.zip"
+            )
+            latin_member, latin_sha256 = libertinus_serif_source(args.weight)
+            latin_source_path = temporary_directory / Path(latin_member).name
+            print(f"Downloading {LIBERTINUS_ARCHIVE_URL}")
+            urllib.request.urlretrieve(
+                LIBERTINUS_ARCHIVE_URL, latin_archive_path
+            )
+            verify_sha256(
+                latin_archive_path, LIBERTINUS_ARCHIVE_SHA256
+            )
+            with zipfile.ZipFile(latin_archive_path) as archive:
+                latin_source_path.write_bytes(archive.read(latin_member))
+            verify_sha256(latin_source_path, latin_sha256)
+
+        sans_source_path = args.sans_source
+        if sans_source_path is None:
+            sans_profile_weight = (
+                "Regular" if args.base == "koburi" else args.weight
+            )
+            sans_filename, sans_source_url, sans_sha256 = (
+                noto_sans_source(sans_profile_weight)
+            )
+            sans_source_path = temporary_directory / sans_filename
+            print(f"Downloading {sans_source_url}")
+            urllib.request.urlretrieve(
+                sans_source_url, sans_source_path
+            )
+            verify_sha256(sans_source_path, sans_sha256)
 
         punctuation_source_path = args.punctuation_source
         if punctuation_source_path is None:
             punctuation_archive_path = (
                 temporary_directory / "shippori3.zip"
             )
+            shippori_profile_weight = (
+                "Regular" if args.base == "koburi" else args.weight
+            )
+            shippori_member, shippori_sha256 = shippori_source(
+                shippori_profile_weight
+            )
             punctuation_source_path = (
-                temporary_directory / SHIPPORI_OTF_MEMBER
+                temporary_directory / shippori_member
             )
             print(f"Downloading {SHIPPORI_ARCHIVE_URL}")
             urllib.request.urlretrieve(
@@ -2033,17 +2506,17 @@ def main() -> None:
             )
             with zipfile.ZipFile(punctuation_archive_path) as archive:
                 punctuation_source_path.write_bytes(
-                    archive.read(SHIPPORI_OTF_MEMBER)
+                    archive.read(shippori_member)
                 )
-            verify_sha256(
-                punctuation_source_path, SHIPPORI_OTF_SHA256
-            )
+            verify_sha256(punctuation_source_path, shippori_sha256)
 
         build(
             source_path,
+            latin_source_path,
             punctuation_source_path,
             sans_source_path,
-            args.output,
+            output_path,
+            identity,
             args.face,
         )
 

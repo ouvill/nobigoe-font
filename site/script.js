@@ -1,3 +1,22 @@
+const siteIdentity = Object.freeze({
+  nameJa: "のびごえ明朝",
+  nameEn: "Nobigoe Mincho",
+  releaseUrl: "https://github.com/ouvill/nobigoe-font/releases",
+});
+
+for (const element of document.querySelectorAll("[data-project-name]")) {
+  element.textContent = siteIdentity.nameJa;
+}
+for (const element of document.querySelectorAll("[data-project-name-en]")) {
+  element.textContent = siteIdentity.nameEn;
+}
+for (const link of document.querySelectorAll("[data-release-url]")) {
+  link.href = siteIdentity.releaseUrl;
+}
+const brandLink = document.querySelector(".brand");
+brandLink.setAttribute("aria-label", `${siteIdentity.nameJa} トップへ`);
+document.title = `${siteIdentity.nameJa} — 声を、つなぐ。`;
+
 const root = document.documentElement;
 root.classList.add("fonts-loading");
 
@@ -249,7 +268,7 @@ catalogWritingMode.addEventListener("click", () => {
 
 async function loadCatalog() {
   try {
-    const response = await fetch("marks-data.json?v=1.020");
+    const response = await fetch("marks-data.json?v=1.024");
     if (!response.ok) {
       throw new Error(`Glyph catalog: HTTP ${response.status}`);
     }
@@ -264,7 +283,11 @@ async function loadCatalog() {
 
 async function revealFont() {
   try {
-    await document.fonts.load("64px Nobigoe", "ー〜〰あ゙♡゙♥゙！！？？");
+    await Promise.all([
+      document.fonts.load("64px Nobigoe", "ー〜〰あ゙♡゙♥゙！！？？"),
+      document.fonts.load('500 48px "Nobigoe Weight"', "声を、どこまでも。"),
+      document.fonts.load('48px "Nobigoe Koburi Demo"', "あのねーーーー"),
+    ]);
     await document.fonts.ready;
   } finally {
     root.classList.remove("fonts-loading");
