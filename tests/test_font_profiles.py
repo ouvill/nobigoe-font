@@ -159,13 +159,13 @@ class FontProfileTests(unittest.TestCase):
         self.assertEqual(
             KOBURI_RUBY_STROKE_ADJUSTMENTS,
             {
-                "ExtraLight": -3,
-                "Light": 0,
-                "Regular": 4,
-                "Medium": 8,
-                "SemiBold": 12,
-                "Bold": 19,
-                "Black": 28,
+                "ExtraLight": -4,
+                "Light": -1,
+                "Regular": 2,
+                "Medium": 7,
+                "SemiBold": 11,
+                "Bold": 17,
+                "Black": 25,
             },
         )
 

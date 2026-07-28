@@ -60,7 +60,7 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 
 ### 使用箇所と改変
 
-`Nobigoe Koburi Mincho Regular`のベースとして使用し、既存のTrueType字形・メトリクス・OpenTypeテーブルを保持して、Noto版と同じ追加機能をTrueType輪郭で収録します。また、同フォントの `ruby` が参照するルビ専用288字形を1000 units/emへ正規化し、通常仮名の輪郭面積を基準に線幅を各ウェイトへ合わせてNoto版へ移植します。派生フォント名にはReserved Font Nameの「源暎」を使用せず、英語ファミリー名を`Nobigoe Koburi Mincho`、日本語ファミリー名を`のびごえこぶり明朝`としています。
+`Nobigoe Koburi Mincho Regular`のベースとして使用し、既存のTrueType字形・メトリクス・OpenTypeテーブルを保持して、Noto版と同じ追加機能をTrueType輪郭で収録します。また、同フォントの `ruby` が参照するルビ専用288字形を1000 units/emへ正規化してNoto版へ移植します。線幅補正では、源暎こぶり明朝で97.7%に小さく設計された通常仮名を比較時だけ原寸へ戻して輪郭面積を測り、Noto各ウェイトとの差分をルビ輪郭へ適用します。ルビ字形は拡大縮小しません。派生フォント名にはReserved Font Nameの「源暎」を使用せず、英語ファミリー名を`Nobigoe Koburi Mincho`、日本語ファミリー名を`のびごえこぶり明朝`としています。
 
 ## Noto Sans JP
 
