@@ -1,7 +1,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from typing import Literal, TypeAlias
+
+BaseType: TypeAlias = Literal["noto", "koburi"]
+
+
+@dataclass(frozen=True)
+class DirectSource:
+    """A pinned font file available directly from a fixed URL."""
+
+    filename: str
+    url: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class ZipMemberSource:
+    """A pinned font file extracted from a member of a fixed ZIP archive."""
+
+    archive_filename: str
+    archive_url: str
+    archive_sha256: str
+    member: str
+    sha256: str
+
+    @property
+    def filename(self) -> str:
+        return PurePosixPath(self.member).name
 
 NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
 NOTO_WEIGHT_CLASSES = {
@@ -138,7 +165,7 @@ class FontIdentity:
         return self.japanese_full_name
 
 
-def font_identity(base: str, weight: str) -> FontIdentity:
+def font_identity(base: BaseType, weight: str) -> FontIdentity:
     if base == "koburi":
         return FontIdentity(
             "Nobigoe Koburi Mincho",
@@ -156,40 +183,62 @@ def font_identity(base: str, weight: str) -> FontIdentity:
     )
 
 
-def default_output_path(identity: FontIdentity, base: str) -> Path:
+def default_output_path(identity: FontIdentity, base: BaseType) -> Path:
     suffix = "ttf" if base == "koburi" else "otf"
     return Path("dist") / f"{identity.postscript_name}.{suffix}"
 
 
-def noto_serif_source(weight: str) -> tuple[str, str, str]:
+def noto_serif_source(weight: str) -> DirectSource:
     filename = f"NotoSerifJP-{weight}.otf"
     url = (
         "https://raw.githubusercontent.com/notofonts/noto-cjk/"
         f"{NOTO_COMMIT}/Serif/SubsetOTF/JP/{filename}"
     )
-    return filename, url, NOTO_SERIF_SHA256[weight]
+    return DirectSource(filename, url, NOTO_SERIF_SHA256[weight])
 
 
-def noto_sans_source(weight: str) -> tuple[str, str, str]:
+def noto_sans_source(weight: str) -> DirectSource:
     sans_weight = NOTO_SANS_WEIGHTS[weight]
     filename = f"NotoSansJP-{sans_weight}.otf"
     url = (
         "https://raw.githubusercontent.com/notofonts/noto-cjk/"
         f"{NOTO_COMMIT}/Sans/SubsetOTF/JP/{filename}"
     )
-    return filename, url, NOTO_SANS_SHA256[sans_weight]
+    return DirectSource(filename, url, NOTO_SANS_SHA256[sans_weight])
 
 
-def libertinus_serif_source(weight: str) -> tuple[str, str]:
+def koburi_source() -> ZipMemberSource:
+    return ZipMemberSource(
+        "GenEiKoburiMin_v6.1.zip",
+        KOBURI_ARCHIVE_URL,
+        KOBURI_ARCHIVE_SHA256,
+        KOBURI_TTF_MEMBER,
+        KOBURI_TTF_SHA256,
+    )
+
+
+def libertinus_serif_source(weight: str) -> ZipMemberSource:
     libertinus_weight = LIBERTINUS_WEIGHTS[weight]
     member = (
         f"Libertinus-{LIBERTINUS_VERSION}/static/OTF/"
         f"LibertinusSerif-{libertinus_weight}.otf"
     )
-    return member, LIBERTINUS_OTF_SHA256[libertinus_weight]
+    return ZipMemberSource(
+        f"Libertinus-{LIBERTINUS_VERSION}.zip",
+        LIBERTINUS_ARCHIVE_URL,
+        LIBERTINUS_ARCHIVE_SHA256,
+        member,
+        LIBERTINUS_OTF_SHA256[libertinus_weight],
+    )
 
 
-def shippori_source(weight: str) -> tuple[str, str]:
+def shippori_source(weight: str) -> ZipMemberSource:
     shippori_weight = SHIPPORI_WEIGHTS[weight]
     member = f"ShipporiMincho-OTF-{shippori_weight}.otf"
-    return member, SHIPPORI_OTF_SHA256[shippori_weight]
+    return ZipMemberSource(
+        "shippori3.zip",
+        SHIPPORI_ARCHIVE_URL,
+        SHIPPORI_ARCHIVE_SHA256,
+        member,
+        SHIPPORI_OTF_SHA256[shippori_weight],
+    )

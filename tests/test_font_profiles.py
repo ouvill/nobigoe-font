@@ -4,13 +4,15 @@ import unittest
 from pathlib import Path
 
 from font_profiles import (
+    DirectSource,
     LIBERTINUS_ARCHIVE_SHA256,
     LIBERTINUS_STROKE_ADJUSTMENTS,
     KOBURI_ARCHIVE_SHA256,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_ARCHIVE_SHA256,
-    default_output_path,
     VERSION_NUMBER,
+    ZipMemberSource,
+    default_output_path,
     font_identity,
     libertinus_serif_source,
     noto_sans_source,
@@ -66,18 +68,23 @@ class FontProfileTests(unittest.TestCase):
     def test_source_profiles_are_pinned(self) -> None:
         for weight in NOTO_WEIGHT_CLASSES:
             with self.subTest(weight=weight):
-                serif_name, serif_url, serif_hash = noto_serif_source(weight)
-                self.assertIn(weight, serif_name)
-                self.assertTrue(serif_url.endswith(serif_name))
-                self.assertEqual(len(serif_hash), 64)
+                serif = noto_serif_source(weight)
+                self.assertIsInstance(serif, DirectSource)
+                self.assertIn(weight, serif.filename)
+                self.assertTrue(serif.url.endswith(serif.filename))
+                self.assertEqual(len(serif.sha256), 64)
 
-                sans_name, sans_url, sans_hash = noto_sans_source(weight)
-                self.assertTrue(sans_url.endswith(sans_name))
-                self.assertEqual(len(sans_hash), 64)
+                sans = noto_sans_source(weight)
+                self.assertIsInstance(sans, DirectSource)
+                self.assertTrue(sans.url.endswith(sans.filename))
+                self.assertEqual(len(sans.sha256), 64)
 
-                shippori_name, shippori_hash = shippori_source(weight)
-                self.assertTrue(shippori_name.startswith("ShipporiMincho-OTF-"))
-                self.assertEqual(len(shippori_hash), 64)
+                shippori = shippori_source(weight)
+                self.assertIsInstance(shippori, ZipMemberSource)
+                self.assertTrue(
+                    shippori.member.startswith("ShipporiMincho-OTF-")
+                )
+                self.assertEqual(len(shippori.sha256), 64)
 
         self.assertEqual(len(SHIPPORI_ARCHIVE_SHA256), 64)
         self.assertEqual(len(LIBERTINUS_ARCHIVE_SHA256), 64)
@@ -85,7 +92,7 @@ class FontProfileTests(unittest.TestCase):
     def test_libertinus_latin_uses_nearest_available_serif_weights(self) -> None:
         self.assertEqual(
             {
-                weight: libertinus_serif_source(weight)[0]
+                weight: libertinus_serif_source(weight).member
                 for weight in NOTO_WEIGHT_CLASSES
             },
             {
@@ -120,7 +127,7 @@ class FontProfileTests(unittest.TestCase):
             },
         )
         for weight in NOTO_WEIGHT_CLASSES:
-            self.assertEqual(len(libertinus_serif_source(weight)[1]), 64)
+            self.assertEqual(len(libertinus_serif_source(weight).sha256), 64)
         self.assertEqual(
             LIBERTINUS_STROKE_ADJUSTMENTS,
             {
@@ -138,12 +145,19 @@ class FontProfileTests(unittest.TestCase):
         self.assertEqual(VERSION_NUMBER, "1.024")
 
     def test_missing_sans_weights_use_nearest_static_sources(self) -> None:
-        self.assertEqual(noto_sans_source("ExtraLight")[0], "NotoSansJP-Thin.otf")
-        self.assertEqual(noto_sans_source("SemiBold")[0], "NotoSansJP-Bold.otf")
+        self.assertEqual(
+            noto_sans_source("ExtraLight").filename, "NotoSansJP-Thin.otf"
+        )
+        self.assertEqual(
+            noto_sans_source("SemiBold").filename, "NotoSansJP-Bold.otf"
+        )
 
     def test_shippori_ligatures_follow_available_weights(self) -> None:
         self.assertEqual(
-            {weight: shippori_source(weight)[0] for weight in NOTO_WEIGHT_CLASSES},
+            {
+                weight: shippori_source(weight).filename
+                for weight in NOTO_WEIGHT_CLASSES
+            },
             {
                 "ExtraLight": "ShipporiMincho-OTF-Regular.otf",
                 "Light": "ShipporiMincho-OTF-Regular.otf",

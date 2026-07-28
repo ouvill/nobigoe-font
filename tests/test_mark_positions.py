@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import unittest
 
-from build_font import (
+from mark_positioning import (
     KOBURI_GENERATED_MARK_PAIRS,
     KOBURI_NATIVE_MARK_PAIRS,
     MARK_POSITION_DIRECTORY,

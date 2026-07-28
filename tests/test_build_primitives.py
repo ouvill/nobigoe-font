@@ -10,15 +10,17 @@ from fontTools.misc.transform import Transform
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
-from build_font import (
+from font_operations import (
     append_ttf_glyphs,
-    adjust_outline_weight,
     feature_ligatures,
     feature_single_substitutions,
-    mark_collision_free_transform,
     replace_latin_glyphs,
     replace_latin_gsub_glyphs,
     tt_glyph,
+)
+from font_geometry import (
+    adjust_outline_weight,
+    mark_collision_free_transform,
     transform_path,
 )
 

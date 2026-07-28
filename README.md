@@ -99,9 +99,21 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
+### コード構成
+
+`build_font.py`はCLIと生成手順のオーケストレーションに限定し、変更理由が異なる処理を次のモジュールへ分割しています。
+
+| モジュール | 責務 |
+|---|---|
+| `font_profiles.py` | ファミリー、ウェイト、固定取得元の型付き定義 |
+| `font_sources.py` | 明示ローカルパスとSHA-256検証済みキャッシュの解決 |
+| `mark_positioning.py` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
+| `font_geometry.py` | 輪郭変換、記号合成、衝突回避 |
+| `font_operations.py` | GSUB・cmap参照とCFF／TrueTypeグリフの追加・置換 |
+
 ### 自動取得して生成
 
-引数を省略するとRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JPとNoto Sans JPは固定コミット、Libertinus Serifと対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
+引数を省略するとRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JPとNoto Sans JPは固定コミット、Libertinus Serifと対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
 
 Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトだけですが、そのまま重複使用はしません。Noto Serif JPの7ウェイトにおける欧文インク量の推移を基準に、Regular由来のExtraLight・Lightを細く、Mediumを太くし、Bold由来のBlackを太く補正します。Regular・SemiBold・Boldは元のLibertinus輪郭を保持します。
 
@@ -118,7 +130,7 @@ done
 .venv/bin/python build_font.py --base koburi
 ```
 
-出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。ダウンロードした元フォントは一時ディレクトリだけに置き、リポジトリへ保存しません。
+出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
 公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布する予定です。
 
@@ -147,6 +159,8 @@ dist/NobigoeKoburiMincho-v1.024.zip
 ```
 
 `--source`、`--latin-source`、`--punctuation-source`、`--sans-source` の一部だけを指定した場合、指定しなかったフォントだけを自動取得します。`--latin-source`はNoto版だけに適用されます。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。源暎こぶり明朝版へローカルファイルを渡す場合は`--base koburi --source /path/to/GenEiKoburiMin6-R.ttf`とします。
+
+明示したローカルファイルはキャッシュより優先します。指定しなかった取得元だけキャッシュを検索し、正しいSHA-256のファイルがなければダウンロードします。キャッシュ内の不完全または不正なファイルは一時ファイルへ再取得し、検証成功後に置換します。
 
 しっぽり明朝はOTF版とTTF版のどちらも `--punctuation-source` に指定できます。明示したファイルはすべての明朝合字に使用されます。既定の自動取得ではNobigoeのウェイトに対応するOTF版を選び、Noto版ではCFF、源暎こぶり明朝版ではTrueTypeの輪郭形式へ追加字形を変換します。
 
