@@ -37,7 +37,7 @@ from fontTools.ttLib.scaleUpem import scale_upem
 
 WAVE_GLYPH_COUNT = 10
 MANGA_WAVE_GLYPH_COUNT = 7
-WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.15
+WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
 KOBURI_RUBY_RULE_COUNT = 289
@@ -233,6 +233,8 @@ def make_sine_wave_tile(
     taper_end: bool = False,
     half_waves: float = 3,
     taper_fraction: float = 1 / 4,
+    start_margin: float = 0,
+    end_margin: float = 0,
     sample_peak_position: float | None = None,
     sample_trough_position: float | None = None,
 ) -> pathops.Path:
@@ -258,6 +260,10 @@ def make_sine_wave_tile(
     direction = -1 if inverted else 1
     normal_phase_velocity = half_waves * math.pi / advance
     taper_length = advance * taper_fraction
+    drawing_start = start_margin if taper_start else 0.0
+    drawing_end = advance - end_margin if taper_end else float(advance)
+    start_taper_length = taper_length - drawing_start
+    end_taper_length = drawing_end - (advance - taper_length)
 
     terminal_phase_extension = (
         WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
@@ -318,29 +324,36 @@ def make_sine_wave_tile(
     def width_at(position: float) -> float:
         scale = 1.0
         if taper_start:
-            progress = min(1.0, max(0.0, position / taper_length))
+            progress = min(
+                1.0,
+                max(
+                    0.0,
+                    (position - drawing_start) / start_taper_length,
+                ),
+            )
             scale *= smoothstep(progress)
         if taper_end:
             progress = min(
-                1.0, max(0.0, (advance - position) / taper_length)
+                1.0,
+                max(0.0, (drawing_end - position) / end_taper_length),
             )
             scale *= smoothstep(progress)
         return half_stroke * scale
 
 
-    breakpoints = {0.0, float(advance)}
+    breakpoints = {drawing_start, drawing_end}
     if taper_start:
         breakpoints.add(taper_length)
     if taper_end:
         breakpoints.add(advance - taper_length)
-    phase_start, _ = phase_at(0)
-    phase_end, _ = phase_at(advance)
+    phase_start, _ = phase_at(drawing_start)
+    phase_end, _ = phase_at(drawing_end)
     for index in range(-8, 16):
         target = math.pi / 2 + index * math.pi
         if not phase_start < target < phase_end:
             continue
-        lower = 0.0
-        upper = float(advance)
+        lower = drawing_start
+        upper = drawing_end
         for _ in range(32):
             middle = (lower + upper) / 2
             middle_phase, _ = phase_at(middle)
@@ -382,14 +395,14 @@ def make_sine_wave_tile(
 
     tile = pathops.Path()
     pen = tile.getPen()
-    pen.moveTo((0, points[0][1] + width_at(0)))
+    pen.moveTo((drawing_start, points[0][1] + width_at(drawing_start)))
     for control_1, control_2, endpoint in segments:
         pen.curveTo(
             (control_1[0], control_1[1] + width_at(control_1[0])),
             (control_2[0], control_2[1] + width_at(control_2[0])),
             (endpoint[0], endpoint[1] + width_at(endpoint[0])),
         )
-    pen.lineTo((advance, points[-1][1] - width_at(advance)))
+    pen.lineTo((drawing_end, points[-1][1] - width_at(drawing_end)))
     for index in range(len(segments) - 1, -1, -1):
         control_1, control_2, _ = segments[index]
         start = points[index]
@@ -405,13 +418,30 @@ def make_sine_wave_tile(
 def make_wave_parts(
     source: pathops.Path, advance: int, vertical_origin: int
 ) -> tuple[pathops.Path, ...]:
+    source_x_min, _, source_x_max, _ = source.bounds
+    start_margin = max(0.0, source_x_min)
+    end_margin = max(0.0, advance - source_x_max)
     horizontal = (
-        make_sine_wave_tile(source, advance, taper_start=True),
+        make_sine_wave_tile(
+            source,
+            advance,
+            taper_start=True,
+            start_margin=start_margin,
+        ),
         make_sine_wave_tile(source, advance),
         make_sine_wave_tile(source, advance, inverted=True),
-        make_sine_wave_tile(source, advance, taper_end=True),
         make_sine_wave_tile(
-            source, advance, inverted=True, taper_end=True
+            source,
+            advance,
+            taper_end=True,
+            end_margin=end_margin,
+        ),
+        make_sine_wave_tile(
+            source,
+            advance,
+            inverted=True,
+            taper_end=True,
+            end_margin=end_margin,
         ),
     )
     tile_center_y = (
@@ -435,6 +465,9 @@ def make_wave_parts(
 def make_manga_wave_parts(
     source: pathops.Path, advance: int, vertical_origin: int
 ) -> tuple[pathops.Path, tuple[pathops.Path, ...]]:
+    source_x_min, _, source_x_max, _ = source.bounds
+    start_margin = max(0.0, source_x_min)
+    end_margin = max(0.0, advance - source_x_max)
     parameters = {
         "half_waves": 4,
         "taper_fraction": 1 / 6,
@@ -444,16 +477,26 @@ def make_manga_wave_parts(
         advance,
         taper_start=True,
         taper_end=True,
+        start_margin=start_margin,
+        end_margin=end_margin,
         **parameters,
     )
     horizontal_start = make_sine_wave_tile(
-        source, advance, taper_start=True, **parameters
+        source,
+        advance,
+        taper_start=True,
+        start_margin=start_margin,
+        **parameters,
     )
     horizontal_middle = make_sine_wave_tile(
         source, advance, **parameters
     )
     horizontal_end = make_sine_wave_tile(
-        source, advance, taper_end=True, **parameters
+        source,
+        advance,
+        taper_end=True,
+        end_margin=end_margin,
+        **parameters,
     )
     tile_center_y = (
         horizontal_middle.bounds[1] + horizontal_middle.bounds[3]

@@ -15,6 +15,8 @@ from build_font import (
     feature_source,
     import_koburi_ruby,
     make_punctuation_ligature,
+    make_manga_wave_parts,
+    make_wave_parts,
     shippori_upright_punctuation_paths,
 )
 from mark_positioning import (
@@ -157,6 +159,51 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(
             adjust_outline_weight(outline, -10).bounds,
             (110.0, 110.0, 890.0, 490.0),
+        )
+
+    def test_wave_terminals_reuse_source_glyph_margins(self) -> None:
+        (
+            horizontal_start,
+            horizontal_middle,
+            _,
+            horizontal_end,
+            _,
+            vertical_start,
+            vertical_middle,
+            _,
+            vertical_end,
+            _,
+        ) = make_wave_parts(rectangle_path(), 1000, 880)
+
+        self.assertEqual(horizontal_start.bounds[0], 100)
+        self.assertEqual(horizontal_end.bounds[2], 900)
+        self.assertEqual(horizontal_middle.bounds[0::2], (0, 1000))
+        self.assertEqual(vertical_start.bounds[3], 780)
+        self.assertEqual(vertical_end.bounds[1], -20)
+        self.assertEqual(vertical_middle.bounds[1::2], (-120, 880))
+
+        manga_isolated, manga_parts = make_manga_wave_parts(
+            rectangle_path(), 1000, 880
+        )
+        (
+            manga_start,
+            manga_middle,
+            manga_end,
+            manga_vertical_isolated,
+            manga_vertical_start,
+            manga_vertical_middle,
+            manga_vertical_end,
+        ) = manga_parts
+
+        self.assertEqual(manga_isolated.bounds[0::2], (100, 900))
+        self.assertEqual(manga_start.bounds[0], 100)
+        self.assertEqual(manga_end.bounds[2], 900)
+        self.assertEqual(manga_middle.bounds[0::2], (0, 1000))
+        self.assertEqual(manga_vertical_isolated.bounds[1::2], (-20, 780))
+        self.assertEqual(manga_vertical_start.bounds[3], 780)
+        self.assertEqual(manga_vertical_end.bounds[1], -20)
+        self.assertEqual(
+            manga_vertical_middle.bounds[1::2], (-120, 880)
         )
 
     def test_exclamation_sequences_use_shippori_upright_pua_ligatures(
