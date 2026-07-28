@@ -14,7 +14,7 @@ for (const link of document.querySelectorAll("[data-release-url]")) {
   link.href = siteIdentity.releaseUrl;
 }
 const brandLink = document.querySelector(".brand");
-brandLink.setAttribute("aria-label", `${siteIdentity.nameJa} トップへ`);
+brandLink.setAttribute("aria-label", "のびごえ明朝・のびごえこぶり明朝 トップへ");
 
 const root = document.documentElement;
 root.classList.add("fonts-loading");
@@ -97,6 +97,9 @@ const sizeValue = document.querySelector("#font-size-value");
 const testerText = document.querySelector("#tester-text");
 const testerCanvas = document.querySelector("#tester-canvas");
 const writingModeButtons = [...document.querySelectorAll("[data-writing-mode]")];
+const testerFamilyButtons = [
+  ...document.querySelectorAll(".tester-families [data-tester-family]"),
+];
 const sampleButtons = [...document.querySelectorAll("[data-sample]")];
 const punctuationStyleButtons = [
   ...document.querySelectorAll("[data-punctuation-style]"),
@@ -123,6 +126,21 @@ function updateTesterFeatures() {
 }
 
 sizeInput.addEventListener("input", updateTesterSize);
+
+for (const button of testerFamilyButtons) {
+  button.addEventListener("click", () => {
+    const family = button.dataset.testerFamily;
+    const koburi = family === "koburi";
+    const fontName = koburi ? "Nobigoe Koburi Demo" : "Nobigoe";
+    const label = koburi ? "のびごえこぶり明朝" : "のびごえ明朝";
+    testerCanvas.dataset.testerFamily = family;
+    testerCanvas.setAttribute("aria-label", `${label}の試字欄`);
+    updatePressedButtons(testerFamilyButtons, button);
+    document.fonts
+      .load(`${sizeInput.value}px "${fontName}"`, testerText.textContent)
+      .catch((error) => console.error(error));
+  });
+}
 
 for (const button of writingModeButtons) {
   button.addEventListener("click", () => {
@@ -334,7 +352,7 @@ catalogWritingMode.addEventListener("click", () => {
 
 async function loadCatalog() {
   try {
-    const response = await fetch("marks-data.json?v=1.024");
+    const response = await fetch("marks-data.json?v=1.025");
     if (!response.ok) {
       throw new Error(`Glyph catalog: HTTP ${response.status}`);
     }

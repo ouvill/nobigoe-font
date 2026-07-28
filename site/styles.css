@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Nobigoe";
-  src: url("assets/NobigoeMincho-Regular.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-Regular.woff2?v=1.025") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-ExtraLight-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-ExtraLight-showcase.woff2?v=1.025") format("woff2");
   font-weight: 200;
   font-style: normal;
   font-display: swap;
@@ -16,7 +16,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-Light-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-Light-showcase.woff2?v=1.025") format("woff2");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
@@ -24,7 +24,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-Regular.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-Regular.woff2?v=1.025") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -32,7 +32,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-Medium-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-Medium-showcase.woff2?v=1.025") format("woff2");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -40,7 +40,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-SemiBold-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-SemiBold-showcase.woff2?v=1.025") format("woff2");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -48,7 +48,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-Bold-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-Bold-showcase.woff2?v=1.025") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -56,7 +56,7 @@
 
 @font-face {
   font-family: "Nobigoe Weight";
-  src: url("assets/NobigoeMincho-Black-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeMincho-Black-showcase.woff2?v=1.025") format("woff2");
   font-weight: 900;
   font-style: normal;
   font-display: swap;
@@ -64,7 +64,7 @@
 
 @font-face {
   font-family: "Nobigoe Koburi Demo";
-  src: url("assets/NobigoeKoburiMincho-Regular-showcase.woff2?v=1.024.1") format("woff2");
+  src: url("assets/NobigoeKoburiMincho-Regular-showcase.woff2?v=1.025") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -355,38 +355,51 @@ button {
   border-color: var(--sage);
 }
 
-.project-identity {
+.hero-families {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 3px 16px;
-  max-width: 360px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 590px;
   margin: auto 0 0;
-  padding-top: 54px;
+  padding-top: 46px;
   border-top: 1px solid var(--line);
 }
 
-.project-identity span {
-  grid-row: 1 / 3;
-  align-self: center;
-  color: var(--muted);
-  font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  writing-mode: vertical-rl;
+.hero-families a {
+  display: grid;
+  min-width: 0;
+  padding-right: 22px;
+  text-decoration: none;
 }
 
-.project-identity strong {
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
+.hero-families a + a {
+  padding-right: 0;
+  padding-left: 22px;
+  border-left: 1px solid var(--line);
 }
 
-.project-identity small {
+.hero-families span,
+.hero-families small {
   color: var(--muted);
   font-family: var(--sans);
-  font-size: 8px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.hero-families strong {
+  margin: 8px 0 4px;
+  font-size: clamp(18px, 1.7vw, 25px);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.hero-families a:last-child strong {
+  font-size: clamp(16px, 1.45vw, 22px);
+}
+
+.hero-families a:hover strong,
+.hero-families a:focus-visible strong {
+  color: var(--sage);
 }
 
 .hero-stage {
@@ -501,6 +514,20 @@ button {
   color: var(--ink-soft);
   font-size: 16px;
   line-height: 2;
+}
+
+.shared-note {
+  display: inline-flex;
+  margin: 0 10px 8px 0;
+  padding: 2px 8px;
+  align-items: center;
+  color: var(--paper-light);
+  background: var(--sage);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
 }
 
 .change-story,
@@ -1176,7 +1203,7 @@ button {
 
 .tester-toolbar {
   display: grid;
-  grid-template-columns: minmax(210px, 1.2fr) repeat(3, auto);
+  grid-template-columns: minmax(190px, 1.2fr) repeat(4, auto);
   gap: 24px;
   align-items: end;
   padding: 24px;
@@ -1231,6 +1258,11 @@ button {
   font-size: 64px;
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+
+.tester-canvas[data-tester-family="koburi"] .tester-text {
+  font-family: "Nobigoe Koburi Demo", var(--serif);
 }
 
 .tester-text:focus {
@@ -1835,8 +1867,19 @@ button {
   .hero-lead {
     font-size: 16px;
   }
-  .project-identity {
+  .hero-families {
+    grid-template-columns: 1fr;
     padding-top: 38px;
+  }
+
+  .hero-families a {
+    padding: 0 0 18px;
+  }
+
+  .hero-families a + a {
+    padding: 18px 0 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 
   .hero-stage {
