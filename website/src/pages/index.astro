@@ -5,6 +5,10 @@ import WeightSpecimen from "../components/WeightSpecimen.astro";
 import { SITE } from "../data/site";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const koburiCompatibilityGlyphs = Array.from(
+  { length: 0xe0d9 - 0xe082 + 1 },
+  (_, index) => String.fromCodePoint(0xe082 + index),
+).join("");
 ---
 
 <BaseLayout pageClass="home-page">
@@ -17,7 +21,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
         <span>長音や波形記号が、</span><span>自然につながる。</span>
       </h1>
       <p class="hero-description">
-        長音「ー」、波ダッシュ「〜」、Wavy Dash「〰」を、必要な長さまで切れ目なく伸ばせる明朝体フォントです。
+        長音「ー」、波ダッシュ「〜」、Wavy
+        Dash「〰」を、必要な長さまで切れ目なく伸ばせる明朝体フォントです。
       </p>
       <div class="hero-actions">
         <a class="button button--solid" href={`${base}/tester/`}
@@ -71,7 +76,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       </h2>
     </header>
     <article class="wave-mechanism">
-      <div class="wave-mechanism__sample" aria-label="波ダッシュを6文字続けた見本">
+      <div
+        class="wave-mechanism__sample"
+        aria-label="波ダッシュを6文字続けた見本"
+      >
         <span>波ダッシュ「〜」 / U+301C WAVE DASH</span>
         <p>〜〜〜〜〜〜</p>
         <div
@@ -146,7 +154,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     <SectionHeading
       eyebrow="書体を選ぶ"
       id="intro-title"
-      description="収録機能は共通です。幅広い用途に使える「のびごえ明朝」と、小説や長文向けの「のびごえこぶり明朝」から選べます。"
+      description="幅広い用途と7ウェイトの「のびごえ明朝」、小説や長文に向く「のびごえこぶり明朝」。使い方に合わせて選べます。"
     >
       用途に合わせて、二つの書体から選べます。
     </SectionHeading>
@@ -197,6 +205,63 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       7段階の太さがあります。
     </SectionHeading>
     <WeightSpecimen />
+  </section>
+
+  <section
+    class="regular-section content-section"
+    aria-labelledby="regular-title"
+  >
+    <SectionHeading
+      eyebrow="Regular 400"
+      id="regular-title"
+      description="のびごえ明朝の標準ウェイトです。和文、源暎こぶり明朝と互換性のある濁点・半濁点字形、欧文をまとめて確認できます。"
+    >
+      Regularの字形を、ひと目で。
+    </SectionHeading>
+    <article class="regular-specimen">
+      <header class="regular-specimen__header">
+        <p>のびごえ明朝</p>
+        <div>
+          <h3>Regular</h3>
+          <span>Weight 400</span>
+        </div>
+      </header>
+      <div class="regular-specimen__body">
+        <section class="regular-specimen__block">
+          <h3><span>01</span>五十音</h3>
+          <div class="kana-specimen">
+            <p>
+              <span>ひらがな</span>
+              あいうえお　かきくけこ　さしすせそ　たちつてと<br />
+              なにぬねの　はひふへほ　まみむめも<br />
+              やゆよ　らりるれろ　わをん
+            </p>
+            <p>
+              <span>カタカナ</span>
+              アイウエオ　カキクケコ　サシスセソ　タチツテト<br />
+              ナニヌネノ　ハヒフヘホ　マミムメモ<br />
+              ヤユヨ　ラリルレロ　ワヲン
+            </p>
+          </div>
+        </section>
+        <section class="regular-specimen__block">
+          <h3><span>02</span>源暎こぶり明朝互換字形</h3>
+          <p class="regular-specimen__meta">
+            外字 U+E082–U+E0D9 / 濁点74字・半濁点14字
+          </p>
+          <p class="compatibility-glyphs">{koburiCompatibilityGlyphs}</p>
+        </section>
+        <section class="regular-specimen__block">
+          <h3><span>03</span>英数字・記号</h3>
+          <div class="latin-regular-specimen">
+            <p><span>Uppercase</span>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
+            <p><span>Lowercase</span>abcdefghijklmnopqrstuvwxyz</p>
+            <p><span>Figures</span>0123456789</p>
+            <p><span>Symbols</span>! ? @ # $ % &amp; * ( ) [ ]</p>
+          </div>
+        </section>
+      </div>
+    </article>
   </section>
 
   <section

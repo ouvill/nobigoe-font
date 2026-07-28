@@ -298,6 +298,29 @@
     text-overflow: clip;
   }
 
+  .regular-specimen__header,
+  .regular-specimen__block {
+    padding-right: 22px;
+    padding-left: 22px;
+  }
+
+  .kana-specimen {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .kana-specimen p {
+    font-size: clamp(24px, 7.3vw, 28px);
+  }
+
+  .compatibility-glyphs {
+    font-size: clamp(28px, 8vw, 32px);
+  }
+
+  .latin-regular-specimen p {
+    font-size: clamp(25px, 7.7vw, 30px);
+  }
+
   .reading-notes {
     padding: 24px;
   }

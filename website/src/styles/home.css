@@ -566,6 +566,146 @@
   white-space: nowrap;
 }
 
+.regular-section {
+  color: var(--paper-bright);
+  background: var(--ink);
+}
+
+.regular-section .section-kicker {
+  color: var(--accent-light);
+}
+
+.regular-section .section-description {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.regular-specimen {
+  color: var(--ink);
+  background: var(--paper-bright);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-family: "Nobigoe", var(--serif);
+}
+
+.regular-specimen__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: clamp(28px, 4vw, 54px);
+  background: var(--accent-light);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.regular-specimen__header p {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.regular-specimen__header div {
+  text-align: right;
+}
+
+.regular-specimen__header h3 {
+  margin: 0;
+  font-size: clamp(40px, 5vw, 68px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.regular-specimen__header div span {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 11px;
+}
+
+.regular-specimen__block {
+  padding: clamp(30px, 4vw, 56px);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.regular-specimen__block:last-child {
+  border-bottom: 0;
+}
+
+.regular-specimen__block > h3 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 clamp(24px, 3vw, 38px);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.regular-specimen__block > h3 span {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.kana-specimen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(30px, 5vw, 76px);
+}
+
+.kana-specimen p,
+.latin-regular-specimen p,
+.compatibility-glyphs {
+  margin: 0;
+}
+
+.kana-specimen p {
+  font-size: clamp(25px, 2.55vw, 38px);
+  letter-spacing: 0.025em;
+  line-height: 1.85;
+}
+
+.kana-specimen p > span,
+.latin-regular-specimen p > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.regular-specimen__meta {
+  margin: -24px 0 24px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 11px;
+}
+
+.compatibility-glyphs {
+  overflow-wrap: anywhere;
+  font-size: clamp(29px, 3vw, 44px);
+  letter-spacing: 0.12em;
+  line-height: 1.75;
+  word-break: break-all;
+}
+
+.latin-regular-specimen {
+  display: grid;
+  gap: clamp(18px, 2vw, 26px);
+}
+
+.latin-regular-specimen p {
+  overflow-wrap: anywhere;
+  font-size: clamp(27px, 3vw, 44px);
+  letter-spacing: 0.015em;
+  line-height: 1.5;
+}
+
 .reading-section {
   background: var(--moss-light);
 }
