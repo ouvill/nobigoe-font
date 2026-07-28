@@ -75,6 +75,27 @@ def adjust_outline_weight(outline: pathops.Path, amount: float) -> pathops.Path:
     return adjusted
 
 
+_HORIZONTAL_WEIGHT_STRETCH = 16
+
+
+def adjust_outline_horizontal_weight(
+    outline: pathops.Path,
+    amount: float,
+) -> pathops.Path:
+    """Adjust vertical stems while retaining thin horizontal strokes."""
+    if amount == 0 or not outline.verbs:
+        return outline
+    stretched = transform_path(
+        outline,
+        Transform(1, 0, 0, _HORIZONTAL_WEIGHT_STRETCH, 0, 0),
+    )
+    adjusted = adjust_outline_weight(stretched, amount)
+    return transform_path(
+        adjusted,
+        Transform(1, 0, 0, 1 / _HORIZONTAL_WEIGHT_STRETCH, 0, 0),
+    )
+
+
 def centered_transform(
     outline: pathops.Path,
     scale: float,

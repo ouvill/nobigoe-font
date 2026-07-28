@@ -84,22 +84,22 @@ LIBERTINUS_WEIGHTS = {
     "Black": "Bold",
 }
 LIBERTINUS_SCALE_FACTORS = {
-    "ExtraLight": 1.130,
-    "Light": 1.124,
+    "ExtraLight": 1.119,
+    "Light": 1.119,
     "Regular": 1.119,
-    "Medium": 1.113,
+    "Medium": 1.119,
     "SemiBold": 1.129,
     "Bold": 1.138,
-    "Black": 1.123,
+    "Black": 1.138,
 }
-LIBERTINUS_STROKE_ADJUSTMENTS = {
-    "ExtraLight": -9,
-    "Light": -6,
-    "Regular": -4,
+LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS = {
+    "ExtraLight": -13,
+    "Light": -9,
+    "Regular": -6,
     "Medium": 1,
-    "SemiBold": -5,
-    "Bold": -3,
-    "Black": 5,
+    "SemiBold": -8,
+    "Bold": -5,
+    "Black": 6,
 }
 # Normalize Koburi's 97.7%-sized hiragana before comparing kana ink area.
 KOBURI_RUBY_STROKE_ADJUSTMENTS = {
@@ -162,7 +162,7 @@ SHIPPORI_COPYRIGHT = (
     "Copyright (c) 2021, The Shippori Mincho Project Authors "
     "(https://github.com/fontdasu/ShipporiMincho)"
 )
-VERSION_NUMBER = "1.026"
+VERSION_NUMBER = "1.027"
 VERSION = f"Version {VERSION_NUMBER}"
 
 

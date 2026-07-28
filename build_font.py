@@ -13,7 +13,7 @@ from font_profiles import (
     FontIdentity,
     LIBERTINUS_COPYRIGHT,
     LIBERTINUS_SCALE_FACTORS,
-    LIBERTINUS_STROKE_ADJUSTMENTS,
+    LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_COPYRIGHT,
@@ -1312,18 +1312,20 @@ def build(
         raise AssertionError("Expected two Koburi Mincho heart mappings")
     if latin_font is not None:
         scale_factor = LIBERTINUS_SCALE_FACTORS[identity.style]
-        weight_adjustment = LIBERTINUS_STROKE_ADJUSTMENTS[identity.style]
+        horizontal_weight_adjustment = LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS[
+            identity.style
+        ]
         replaced_latin = _font_operations.replace_latin_glyphs(
             font,
             latin_font,
-            weight_adjustment=weight_adjustment,
+            horizontal_weight_adjustment=horizontal_weight_adjustment,
             scale_factor=scale_factor,
         )
         _font_operations.replace_latin_gsub_glyphs(
             font,
             latin_font,
             replaced_latin,
-            weight_adjustment=weight_adjustment,
+            horizontal_weight_adjustment=horizontal_weight_adjustment,
             scale_factor=scale_factor,
         )
 

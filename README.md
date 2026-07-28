@@ -122,7 +122,7 @@ python3 -m venv .venv
 
 引数を省略するとRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JPとNoto Sans JPは固定コミット、Libertinus Serif、源暎こぶり明朝、対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
 
-Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトだけですが、そのまま重複使用はしません。和文と調和するNoto Serif JPの欧文原字を基準に、各ウェイトでA–Zの輪郭高さ中央値が一致するようLibertinus Serifを1.113–1.138倍へ拡大します。そのうえで大文字・小文字・数字それぞれの「輪郭面積÷送り幅」の差が最小になるよう、輪郭を-9〜+5 units補正します。拡大率と補正量は`font_profiles.py`へウェイト別に固定し、通常字形、`locl`異体字、標準合字へ同じ変換を適用します。
+Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです。和文と欧文の高さを厳密に追従させて横幅まで変形するのではなく、Noto Serif JPの和文とおおむね高さが揃う等方拡大を実マスターごとに固定しています。Regular由来のExtraLight・Light・Regular・Mediumは1.119倍、Semiboldは1.129倍、Bold由来のBold・Blackは1.138倍です。同じマスターから作るウェイトでは輪郭と送り幅に同じ倍率を使い、個々の欧文字形の送り幅を共通化することで、拡大率に由来する文字列幅の逆転をなくしています。そのうえで細い横画をほぼ保ち、太い縦画を中心に-13〜+6 unitsのウェイト別輪郭補正を行います。同じ変換を通常字形、`ccmp`・`locl`異体字、標準合字へ適用します。
 
 ```sh
 # Noto版Regular
@@ -150,13 +150,13 @@ done
 ```
 
 ```text
-dist/NobigoeMincho-v1.026.zip
-dist/NobigoeKoburiMincho-v1.026.zip
+dist/NobigoeMincho-v1.027.zip
+dist/NobigoeKoburiMincho-v1.027.zip
 ```
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`font_profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.026`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`font_profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.027`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 

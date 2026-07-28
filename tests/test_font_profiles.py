@@ -7,7 +7,7 @@ from font_profiles import (
     DirectSource,
     LIBERTINUS_ARCHIVE_SHA256,
     LIBERTINUS_SCALE_FACTORS,
-    LIBERTINUS_STROKE_ADJUSTMENTS,
+    LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
     KOBURI_ARCHIVE_SHA256,
     NOTO_WEIGHT_CLASSES,
@@ -134,25 +134,25 @@ class FontProfileTests(unittest.TestCase):
         self.assertEqual(
             LIBERTINUS_SCALE_FACTORS,
             {
-                "ExtraLight": 1.130,
-                "Light": 1.124,
+                "ExtraLight": 1.119,
+                "Light": 1.119,
                 "Regular": 1.119,
-                "Medium": 1.113,
+                "Medium": 1.119,
                 "SemiBold": 1.129,
                 "Bold": 1.138,
-                "Black": 1.123,
+                "Black": 1.138,
             },
         )
         self.assertEqual(
-            LIBERTINUS_STROKE_ADJUSTMENTS,
+            LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
             {
-                "ExtraLight": -9,
-                "Light": -6,
-                "Regular": -4,
+                "ExtraLight": -13,
+                "Light": -9,
+                "Regular": -6,
                 "Medium": 1,
-                "SemiBold": -5,
-                "Bold": -3,
-                "Black": 5,
+                "SemiBold": -8,
+                "Bold": -5,
+                "Black": 6,
             },
         )
 
@@ -189,7 +189,7 @@ class FontProfileTests(unittest.TestCase):
 
 
     def test_release_version_tracks_feature_change(self) -> None:
-        self.assertEqual(VERSION_NUMBER, "1.026")
+        self.assertEqual(VERSION_NUMBER, "1.027")
 
     def test_missing_sans_weights_use_nearest_static_sources(self) -> None:
         self.assertEqual(

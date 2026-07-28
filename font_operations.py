@@ -394,7 +394,7 @@ def replace_glyph_from_source(
     target_name: str,
     source_font: TTFont,
     source_name: str,
-    weight_adjustment: float = 0,
+    horizontal_weight_adjustment: float = 0,
     scale_factor: float = 1,
 ) -> None:
     if scale_factor <= 0:
@@ -415,10 +415,13 @@ def replace_glyph_from_source(
             outline,
             Transform(scale_factor, 0, 0, scale_factor, 0, 0),
         )
-    outline = _font_geometry.adjust_outline_weight(outline, weight_adjustment)
+    outline = _font_geometry.adjust_outline_horizontal_weight(
+        outline,
+        horizontal_weight_adjustment,
+    )
     left_side_bearing = (
         math.floor(outline.bounds[0])
-        if (scale_factor != 1 or weight_adjustment) and outline.verbs
+        if (scale_factor != 1 or horizontal_weight_adjustment) and outline.verbs
         else round(source_lsb * scale_factor)
     )
     replace_glyph(
@@ -434,7 +437,7 @@ def replace_glyph_from_source(
 def replace_latin_glyphs(
     font: TTFont,
     latin_font: TTFont,
-    weight_adjustment: float = 0,
+    horizontal_weight_adjustment: float = 0,
     scale_factor: float = 1,
 ) -> tuple[int, ...]:
     target_cmap = font.getBestCmap()
@@ -471,7 +474,7 @@ def replace_latin_glyphs(
             target_name,
             latin_font,
             source_name,
-            weight_adjustment,
+            horizontal_weight_adjustment,
             scale_factor,
         )
         replaced.append(codepoint)
@@ -483,7 +486,7 @@ def replace_latin_gsub_glyphs(
     font: TTFont,
     latin_font: TTFont,
     replaced_codepoints: tuple[int, ...],
-    weight_adjustment: float = 0,
+    horizontal_weight_adjustment: float = 0,
     scale_factor: float = 1,
 ) -> tuple[str, ...]:
     target_cmap = font.getBestCmap()
@@ -521,7 +524,7 @@ def replace_latin_gsub_glyphs(
                 target_name,
                 latin_font,
                 source_name,
-                weight_adjustment,
+                horizontal_weight_adjustment,
                 scale_factor,
             )
             replaced_outputs.add(target_name)
@@ -548,7 +551,7 @@ def replace_latin_gsub_glyphs(
             target_output,
             latin_font,
             source_output,
-            weight_adjustment,
+            horizontal_weight_adjustment,
             scale_factor,
         )
         replaced_outputs.add(target_output)

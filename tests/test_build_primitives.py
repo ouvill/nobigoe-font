@@ -39,6 +39,7 @@ from font_operations import (
 from font_geometry import (
     bounds,
     adjust_outline_weight,
+    adjust_outline_horizontal_weight,
     centered_transform,
     transform_path,
 )
@@ -159,6 +160,18 @@ class TrueTypeBuildTests(unittest.TestCase):
             adjust_outline_weight(outline, -10).bounds,
             (110.0, 110.0, 890.0, 490.0),
         )
+
+    def test_horizontal_weight_adjustment_preserves_vertical_extent(self) -> None:
+        adjusted = adjust_outline_horizontal_weight(rectangle_path(), 10)
+
+        self.assertEqual((adjusted.bounds[0], adjusted.bounds[2]), (90.0, 910.0))
+        self.assertAlmostEqual(adjusted.bounds[1], 99.375)
+        self.assertAlmostEqual(adjusted.bounds[3], 500.625)
+
+        thinned = adjust_outline_horizontal_weight(rectangle_path(), -10)
+        self.assertEqual((thinned.bounds[0], thinned.bounds[2]), (110.0, 890.0))
+        self.assertAlmostEqual(thinned.bounds[1], 100.625)
+        self.assertAlmostEqual(thinned.bounds[3], 499.375)
 
     def test_wave_terminals_reuse_source_glyph_margins(self) -> None:
         (
