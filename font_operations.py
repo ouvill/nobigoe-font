@@ -8,6 +8,7 @@ from typing import Protocol
 
 import font_geometry as _font_geometry
 import pathops
+from fontTools.misc.transform import Transform
 from fontTools.pens.cu2quPen import Cu2QuPen
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
@@ -394,7 +395,10 @@ def replace_glyph_from_source(
     source_font: TTFont,
     source_name: str,
     weight_adjustment: float = 0,
+    scale_factor: float = 1,
 ) -> None:
+    if scale_factor <= 0:
+        raise ValueError("Latin scale factor must be positive")
     try:
         _, _, _, target_y_max = _font_geometry.bounds(font, target_name)
     except ValueError:
@@ -405,20 +409,24 @@ def replace_glyph_from_source(
         else 0
     )
     source_advance, source_lsb = source_font["hmtx"].metrics[source_name]
-    outline = _font_geometry.adjust_outline_weight(
-        _font_geometry.glyph_path(source_font, source_name), weight_adjustment
-    )
+    outline = _font_geometry.glyph_path(source_font, source_name)
+    if scale_factor != 1:
+        outline = _font_geometry.transform_path(
+            outline,
+            Transform(scale_factor, 0, 0, scale_factor, 0, 0),
+        )
+    outline = _font_geometry.adjust_outline_weight(outline, weight_adjustment)
     left_side_bearing = (
         math.floor(outline.bounds[0])
-        if weight_adjustment and outline.verbs
-        else source_lsb
+        if (scale_factor != 1 or weight_adjustment) and outline.verbs
+        else round(source_lsb * scale_factor)
     )
     replace_glyph(
         font,
         target_name,
         outline,
         round(vertical_origin),
-        advance_override=source_advance,
+        advance_override=round(source_advance * scale_factor),
         left_side_bearing_override=left_side_bearing,
     )
 
@@ -427,6 +435,7 @@ def replace_latin_glyphs(
     font: TTFont,
     latin_font: TTFont,
     weight_adjustment: float = 0,
+    scale_factor: float = 1,
 ) -> tuple[int, ...]:
     target_cmap = font.getBestCmap()
     latin_cmap = latin_font.getBestCmap()
@@ -463,6 +472,7 @@ def replace_latin_glyphs(
             latin_font,
             source_name,
             weight_adjustment,
+            scale_factor,
         )
         replaced.append(codepoint)
         replaced_names.add(target_name)
@@ -474,6 +484,7 @@ def replace_latin_gsub_glyphs(
     latin_font: TTFont,
     replaced_codepoints: tuple[int, ...],
     weight_adjustment: float = 0,
+    scale_factor: float = 1,
 ) -> tuple[str, ...]:
     target_cmap = font.getBestCmap()
     latin_cmap = latin_font.getBestCmap()
@@ -511,6 +522,7 @@ def replace_latin_gsub_glyphs(
                 latin_font,
                 source_name,
                 weight_adjustment,
+                scale_factor,
             )
             replaced_outputs.add(target_name)
 
@@ -537,6 +549,7 @@ def replace_latin_gsub_glyphs(
             latin_font,
             source_output,
             weight_adjustment,
+            scale_factor,
         )
         replaced_outputs.add(target_output)
     return tuple(sorted(replaced_outputs))

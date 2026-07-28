@@ -120,7 +120,7 @@ python3 -m venv .venv
 
 引数を省略するとRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JPとNoto Sans JPは固定コミット、Libertinus Serifと対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
 
-Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトだけですが、そのまま重複使用はしません。Noto Serif JPの7ウェイトにおける欧文インク量の推移を基準に、Regular由来のExtraLight・Lightを細く、Mediumを太くし、Bold由来のBlackを太く補正します。Regular・SemiBold・Boldは元のLibertinus輪郭を保持します。
+Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトだけですが、そのまま重複使用はしません。和文と調和するNoto Serif JPの欧文原字を基準に、各ウェイトでA–Zの輪郭高さ中央値が一致するようLibertinus Serifを1.113–1.138倍へ拡大します。そのうえで大文字・小文字・数字それぞれの「輪郭面積÷送り幅」の差が最小になるよう、輪郭を-9〜+5 units補正します。拡大率と補正量は`font_profiles.py`へウェイト別に固定し、通常字形、`locl`異体字、標準合字へ同じ変換を適用します。
 
 ```sh
 # Noto版Regular

@@ -44,7 +44,7 @@
 
 ### 使用箇所と改変
 
-Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended Additionalと、英文で使用するダッシュ、引用符、省略記号などの字形・水平メトリクスを使用します。標準の `fi`・`fl`・`ffi`・`ffl` 合字と、Noto Serif JPの `locl` が既定で選ぶ引用符・数字にも対応するLibertinus Serif字形を移植します。Libertinus Serifにない文字はNoto Serif JPの字形を保持します。Libertinus Serifが提供する3ウェイトを上表の対応で使用し、ExtraLight・Light・Medium・BlackではNoto Serif JPのウェイト推移に合うよう輪郭を細らせ、または太らせます。Noto Serif JP側のグリフ名とOpenTypeテーブルへ調整後の輪郭と水平メトリクスを移植します。源暎こぶり明朝版には取り込みません。
+Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended Additionalと、英文で使用するダッシュ、引用符、省略記号などの字形・水平メトリクスを使用します。標準の `fi`・`fl`・`ffi`・`ffl` 合字と、Noto Serif JPの `locl` が既定で選ぶ引用符・数字にも対応するLibertinus Serif字形を移植します。Libertinus Serifにない文字はNoto Serif JPの字形を保持します。Libertinus Serifが提供する3ウェイトを上表の対応で使用し、Noto Serif JPの欧文原字を基準に、大文字の輪郭高さ中央値と大文字・小文字・数字の送り幅あたりの輪郭面積を測定して、全7ウェイトの大きさと太さを補正します。Noto Serif JP側のグリフ名とOpenTypeテーブルへ調整後の輪郭と水平メトリクスを移植します。源暎こぶり明朝版には取り込みません。
 
 ## 源暎こぶり明朝
 

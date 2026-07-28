@@ -83,14 +83,23 @@ LIBERTINUS_WEIGHTS = {
     "Bold": "Bold",
     "Black": "Bold",
 }
+LIBERTINUS_SCALE_FACTORS = {
+    "ExtraLight": 1.130,
+    "Light": 1.124,
+    "Regular": 1.119,
+    "Medium": 1.113,
+    "SemiBold": 1.129,
+    "Bold": 1.138,
+    "Black": 1.123,
+}
 LIBERTINUS_STROKE_ADJUSTMENTS = {
-    "ExtraLight": -6,
-    "Light": -3,
-    "Regular": 0,
-    "Medium": 4,
-    "SemiBold": 0,
-    "Bold": 0,
-    "Black": 8,
+    "ExtraLight": -9,
+    "Light": -6,
+    "Regular": -3,
+    "Medium": 1,
+    "SemiBold": -4,
+    "Bold": -3,
+    "Black": 5,
 }
 LIBERTINUS_OTF_SHA256 = {
     "Regular": "fcf06307a77367394fcb0ccb241e59eea70dba3d732be309647611224679c733",

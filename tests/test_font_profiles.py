@@ -6,6 +6,7 @@ from pathlib import Path
 from font_profiles import (
     DirectSource,
     LIBERTINUS_ARCHIVE_SHA256,
+    LIBERTINUS_SCALE_FACTORS,
     LIBERTINUS_STROKE_ADJUSTMENTS,
     KOBURI_ARCHIVE_SHA256,
     NOTO_WEIGHT_CLASSES,
@@ -129,15 +130,27 @@ class FontProfileTests(unittest.TestCase):
         for weight in NOTO_WEIGHT_CLASSES:
             self.assertEqual(len(libertinus_serif_source(weight).sha256), 64)
         self.assertEqual(
+            LIBERTINUS_SCALE_FACTORS,
+            {
+                "ExtraLight": 1.130,
+                "Light": 1.124,
+                "Regular": 1.119,
+                "Medium": 1.113,
+                "SemiBold": 1.129,
+                "Bold": 1.138,
+                "Black": 1.123,
+            },
+        )
+        self.assertEqual(
             LIBERTINUS_STROKE_ADJUSTMENTS,
             {
-                "ExtraLight": -6,
-                "Light": -3,
-                "Regular": 0,
-                "Medium": 4,
-                "SemiBold": 0,
-                "Bold": 0,
-                "Black": 8,
+                "ExtraLight": -9,
+                "Light": -6,
+                "Regular": -3,
+                "Medium": 1,
+                "SemiBold": -4,
+                "Bold": -3,
+                "Black": 5,
             },
         )
 

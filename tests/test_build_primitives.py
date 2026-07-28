@@ -26,6 +26,7 @@ from font_operations import (
     tt_glyph,
 )
 from font_geometry import (
+    bounds,
     adjust_outline_weight,
     centered_transform,
     mark_collision_free_transform,
@@ -386,6 +387,31 @@ class TrueTypeBuildTests(unittest.TestCase):
             target["hmtx"].metrics[target_fi],
             source["hmtx"].metrics[source_fi],
         )
+
+    def test_latin_replacement_scales_outlines_advances_and_gsub_outputs(
+        self,
+    ) -> None:
+        target = ascii_true_type_font(900, "target")
+        source = ascii_true_type_font(500, "source")
+
+        replaced = replace_latin_glyphs(target, source, scale_factor=1.1)
+        replace_latin_gsub_glyphs(
+            target,
+            source,
+            replaced,
+            scale_factor=1.1,
+        )
+
+        target_cmap = target.getBestCmap()
+        target_a = target_cmap[0x41]
+        self.assertEqual(target["hmtx"].metrics[target_a], (550, 44))
+        self.assertEqual(bounds(target, target_a), (44, 88, 506, 660))
+        target_fi = feature_ligatures(target, "liga")[
+            (target_cmap[0x66], target_cmap[0x69])
+        ]
+        self.assertEqual(target["hmtx"].metrics[target_fi], (550, 44))
+        self.assertEqual(bounds(target, target_fi), (44, 88, 506, 660))
+
 
 if __name__ == "__main__":
     unittest.main()
