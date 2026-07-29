@@ -1,9 +1,9 @@
 export const SITE = {
   name: "のびごえ明朝",
   companion: "のびごえこぶり明朝",
-  title: "のびごえ明朝・のびごえこぶり明朝 — 声を、つなぐ。",
+  title: "のびごえ明朝 — 文章も、声の表情も。",
   description:
-    "伸びる記号や結合文字を備えた7ウェイトの明朝体と、小説・縦組向けのこぶり明朝。",
+    "Noto Serif JPを土台に、伸長記号、濁点・半濁点、感嘆符・疑問符の表現を加えた一般用途の明朝体。",
   author: {
     name: "Ouvill",
     url: "https://blog.ouvill.net",

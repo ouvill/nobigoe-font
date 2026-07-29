@@ -1,353 +1,379 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import SectionHeading from "../components/SectionHeading.astro";
 import ShapedText from "../components/ShapedText.astro";
 import WeightSpecimen from "../components/WeightSpecimen.astro";
 import { SITE } from "../data/site";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-const koburiCompatibilityGlyphs = Array.from(
-  { length: 0xe0d9 - 0xe082 + 1 },
-  (_, index) => String.fromCodePoint(0xe082 + index),
-).join("");
 ---
 
 <BaseLayout pageClass="home-page">
   <section class="home-hero" aria-labelledby="hero-title">
     <div class="hero-copy">
       <p class="hero-overline">
-        無料で使える明朝体フォント <span>Version {SITE.version}</span>
+        <span>GENERAL-PURPOSE JAPANESE SERIF</span>
+        <span>Version {SITE.version}</span>
       </p>
       <h1 id="hero-title">
-        <span>長音や波形記号が、</span><span>自然につながる。</span>
+        <span>文章も、</span>
+        <span>声の表情も。</span>
       </h1>
       <p class="hero-description">
-        長音「ー」、波ダッシュ「〜」、Wavy
-        Dash「〰」を、必要な長さまで切れ目なく伸ばせる明朝体フォントです。
+        のびごえ明朝は、Noto Serif
+        JPを土台にした一般用途の明朝体です。本文を読みやすく組める文字を揃えながら、長く伸びる記号、濁点・半濁点、感嘆符や疑問符まで、声のような文字表現を加えました。
       </p>
       <div class="hero-actions">
-        <a class="button button--solid" href={`${base}/tester/`}
-          >文章を入力して試す</a
-        >
+        <a class="button button--solid" href={`${base}/tester/`}>文章で試す</a>
         <a class="button button--line" href={SITE.releaseUrl}
-          >フォントをダウンロード ↗</a
+          >無料ダウンロード ↗</a
         >
       </div>
-    </div>
-    <div class="hero-specimen" aria-label="長音・波ダッシュ・Wavy Dashの見本">
-      <h2>「ー」「〜」「〰」を繰り返すだけ</h2>
-      <p class="hero-specimen-description">
-        OpenType対応アプリでは、並びに合わせた字形へ自動で置き換わります。
+      <p class="hero-license">
+        7ウェイト · 横組／縦組 · SIL Open Font License 1.1
       </p>
-      <div class="hero-symbols">
-        <article>
-          <span>長音</span>
-          <strong
-            ><ShapedText
-              class="shaped-text"
-              text="あーーーーーー"
-              label="あに続く、つながった6文字の長音"
-            /></strong
-          >
-        </article>
-        <article class="hero-symbols__wave">
-          <span>波ダッシュ</span>
-          <strong
-            ><ShapedText
-              class="shaped-text"
-              text="ざわ〜〜〜〜〜"
-              label="ざわに続く、つながった5文字の波ダッシュ"
-            /></strong
-          >
-        </article>
-        <article>
-          <span>Wavy Dash</span>
-          <strong
-            ><ShapedText
-              class="shaped-text"
-              text="波紋〰〰〰〰"
-              label="波紋に続く、つながった4文字のWavy Dash"
-            /></strong
-          >
-        </article>
-      </div>
-      <p class="hero-specimen-note">横組・縦組の両方に対応</p>
     </div>
-    <div class="hero-family-strip">
-      <article>
-        <span>7ウェイト</span><strong>のびごえ明朝</strong><small
-          >見出し・本文向け</small
-        >
-      </article>
-      <article>
-        <span>Regular</span><strong>のびごえこぶり明朝</strong><small
-          >小説・長文・縦組向け</small
-        >
-      </article>
-    </div>
-  </section>
 
-  <section class="capability-summary" aria-labelledby="capability-title">
-    <header>
-      <p>一番の特徴</p>
-      <h2 id="capability-title">
-        三つの伸長記号を、好きな長さまで自然につなげられます。
-      </h2>
-    </header>
-    <article class="wave-mechanism">
-      <div
-        class="wave-mechanism__sample"
-        aria-label="波ダッシュを6文字続けた見本"
+    <div class="hero-specimen" aria-label="のびごえ明朝でできる文字表現の見本">
+      <p class="hero-specimen-index">NOBIGOE IN ACTION</p>
+      <div class="hero-voice hero-voice--long">
+        <span>伸ばす</span>
+        <strong>
+          <ShapedText
+            class="shaped-text"
+            text="待ってーーーー！"
+            label="待ってに続いて長くつながる長音と感嘆符"
+          />
+        </strong>
+      </div>
+      <div class="hero-voice hero-voice--wave">
+        <span>揺らす</span>
+        <strong>
+          <ShapedText
+            class="shaped-text"
+            text="ざわ〜〜〜〜〜"
+            label="ざわに続いて長くつながる波ダッシュ"
+          />
+        </strong>
+      </div>
+      <div class="hero-voice hero-voice--mark">
+        <span>濁らせる</span>
+        <strong>
+          <ShapedText
+            class="shaped-text"
+            text="あ゙っ！！？"
+            label="濁点付きのあ、小さいつ、感嘆符二つと疑問符の合字"
+          />
+        </strong>
+      </div>
+      <p class="hero-specimen-note">
+        同じフォント、同じ文字入力から。OpenType機能で自動的に組み替わります。
+      </p>
+    </div>
+
+    <nav class="capability-nav" aria-label="できること">
+      <a href="#extend"
+        ><span>01</span><strong>記号を伸ばす</strong><small
+          >4種類・縦横対応</small
+        ></a
       >
-        <span>波ダッシュ「〜」 / U+301C WAVE DASH</span>
-        <p>
-          <ShapedText
-            class="shaped-text"
-            text="〜〜〜〜〜〜"
-            label="つながった6文字の波ダッシュ"
-          />
-        </p>
-        <div
-          class="wave-parity"
-          aria-label="奇数番目と偶数番目の波形を交互に使用"
-        >
-          <span>奇数</span><span>偶数</span><span>奇数</span><span>偶数</span
-          ><span>奇数</span><span>偶数</span>
-        </div>
-      </div>
-      <div class="wave-mechanism__copy">
-        <p>波ダッシュがつながる仕組み</p>
-        <h3>「〜」は一文字に3半波。奇数番目と偶数番目で波の形が変わります。</h3>
-        <p>
-          3半波は奇数なので、同じ字形をそのまま並べると波がつながりません。文字の並びに応じて二つの字形を交互に使い、切れ目のない波へ自動で置き換えます。
-        </p>
-      </div>
-    </article>
-    <div class="extension-notes">
-      <article>
-        <p class="capability-glyph">
-          <ShapedText
-            class="shaped-text"
-            text="あーーーー"
-            label="あに続く、つながった4文字の長音"
-          />
-        </p>
-        <div>
-          <h3>長音「ー」</h3><p>
-            始端・中間・終端の字形を使い分け、一本の線として伸ばします。
-          </p>
-        </div>
-      </article>
-      <article>
-        <p class="capability-glyph">
-          <ShapedText
-            class="shaped-text"
-            text="波紋〰〰〰"
-            label="波紋に続く、つながった3文字のWavy Dash"
-          />
-        </p>
-        <div>
-          <h3>Wavy Dash「〰」 / U+3030</h3><p>
-            一文字に4半波を収めた細かな波が、そのまま連続します。
-          </p>
-        </div>
-      </article>
-    </div>
-    <h3 class="other-features-title">そのほかの収録機能</h3>
-    <div class="capability-list">
-      <article>
-        <p class="capability-glyph">
-          <ShapedText
-            class="shaped-text"
-            text="が　き゚"
-            label="結合濁点付きの「か」と結合半濁点付きの「き」"
-          />
-        </p>
-        <div>
-          <h3>濁点・半濁点を合成</h3><p>
-            かなの後ろに結合文字を入力すると、一体の字形になります。
-          </p>
-        </div>
-      </article>
-      <article>
-        <p class="capability-glyph">
-          <ShapedText
-            class="shaped-text"
-            text="！？　？？？"
-            label="一文字幅にまとまった感嘆符と疑問符"
-          />
-        </p>
-        <div>
-          <h3>連続する約物を一文字幅に</h3><p>
-            感嘆符と疑問符の組み合わせを、全角一文字へ収めます。
-          </p>
-        </div>
-      </article>
-      <article>
-        <p class="capability-glyph capability-glyph--vertical">縦組</p>
-        <div>
-          <h3>横組・縦組に対応</h3><p>
-            横組の見出し・本文から、小説や電子書籍の縦組まで使えます。
-          </p>
-          <a
-            class="specimen-link"
-            href={`${base}/nobigoe-mincho-vertical-specimen.pdf`}
-            >縦組みPDF見本を見る</a
-          >
-        </div>
-      </article>
-    </div>
+      <a href="#marks"
+        ><span>02</span><strong>濁点を足す</strong><small>194の結合字形</small
+        ></a
+      >
+      <a href="#punctuation"
+        ><span>03</span><strong>約物をたたむ</strong><small
+          >16組 × 4デザイン</small
+        ></a
+      >
+      <a href="#families"
+        ><span>04</span><strong>文章を組む</strong><small
+          >2書体・7ウェイト</small
+        ></a
+      >
+    </nav>
   </section>
 
-  <section class="home-intro content-section" aria-labelledby="intro-title">
-    <SectionHeading
-      eyebrow="書体を選ぶ"
-      id="intro-title"
-      description="幅広い用途と7ウェイトの「のびごえ明朝」、小説や長文に向く「のびごえこぶり明朝」。使い方に合わせて選べます。"
-    >
-      用途に合わせて、二つの書体から選べます。
-    </SectionHeading>
-    <div class="family-cards">
-      <article class="family-card family-card--standard">
+  <section class="positioning-section" aria-labelledby="positioning-title">
+    <p class="section-index">まず知ってほしいこと</p>
+    <div class="positioning-copy">
+      <h2 id="positioning-title">
+        マンガだけではなく、<br />ふだんの文章から使えます。
+      </h2>
+      <div>
+        <p>
+          特徴的な記号は、セリフや擬音の表現にも役立ちます。ただし、のびごえ明朝はマンガ専用書体ではありません。Noto
+          Serif JP由来の和文とLibertinus
+          Serifの欧文を組み合わせ、見出し、本文、ウェブ、印刷物まで広く使える設計です。
+        </p>
+        <p>
+          必要なときだけ、OpenType機能が声のニュアンスを加えます。普段は端正な明朝体として、表現したい場面では一歩先まで。
+        </p>
+      </div>
+    </div>
+    <dl class="positioning-facts">
+      <div>
+        <dt>和文</dt><dd>Noto Serif JP</dd><small
+          >広い文字収録を持つ本文の土台</small
+        >
+      </div>
+      <div>
+        <dt>欧文</dt><dd>Libertinus Serif</dd><small
+          >和文の濃さへ合わせた欧文</small
+        >
+      </div>
+      <div>
+        <dt>用途</dt><dd>General purpose</dd><small
+          >本文・見出し・ウェブ・印刷</small
+        >
+      </div>
+    </dl>
+  </section>
+
+  <section
+    class="feature-section feature-section--extend"
+    id="extend"
+    aria-labelledby="extend-title"
+  >
+    <header class="feature-heading">
+      <p><span>01</span> EXTEND</p>
+      <h2 id="extend-title">入力したぶんだけ、<br />切れ目なく伸ばせます。</h2>
+      <p>
+        同じ記号を2文字以上続けると、始端・中間・終端の字形へ自動で置き換わります。長さを先に決める必要はありません。
+      </p>
+    </header>
+
+    <div class="extension-board">
+      <article>
+        <header><span>長音</span><code>ー U+30FC</code></header>
+        <p>
+          <ShapedText
+            class="shaped-text"
+            text="まだーーーーーー"
+            label="まだに続く6文字のつながった長音"
+          />
+        </p>
+        <small>セリフ、語尾、呼びかけをまっすぐ伸ばす</small>
+      </article>
+      <article>
+        <header><span>HORIZONTAL BAR</span><code>― U+2015</code></header>
+        <p>
+          <ShapedText
+            class="shaped-text"
+            text="遠くへ―――――"
+            label="遠くへに続く5文字のつながった水平線"
+          />
+        </p>
+        <small>区切りや長いダッシュを一本の線にする</small>
+      </article>
+      <article class="extension-board__accent">
         <header>
-          <p>標準ファミリー</p>
-          <h3>のびごえ明朝</h3>
-          <span>Noto Serif JP ＋ Libertinus Serif</span>
+          <span>波ダッシュ</span><code>〜 U+301C ／ ～ U+FF5E</code>
         </header>
         <p>
-          Noto Serif JPの和文と、各ウェイトへ太さを合わせたLibertinus
-          Serifの欧文。見出しから本文まで7段階で使えます。
+          <ShapedText
+            class="shaped-text"
+            text="ゆらり〜〜〜〜〜"
+            label="ゆらりに続く5文字のつながった波ダッシュ"
+          />
+        </p>
+        <small>全角チルダ「～」でも同じ波形を使えます</small>
+      </article>
+      <article>
+        <header><span>WAVY DASH</span><code>〰 U+3030</code></header>
+        <p>
+          <ShapedText
+            class="shaped-text"
+            text="水面〰〰〰〰〰"
+            label="水面に続く5文字のつながった細かな波線"
+          />
+        </p>
+        <small>細かな波を連ねて、揺れや余韻をつくる</small>
+      </article>
+    </div>
+
+    <div class="feature-note">
+      <strong>横組でも、縦組でも。</strong>
+      <p>
+        4種類すべてに縦組用の字形があります。一般的なシェーピングエンジンでは有効ですが、利用アプリがOpenTypeの「前後関係に依存する字形（calt）」に対応している必要があります。
+      </p>
+    </div>
+  </section>
+
+  <section
+    class="feature-section feature-section--marks"
+    id="marks"
+    aria-labelledby="marks-title"
+  >
+    <header class="feature-heading feature-heading--light">
+      <p><span>02</span> COMBINE</p>
+      <h2 id="marks-title">いつもの仮名に、<br />濁点・半濁点を足せます。</h2>
+      <p>
+        基本の文字と結合濁点・結合半濁点を入力すると、一体になった字形へ置き換わります。辞書にない声、方言、発音のニュアンスも文字にできます。
+      </p>
+    </header>
+
+    <div class="marks-showcase">
+      <div class="marks-stage">
+        <p class="marks-stage__label">かな ＋ U+3099 / U+309A</p>
+        <p class="marks-stage__glyphs">
+          <ShapedText
+            class="shaped-text"
+            text="あ゙　ぁ゙　ん゙　ア゙　セ゚　ㇷ゚"
+            label="濁点または半濁点が付いた6種類の仮名"
+          />
+        </p>
+        <p class="marks-stage__symbols">
+          <ShapedText
+            class="shaped-text"
+            text="ー゙　♡゙　♥゙"
+            label="濁点が付いた長音、白ハート、黒ハート"
+          />
+        </p>
+      </div>
+      <div class="marks-details">
+        <article>
+          <strong>191</strong><h3>仮名の組み合わせ</h3><p>
+            ひらがな、カタカナ、小書き仮名などをAdobe-Manga1-0の対象列に沿って収録。
+          </p>
+        </article>
+        <article>
+          <strong>+ 3</strong><h3>長音とハート</h3><p>
+            長音、白ハート、黒ハートに濁点を足した3字形も使えます。
+          </p>
+        </article>
+        <article>
+          <strong>88</strong><h3>互換用の直接入力</h3><p>
+            源暎こぶり明朝互換の88字形は、私用領域U+E082–U+E0D9からも入力できます。
+          </p>
+        </article>
+      </div>
+    </div>
+
+    <a class="text-link" href={`${base}/glyphs/`}>194字形を一覧で探す →</a>
+  </section>
+
+  <section
+    class="feature-section feature-section--punctuation"
+    id="punctuation"
+    aria-labelledby="punctuation-title"
+  >
+    <header class="feature-heading">
+      <p><span>03</span> EMPHASIZE</p>
+      <h2 id="punctuation-title">
+        連ねた「！」「？」を、<br />一文字ぶんに収められます。
+      </h2>
+      <p>
+        全角の感嘆符と疑問符を2〜5文字続けるだけ。対応する16通りの並びを全角一文字幅へまとめ、文章のリズムを崩さず強調できます。
+      </p>
+    </header>
+
+    <div class="punctuation-layout">
+      <div class="punctuation-stage" aria-label="感嘆符と疑問符の合字見本">
+        <p>？？　？？？</p>
+        <p>！！　！！！　！！！！　！！！！！</p>
+        <p>？！　！？</p>
+        <p>？？！　？！？　！？？</p>
+        <p>！！？　！？！　？！！</p>
+        <p>！！？？　？？！！</p>
+      </div>
+      <div class="punctuation-variants">
+        <p class="variant-mincho"><span>明朝</span><strong>！！？</strong></p>
+        <p class="variant-mincho-italic">
+          <span>斜体明朝</span><strong>！！？</strong>
+        </p>
+        <p class="variant-gothic">
+          <span>ゴシック</span><strong>！！？</strong>
+        </p>
+        <p class="variant-gothic-italic">
+          <span>斜体ゴシック</span><strong>！！？</strong>
+        </p>
+      </div>
+    </div>
+
+    <div class="ruby-panel">
+      <div>
+        <p class="ruby-panel__index">RUBY</p>
+        <h3>ルビ用の小さな字形も。</h3>
+        <p>
+          通常のかな、数字、約物に加え、半濁点付き14字形をOpenTypeの「ruby」で小さなルビ専用字形へ切り替えられます。
+        </p>
+      </div>
+      <p class="ruby-panel__sample">ㇷ゚　か゚　き゚　く゚　セ゚　ツ゚　ト゚</p>
+    </div>
+  </section>
+
+  <section
+    class="families-section"
+    id="families"
+    aria-labelledby="families-title"
+  >
+    <header class="section-heading">
+      <p class="section-index">04 / TYPESETTING</p>
+      <h2 id="families-title">
+        表現の前後にある、<br />ふつうの文章も組めます。
+      </h2>
+      <p>
+        表示用の特殊な字形だけを集めたフォントではありません。用途と読み心地に合わせて、二つの本文書体から選べます。
+      </p>
+    </header>
+
+    <div class="family-cards">
+      <article class="family-card family-card--standard">
+        <p>STANDARD FAMILY / 7 WEIGHTS</p>
+        <h3>のびごえ明朝</h3>
+        <p class="family-card__sample">言葉の輪郭を、静かに整える。</p>
+        <p>
+          Noto Serif JPの和文とLibertinus
+          Serifの欧文を組み合わせた標準ファミリー。細い本文から強い見出しまで、7段階の太さで組めます。
         </p>
         <dl>
-          <div><dt>ウェイト</dt><dd>200–900 / 7 weights</dd></div><div>
+          <div><dt>和文</dt><dd>Noto Serif JP</dd></div><div>
             <dt>形式</dt><dd>OpenType / CFF</dd>
           </div>
         </dl>
       </article>
       <article class="family-card family-card--koburi">
-        <header>
-          <p>小説・長文向け</p>
-          <h3>のびごえこぶり明朝</h3>
-          <span>源暎こぶり明朝ベース</span>
-        </header>
+        <p>READING FAMILY / REGULAR</p>
+        <h3>のびごえこぶり明朝</h3>
+        <p class="family-card__sample">雨の音が、遠くの屋根を渡っていた。</p>
         <p>
-          小ぶりな仮名と漢字との抑揚を活かした、小説・長文向けの本文書体。物語を静かに読み進める縦組に向いています。
+          源暎こぶり明朝を土台にした本文ファミリー。小ぶりな仮名が漢字との間に抑揚をつくり、小説や長文、縦組をゆったり見せます。
         </p>
         <dl>
-          <div><dt>ウェイト</dt><dd>Regular 400</dd></div><div>
+          <div><dt>和文</dt><dd>源暎こぶり明朝</dd></div><div>
             <dt>形式</dt><dd>TrueType</dd>
           </div>
         </dl>
       </article>
     </div>
-  </section>
 
-  <section
-    class="weight-section content-section"
-    aria-labelledby="weight-title"
-  >
-    <SectionHeading
-      eyebrow="のびごえ明朝"
-      id="weight-title"
-      description="ExtraLight 200からBlack 900まで。日本語と欧文の濃さを揃えた7ウェイトを収録しています。"
-    >
-      7段階の太さがあります。
-    </SectionHeading>
-    <WeightSpecimen />
-  </section>
-
-  <section
-    class="regular-section content-section"
-    aria-labelledby="regular-title"
-  >
-    <SectionHeading
-      eyebrow="Regular 400"
-      id="regular-title"
-      description="のびごえ明朝の標準ウェイトです。和文、源暎こぶり明朝と互換性のある濁点・半濁点字形、欧文をまとめて確認できます。"
-    >
-      Regularの字形を、ひと目で。
-    </SectionHeading>
-    <article class="regular-specimen">
-      <header class="regular-specimen__header">
-        <p>のびごえ明朝</p>
-        <div>
-          <h3>Regular</h3>
-          <span>Weight 400</span>
-        </div>
+    <div class="weight-area">
+      <header>
+        <p>7 WEIGHTS</p>
+        <h3>見出しから本文まで、同じ声で。</h3>
+        <span>ExtraLight 200 — Black 900</span>
       </header>
-      <div class="regular-specimen__body">
-        <section class="regular-specimen__block">
-          <h3><span>01</span>五十音</h3>
-          <div class="kana-specimen">
-            <p>
-              <span>ひらがな</span>
-              あいうえお　かきくけこ　さしすせそ　たちつてと<br />
-              なにぬねの　はひふへほ　まみむめも<br />
-              やゆよ　らりるれろ　わをん
-            </p>
-            <p>
-              <span>カタカナ</span>
-              アイウエオ　カキクケコ　サシスセソ　タチツテト<br />
-              ナニヌネノ　ハヒフヘホ　マミムメモ<br />
-              ヤユヨ　ラリルレロ　ワヲン
-            </p>
-          </div>
-        </section>
-        <section class="regular-specimen__block">
-          <h3><span>02</span>源暎こぶり明朝互換字形</h3>
-          <p class="regular-specimen__meta">
-            外字 U+E082–U+E0D9 / 濁点74字・半濁点14字
-          </p>
-          <p class="compatibility-glyphs">{koburiCompatibilityGlyphs}</p>
-        </section>
-        <section class="regular-specimen__block">
-          <h3><span>03</span>英数字・記号</h3>
-          <div class="latin-regular-specimen">
-            <p><span>Uppercase</span>ABCDEFGHIJKLMNOPQRSTUVWXYZ</p>
-            <p><span>Lowercase</span>abcdefghijklmnopqrstuvwxyz</p>
-            <p><span>Figures</span>0123456789</p>
-            <p><span>Symbols</span>! ? @ # $ % &amp; * ( ) [ ]</p>
-          </div>
-        </section>
-      </div>
-    </article>
-  </section>
+      <WeightSpecimen />
+    </div>
 
-  <section
-    class="reading-section content-section"
-    aria-labelledby="reading-title"
-  >
-    <SectionHeading
-      eyebrow="のびごえこぶり明朝"
-      id="reading-title"
-      description="小ぶりな仮名と漢字の抑揚を活かした、小説・長文向けの本文書体です。"
-    >
-      小説や長文を、縦組で読みやすく。
-    </SectionHeading>
-    <div class="reading-showcase">
-      <div class="reading-notes">
-        <article>
-          <span>01</span><h3>受け継ぐ仮名</h3><p>
-            ベース書体が持つ小ぶりな仮名を受け継ぎ、漢字へ穏やかに寄り添います。
-          </p>
-        </article>
-        <article>
-          <span>02</span><h3>漢字との抑揚</h3><p>
-            漢字を大きく、仮名を小さく見せる字面が、文節に自然なリズムを生みます。
-          </p>
-        </article>
-        <article>
-          <span>03</span><h3>長文の密度</h3><p>
-            小説や電子書籍の長い段落でも、ゆったり見える本文設計です。
-          </p>
-        </article>
+    <div class="vertical-area">
+      <div class="vertical-copy">
+        <p>HORIZONTAL / VERTICAL</p>
+        <h3>横組と縦組、どちらにも。</h3>
+        <p>
+          伸長記号、濁点・半濁点付き仮名、ルビ用字形は縦組にも対応。ウェブの本文から小説、電子書籍、印刷物まで使えます。
+        </p>
+        <a
+          class="text-link"
+          href={`${base}/nobigoe-mincho-vertical-specimen.pdf`}
+          >縦組PDF見本を見る →</a
+        >
       </div>
       <figure class="vertical-specimen">
         <p>
           雨の音が、遠くの屋根を静かに渡っていた。<br /><span
             >「待ってーーーー」。</span
-          ><br
-          />呼び声は夜の奥へ細く伸び、やがて風の気配に溶けていく。頁をめくったあとにも、物語の余韻だけが残っていた。
+          ><br />呼び声は夜の奥へ細く伸び、やがて風の気配に溶けていく。
         </p>
         <figcaption>のびごえこぶり明朝 Regular / 縦組</figcaption>
       </figure>
@@ -356,18 +382,18 @@ const koburiCompatibilityGlyphs = Array.from(
 
   <section class="explore-section" aria-labelledby="explore-title">
     <header>
-      <p>試す・確認する</p>
-      <h2 id="explore-title">まずはブラウザで確認できます。</h2>
+      <p>TRY IT YOURSELF</p>
+      <h2 id="explore-title">説明の次は、<br />自分の言葉で試せます。</h2>
     </header>
     <div class="explore-links">
       <a class="explore-card" href={`${base}/tester/`}>
         <span>文章を入力する</span><h3>文字テスター</h3><p>
-          二つの書体と横組・縦組を切り替えて、実際の文章で確認できます。
+          二つの書体、7ウェイト、横組・縦組、約物の4デザインをブラウザで切り替えられます。
         </p><strong>テスターを開く →</strong>
       </a>
       <a class="explore-card" href={`${base}/glyphs/`}>
-        <span>結合文字対応字形を探す</span><h3>濁点・半濁点付き194字形</h3><p>
-          結合文字に対応する仮名191字形と記号3字形を、文字種・書体・ウェイトで絞り込めます。
+        <span>結合字形を探す</span><h3>194字形の一覧</h3><p>
+          濁点・半濁点を付けられる文字を、文字種・書体・ウェイトで絞り込めます。
         </p><strong>字形一覧を開く →</strong>
       </a>
     </div>
@@ -378,9 +404,10 @@ const koburiCompatibilityGlyphs = Array.from(
     id="download"
     aria-labelledby="download-title"
   >
-    <div>
-      <p>無料で利用できます / SIL OFL 1.1</p><h2 id="download-title">
-        フォントをダウンロード
+    <div class="download-copy">
+      <p>OPEN SOURCE / SIL OFL 1.1</p>
+      <h2 id="download-title">
+        無料でダウンロードして、<br />すぐに使えます。
       </h2>
       <div class="download-actions">
         <a class="button button--paper" href={SITE.releaseUrl}
@@ -393,14 +420,14 @@ const koburiCompatibilityGlyphs = Array.from(
     </div>
     <div class="package-list">
       <article>
-        <span>標準ファミリー</span><h3>のびごえ明朝</h3><p>
-          7 weights · OpenType/CFF
-        </p><code>NobigoeMincho-v{SITE.version}.zip</code>
+        <span>7 weights · OpenType/CFF</span><h3>のびごえ明朝</h3><code
+          >NobigoeMincho-v{SITE.version}.zip</code
+        >
       </article>
       <article>
-        <span>小説・長文向け</span><h3>のびごえこぶり明朝</h3><p>
-          Regular · TrueType
-        </p><code>NobigoeKoburiMincho-v{SITE.version}.zip</code>
+        <span>Regular · TrueType</span><h3>のびごえこぶり明朝</h3><code
+          >NobigoeKoburiMincho-v{SITE.version}.zip</code
+        >
       </article>
     </div>
   </section>
