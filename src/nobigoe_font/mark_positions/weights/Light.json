@@ -2,8 +2,8 @@
   "weight": "Light",
   "positions": {
     "3041+3099": {
-      "horizontal": [0.806, 883, -104],
-      "vertical": [0.806, 1002, 85]
+      "horizontal": [0.806, 883, -104, 0],
+      "vertical": [0.806, 1002, 85, 0]
     }
   }
 }

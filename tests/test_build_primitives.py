@@ -39,6 +39,7 @@ from nobigoe_font.marks import (
     KOBURI_PUA_MARK_PAIRS,
     KOBURI_PUA_START,
     MANGA_MISSING_SMALL_KANA,
+    MarkPlacement,
 )
 
 from nobigoe_font.operations import (
@@ -60,6 +61,7 @@ from nobigoe_font.geometry import (
     adjust_outline_weight,
     adjust_outline_horizontal_weight,
     centered_transform,
+    mark_placement_transform,
     glyph_path,
     transform_path,
 )
@@ -472,6 +474,31 @@ class TrueTypeBuildTests(unittest.TestCase):
             add_stem_hints=False,
             advance_override=1000,
         )
+
+    def test_zero_mark_rotation_matches_the_original_transform(self) -> None:
+        transform = mark_placement_transform(
+            rectangle_path(),
+            MarkPlacement(0.8, 900, -50, 0),
+        )
+
+        self.assertEqual(transform, Transform(0.8, 0, 0, 0.8, 900, -50))
+
+    def test_mark_rotation_preserves_center_and_uses_positive_ccw(self) -> None:
+        mark = rectangle_path()
+        transform = mark_placement_transform(
+            mark,
+            MarkPlacement(0.8, 900, -50, 90),
+        )
+        placed = transform_path(mark, transform)
+        x_min, y_min, x_max, y_max = placed.bounds
+
+        self.assertAlmostEqual((x_min + x_max) / 2, 1300)
+        self.assertAlmostEqual((y_min + y_max) / 2, 190)
+        self.assertAlmostEqual(x_max - x_min, 320)
+        self.assertAlmostEqual(y_max - y_min, 640)
+        right_edge_x, right_edge_y = transform.transformPoint((900, 300))
+        self.assertAlmostEqual(right_edge_x, 1300)
+        self.assertAlmostEqual(right_edge_y, 510)
 
     def test_choon_dakuten_uses_koburi_mark_centers(self) -> None:
         mark = transform_path(

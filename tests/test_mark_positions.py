@@ -16,14 +16,12 @@ from nobigoe_font.marks import (
 )
 
 
-def transform_values(transform: object) -> tuple[float, float, float, float, float, float]:
+def placement_values(placement: object) -> tuple[float, float, float, float]:
     return (
-        transform.xx,
-        transform.xy,
-        transform.yx,
-        transform.yy,
-        transform.dx,
-        transform.dy,
+        placement.scale,
+        placement.x,
+        placement.y,
+        placement.rotation,
     )
 
 
@@ -52,8 +50,13 @@ class PunctuationMarkPositionTests(unittest.TestCase):
                     for pair in PUNCTUATION_MARK_PAIRS:
                         for orientation in ("horizontal", "vertical"):
                             self.assertGreater(
-                                positions[pair][orientation].xx,
+                                positions[pair][orientation].scale,
                                 0,
+                            )
+                            expected_rotation = -3 if pair[1] == 0x3099 else 0
+                            self.assertEqual(
+                                positions[pair][orientation].rotation,
+                                expected_rotation,
                             )
 
     def test_unknown_family_weight_is_rejected(self) -> None:
@@ -85,8 +88,8 @@ class NotoWeightMarkPositionOverrideTests(unittest.TestCase):
                 self.assertEqual(set(weighted), set(regular))
                 self.assertTrue(
                     any(
-                        transform_values(weighted[pair][orientation])
-                        != transform_values(regular[pair][orientation])
+                        placement_values(weighted[pair][orientation])
+                        != placement_values(regular[pair][orientation])
                         for pair in regular
                         for orientation in ("horizontal", "vertical")
                     )
@@ -96,13 +99,38 @@ class NotoWeightMarkPositionOverrideTests(unittest.TestCase):
         black = load_mark_position_overrides(weight="Black")
         pair = (0x3051, 0x309A)
         self.assertEqual(
-            transform_values(black[pair]["horizontal"]),
-            (0.929, 0, 0, 0.929, 1016, 75),
+            placement_values(black[pair]["horizontal"]),
+            (0.929, 1016, 75, 0),
         )
         self.assertEqual(
-            transform_values(black[pair]["vertical"]),
-            (0.929, 0, 0, 0.929, 1005, 79),
+            placement_values(black[pair]["vertical"]),
+            (0.929, 1005, 79, 0),
         )
+
+    def test_mi_dakuten_preserves_its_reviewed_rotation_across_weights(
+        self,
+    ) -> None:
+        pair = (0x30DF, 0x3099)
+        for weight in (
+            "ExtraLight",
+            "Light",
+            "Regular",
+            "Medium",
+            "SemiBold",
+            "Bold",
+            "Black",
+        ):
+            with self.subTest(weight=weight):
+                positions = load_mark_position_overrides(weight=weight)
+                self.assertEqual(
+                    positions[pair]["horizontal"].rotation,
+                    5,
+                )
+                self.assertEqual(
+                    positions[pair]["vertical"].rotation,
+                    5,
+                )
+
 
     def test_unknown_noto_weight_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unknown Noto mark position weight"):
@@ -120,23 +148,23 @@ class KoburiMarkPositionOverrideTests(unittest.TestCase):
         for pair in KOBURI_NATIVE_MARK_PAIRS:
             for orientation in ("horizontal", "vertical"):
                 self.assertEqual(
-                    transform_values(koburi[pair][orientation]),
-                    transform_values(noto[pair][orientation]),
+                    placement_values(koburi[pair][orientation]),
+                    placement_values(noto[pair][orientation]),
                 )
 
         changed_pairs = {
             pair
             for pair in KOBURI_GENERATED_MARK_PAIRS
             if any(
-                transform_values(koburi[pair][orientation])
-                != transform_values(noto[pair][orientation])
+                placement_values(koburi[pair][orientation])
+                != placement_values(noto[pair][orientation])
                 for orientation in ("horizontal", "vertical")
             )
         }
         self.assertEqual(changed_pairs, KOBURI_GENERATED_MARK_PAIRS)
         self.assertEqual(
-            transform_values(koburi[(0x3042, 0x309A)]["horizontal"]),
-            (0.992, 0, 0, 0.992, 738, -14),
+            placement_values(koburi[(0x3042, 0x309A)]["horizontal"]),
+            (0.992, 738, -14, 0),
         )
 
     def test_koburi_configuration_rejects_missing_unknown_and_invalid_values(
@@ -151,12 +179,16 @@ class KoburiMarkPositionOverrideTests(unittest.TestCase):
                 lambda data: data["positions"].update(
                     {
                         "FFFF+3099": {
-                            "horizontal": [1, 0, 0],
-                            "vertical": [1, 0, 0],
+                            "horizontal": [1, 0, 0, 0],
+                            "vertical": [1, 0, 0, 0],
                         }
                     }
                 ),
                 "extra U\\+FFFF\\+U\\+3099",
+            ),
+            (
+                lambda data: data["positions"]["3042+309A"]["horizontal"].pop(),
+                "\\[scale, x, y, rotation\\]",
             ),
             (
                 lambda data: data["positions"]["3042+309A"]["horizontal"].__setitem__(

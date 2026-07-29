@@ -1132,7 +1132,10 @@ def build(
             _font_geometry.compose_mark_glyph(
                 _font_geometry.glyph_path(font, cmap[base]),
                 mark_paths[mark],
-                punctuation_mark_positions[pair]["horizontal"],
+                _font_geometry.mark_placement_transform(
+                    mark_paths[mark],
+                    punctuation_mark_positions[pair]["horizontal"],
+                ),
             )
         )
         punctuation_mark_vertical_paths.append(
@@ -1144,7 +1147,10 @@ def build(
                     ),
                 ),
                 mark_paths[mark],
-                punctuation_mark_positions[pair]["vertical"],
+                _font_geometry.mark_placement_transform(
+                    mark_paths[mark],
+                    punctuation_mark_positions[pair]["vertical"],
+                ),
             )
         )
     _font_operations.append_glyphs(
@@ -1229,7 +1235,10 @@ def build(
                 mark_paths[mark], 1, target_x, target_y
             )
         else:
-            mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
+            mark_transform = _font_geometry.mark_placement_transform(
+                mark_paths[mark],
+                mark_position_overrides[(base, mark)]["horizontal"],
+            )
         horizontal_mark_paths.append(
             _font_geometry.compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
         )
@@ -1264,7 +1273,10 @@ def build(
                 mark_paths[mark], 1, target_x, target_y
             )
         else:
-            mark_transform = mark_position_overrides[(base, mark)]["vertical"]
+            mark_transform = _font_geometry.mark_placement_transform(
+                mark_paths[mark],
+                mark_position_overrides[(base, mark)]["vertical"],
+            )
         vertical_mark_paths.append(
             _font_geometry.compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
         )
