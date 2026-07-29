@@ -1,5 +1,5 @@
 ---
-import { openSync, type Font } from "fontkit";
+import { openSync, type Font, type PathCommand } from "fontkit";
 import { resolve } from "node:path";
 
 interface Props {
@@ -12,7 +12,24 @@ const { text, label = text, class: className } = Astro.props;
 const font = openSync(
   resolve(process.cwd(), "src/assets/fonts/NobigoeMincho-Regular.woff2"),
 ) as Font;
-const run = font.layout(text, { calt: true, ccmp: true });
+
+const svgCommands = {
+  moveTo: "M",
+  lineTo: "L",
+  quadraticCurveTo: "Q",
+  bezierCurveTo: "C",
+  closePath: "Z",
+} satisfies Record<PathCommand["command"], string>;
+
+const translatePath = (commands: PathCommand[], x: number, y: number) =>
+  commands
+    .map(
+      ({ command, args }) =>
+        svgCommands[command] +
+        args.map((value, index) => value + (index % 2 === 0 ? x : y)).join(" "),
+    )
+    .join("");
+const run = font.layout(text, { calt: true, ccmp: true }, "latn");
 
 let penX = 0;
 let penY = 0;
@@ -34,10 +51,7 @@ const paths = run.glyphs.map((glyph, index) => {
   penX += position.xAdvance;
   penY += position.yAdvance;
 
-  return {
-    d: glyph.path.toSVG(),
-    transform: `translate(${x} ${y})`,
-  };
+  return translatePath(glyph.path.commands, x, y);
 });
 
 const padding = font.unitsPerEm * 0.025;
@@ -58,10 +72,6 @@ const viewBox = [
   focusable="false"
 >
   <g transform="scale(1 -1)" aria-hidden="true">
-    {
-      paths.map((path: { d: string; transform: string }) => (
-        <path d={path.d} transform={path.transform} fill="currentColor" />
-      ))
-    }
+    <path d={paths.join("")} fill="currentColor"></path>
   </g>
 </svg>
