@@ -180,3 +180,115 @@ a {
 .mobile-nav {
   display: none;
 }
+
+.site-footer {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.8fr) minmax(560px, 1.2fr);
+  color: var(--paper-bright);
+  background: var(--ink);
+  border-top: 4px solid var(--accent);
+}
+
+.footer-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(18px, 2.2vw, 32px);
+  padding: clamp(52px, 6vw, 84px) var(--gutter);
+}
+
+.site-footer .footer-mark {
+  width: 56px;
+  height: 56px;
+  border-color: rgba(255, 255, 255, 0.46);
+  color: var(--accent-light);
+  font-size: 24px;
+}
+
+.footer-lead p {
+  margin: 0;
+}
+
+.footer-lead strong {
+  display: block;
+  font-size: clamp(25px, 2.4vw, 36px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.5;
+}
+
+.footer-lead small {
+  display: block;
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.56);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.footer-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.footer-nav a {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  padding: 18px clamp(18px, 2.4vw, 34px);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.footer-nav a:nth-child(3n) {
+  border-right: 0;
+}
+
+.footer-nav a:hover,
+.footer-nav a:focus-visible {
+  color: var(--paper-bright);
+  background: var(--accent);
+}
+
+.footer-nav a:focus-visible {
+  outline: 2px solid var(--paper-bright);
+  outline-offset: -5px;
+}
+
+.footer-credit {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 20px var(--gutter) 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.52);
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  line-height: 1.7;
+  text-align: right;
+}
+
+.footer-credit a {
+  color: var(--accent-light);
+  text-decoration: underline;
+  text-decoration-color: rgba(239, 216, 207, 0.42);
+  text-underline-offset: 0.22em;
+}
+
+.footer-credit a:hover {
+  text-decoration-color: currentColor;
+}
+
+.footer-credit a:focus-visible {
+  outline: 2px solid var(--paper-bright);
+  outline-offset: 3px;
+}
