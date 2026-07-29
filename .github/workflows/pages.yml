@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  release:
-    types:
-      - published
   workflow_run:
     workflows:
       - Build and publish release
@@ -22,8 +19,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  release_ready:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.release.outputs.available }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check matching release assets
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(python3 -c 'from font_profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          tag="v${version}"
+          release_json=""
+          if release_json=$(gh release view "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets 2>/dev/null
+          ); then
+            if RELEASE_JSON="$release_json" VERSION="$version" python3 - <<'PY'
+          import json
+          import os
+
+          version = os.environ["VERSION"]
+          expected = {
+              f"NobigoeMincho-v{version}.zip",
+              f"NobigoeKoburiMincho-v{version}.zip",
+          }
+          release = json.loads(os.environ["RELEASE_JSON"])
+          actual = {
+              asset["name"]
+              for asset in release["assets"]
+              if asset["name"].endswith(".zip")
+          }
+          if actual != expected:
+              missing = sorted(expected - actual)
+              unexpected = sorted(actual - expected)
+              raise SystemExit(
+                  f"Release ZIP mismatch: missing={missing}, unexpected={unexpected}"
+              )
+          PY
+            then
+              echo "available=true" >> "$GITHUB_OUTPUT"
+              echo "Found both release ZIPs for $tag"
+              exit 0
+            fi
+          fi
+
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            echo "::notice::Deferring Pages deployment until both release ZIPs for $tag are published"
+            exit 0
+          fi
+
+          echo "::error::Both release ZIPs for $tag must exist before deploying Pages"
+          exit 1
+
+  build:
+    needs: release_ready
+    if: needs.release_ready.outputs.available == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
