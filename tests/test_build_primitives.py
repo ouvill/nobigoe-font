@@ -13,16 +13,18 @@ from fontTools.misc.transform import Transform
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
-from build_font import (
-    autohint_latin_glyphs,
-    feature_source,
+from nobigoe_font.hinting import autohint_latin_glyphs
+from nobigoe_font.features import feature_source
+from nobigoe_font.pipeline import (
     import_koburi_ruby,
-    make_punctuation_ligature,
     make_manga_wave_parts,
     make_wave_parts,
+)
+from nobigoe_font.punctuation import (
+    make_punctuation_ligature,
     shippori_upright_punctuation_paths,
 )
-from mark_positioning import (
+from nobigoe_font.marks import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
     KOBURI_PUA_MARK_PAIRS,
@@ -30,7 +32,7 @@ from mark_positioning import (
     MANGA_MISSING_SMALL_KANA,
 )
 
-from font_operations import (
+from nobigoe_font.operations import (
     add_unicode_mapping_if_missing,
     append_ttf_glyphs,
     feature_ligatures,
@@ -38,8 +40,8 @@ from font_operations import (
     import_latin_font,
     tt_glyph,
 )
-from font_profiles import LatinBuildProfile
-from font_geometry import (
+from nobigoe_font.profiles import LatinBuildProfile
+from nobigoe_font.geometry import (
     bounds,
     adjust_outline_weight,
     adjust_outline_horizontal_weight,
@@ -380,22 +382,22 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         with (
             patch(
-                "build_font._font_operations.feature_single_substitutions",
+                "nobigoe_font.pipeline._font_operations.feature_single_substitutions",
                 side_effect=feature_substitutions,
             ),
             patch(
-                "build_font._font_operations.find_vertical_glyph",
+                "nobigoe_font.pipeline._font_operations.find_vertical_glyph",
                 side_effect=lambda _, target_name: target_vertical[target_name],
             ),
             patch(
-                "build_font._font_geometry.glyph_path",
+                "nobigoe_font.pipeline._font_geometry.glyph_path",
                 side_effect=lambda _, source_name: f"path:{source_name}",
             ),
             patch(
-                "build_font._font_geometry.adjust_outline_weight",
+                "nobigoe_font.pipeline._font_geometry.adjust_outline_weight",
                 side_effect=lambda outline, amount: f"{outline}@{amount}",
             ),
-            patch("build_font._font_operations.append_glyphs") as append,
+            patch("nobigoe_font.pipeline._font_operations.append_glyphs") as append,
         ):
             substitutions, vertical_maps = import_koburi_ruby(
                 target_font,
@@ -596,7 +598,9 @@ class TrueTypeBuildTests(unittest.TestCase):
                 hinted_path = Path(command[command.index("--output") + 1])
                 hinted_path.write_bytes(b"hinted")
 
-            with patch("build_font.subprocess.run", side_effect=fake_run):
+            with patch(
+                "nobigoe_font.hinting.subprocess.run", side_effect=fake_run
+            ):
                 autohint_latin_glyphs(
                     output_path,
                     ("latin.A", "latin.B"),

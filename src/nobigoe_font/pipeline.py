@@ -1,40 +1,42 @@
-#!/usr/bin/env python3
 """Build Nobigoe font families with extensible punctuation."""
 
 from __future__ import annotations
 
-import argparse
-import copy
 import math
 import shutil
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from font_profiles import (
+from .profiles import (
     BaseType,
     FontIdentity,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
-    LATIN_FAMILIES,
     LatinBuildProfile,
-    NOTO_WEIGHT_CLASSES,
     SHIPPORI_COPYRIGHT,
     SHIPPORI_STROKE_ADJUSTMENTS,
-    VERSION,
-    VERSION_NUMBER,
-    default_output_path,
-    font_identity,
-    latin_build_profile,
 )
-from font_sources import DEFAULT_CACHE_DIR, SourceCache, SourceOverrides
-import font_geometry as _font_geometry
-import font_operations as _font_operations
-import mark_positioning as _mark_positioning
+from . import geometry as _font_geometry
+from . import operations as _font_operations
+from . import marks as _mark_positioning
+from .features import feature_source, merge_features
+from .hinting import autohint_latin_glyphs
+from .metadata import rename_font
+from .punctuation import (
+    MANGA_PUNCTUATION_SEQUENCES,
+    PUNCTUATION_ALTERNATE_COUNT,
+    PUNCTUATION_VARIANT_SEQUENCES,
+    SHIPPORI_PRECOMPOSED_LIGATURES,
+    SHIPPORI_UPRIGHT_EXCLAMATIONS,
+    SHIPPORI_UPRIGHT_PUNCTUATION,
+    make_punctuation_ligature,
+    make_sans_punctuation_ligature,
+    shippori_upright_punctuation_paths,
+    slant_punctuation_outline,
+)
 
 import pathops
-from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.misc.transform import Transform
-from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.scaleUpem import scale_upem
 from fontTools.varLib.instancer import instantiateVariableFont
@@ -48,128 +50,9 @@ OVERLAP = 0
 KOBURI_RUBY_RULE_COUNT = 289
 KOBURI_RUBY_OUTPUT_COUNT = 288
 KOBURI_RUBY_VERTICAL_ORIGIN = 880
-SHIPPORI_PRECOMPOSED_LIGATURES = {
-    "!!": 0x203C,
-    "??": 0x2047,
-    "?!": 0x2048,
-    "!?": 0x2049,
-}
-SHIPPORI_UPRIGHT_PUNCTUATION = {
-    "!": 0xE000,
-    "?": 0xFF1F,
-}
-SHIPPORI_UPRIGHT_EXCLAMATIONS = {
-    "!": SHIPPORI_UPRIGHT_PUNCTUATION["!"],
-    "!!": 0xE002,
-    "!!!": 0xE007,
-    "!!!!": 0xE0E3,
-}
-SHIPPORI_COMPONENT_LIGATURES = {
-    "!": SHIPPORI_UPRIGHT_EXCLAMATIONS["!!"],
-    "?": 0x2047,
-}
-MANGA_PUNCTUATION_SEQUENCES = (
-    "!!!!!",
-    "!!!!",
-    "!!??",
-    "??!!",
-    "!!!",
-    "???",
-    "!!?",
-    "??!",
-    "?!?",
-    "!??",
-    "!?!",
-    "?!!",
-    "?!",
-    "!?",
-    "!!",
-    "??",
-)
-PUNCTUATION_VARIANT_SEQUENCES = (
-    "!",
-    "?",
-    *MANGA_PUNCTUATION_SEQUENCES,
-)
-PUNCTUATION_ALTERNATE_COUNT = 3 * len(PUNCTUATION_VARIANT_SEQUENCES)
-PUNCTUATION_SLANT_ANGLE = 12
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Add automatically joining ー, ―, 〜, ～, and 〰 glyphs to "
-            "Noto Serif JP or GenEi Koburi Mincho."
-        )
-    )
-    parser.add_argument(
-        "--base",
-        choices=("noto", "koburi"),
-        default="noto",
-        help="base typeface; Koburi is available in Regular only",
-    )
-    parser.add_argument(
-        "--weight",
-        choices=tuple(NOTO_WEIGHT_CLASSES),
-        default="Regular",
-        help="Noto Serif JP weight",
-    )
-    parser.add_argument(
-        "--latin-family",
-        choices=LATIN_FAMILIES,
-        default="libertinus",
-        help=(
-            "Latin glyph source for the Noto base; "
-            "the existing Libertinus profile remains the default"
-        ),
-    )
-    parser.add_argument(
-        "--source",
-        type=Path,
-        help="local Noto Serif JP OTF/TTC or GenEi Koburi Mincho TTF",
-    )
-    parser.add_argument(
-        "--latin-source",
-        type=Path,
-        help="local font overriding the selected Noto-based Latin source",
-    )
-    parser.add_argument(
-        "--ruby-source",
-        type=Path,
-        help="GenEi Koburi Mincho TTF used for Noto-based ruby glyphs",
-    )
-    parser.add_argument(
-        "--punctuation-source",
-        type=Path,
-        help=(
-            "Shippori Mincho OTF/TTF used for Manga1 "
-            "exclamation/question ligatures (matching OTF weight by default)"
-        ),
-    )
-    parser.add_argument(
-        "--sans-source",
-        type=Path,
-        help="local Noto Sans JP OTF used for sans punctuation variants",
-    )
-    parser.add_argument(
-        "--cache-dir",
-        type=Path,
-        default=DEFAULT_CACHE_DIR,
-        help="directory for the persistent verified font-source cache",
-    )
-    parser.add_argument(
-        "--face", type=int, default=0, help="TTC face index"
-    )
-    parser.add_argument("--output", type=Path)
-    parser.add_argument(
-        "--autohint",
-        action="store_true",
-        help=(
-            "run AFDKO otfautohint on imported Latin glyphs after building; "
-            "requires the otfautohint command"
-        ),
-    )
-    return parser.parse_args()
+
 
 
 def stroke_band(
@@ -554,108 +437,6 @@ def make_manga_wave_parts(
 
 
 
-def shippori_upright_punctuation_paths(
-    font: TTFont,
-) -> dict[str, pathops.Path]:
-    cmap = font.getBestCmap()
-    return {
-        mark: _font_geometry.glyph_path(font, cmap[codepoint])
-        for mark, codepoint in SHIPPORI_UPRIGHT_PUNCTUATION.items()
-    }
-
-
-def make_punctuation_ligature(
-    font: TTFont, sequence: str, advance: int = 1000
-) -> pathops.Path:
-    gap = 40
-    components: list[tuple[pathops.Path, float, float]] = []
-    total_width = gap * (len(sequence) - 1)
-    cmap = font.getBestCmap()
-    upright_codepoint = SHIPPORI_UPRIGHT_EXCLAMATIONS.get(sequence)
-    if upright_codepoint is not None:
-        return _font_geometry.glyph_path(font, cmap[upright_codepoint])
-    precomposed_codepoint = SHIPPORI_PRECOMPOSED_LIGATURES.get(
-        sequence
-    )
-    if precomposed_codepoint is not None:
-        return _font_geometry.glyph_path(font, cmap[precomposed_codepoint])
-
-    for mark in sequence:
-        source_codepoint = SHIPPORI_COMPONENT_LIGATURES[mark]
-        source = _font_geometry.glyph_path(font, cmap[source_codepoint])
-        contours = list(source.contours)
-        if len(contours) != 4:
-            raise ValueError(
-                f"Expected four contours in U+{source_codepoint:04X}"
-            )
-        outline = pathops.Path()
-        outline.addPath(contours[0])
-        outline.addPath(contours[2])
-        x_min, _, x_max, _ = outline.bounds
-        width = x_max - x_min
-        components.append((outline, x_min, width))
-        total_width += width
-
-    scale = min(1.0, (advance - 40) / total_width)
-    combined = pathops.Path()
-    cursor = (advance - total_width * scale) / 2
-    for outline, x_min, width in components:
-        transform = Transform(
-            scale, 0, 0, 1, cursor - scale * x_min, 0
-        )
-        outline.draw(TransformPen(combined.getPen(), transform))
-        cursor += (width + gap) * scale
-    return combined
-
-
-def make_sans_punctuation_ligature(
-    font: TTFont, sequence: str, advance: int = 1000
-) -> pathops.Path:
-    gap = 40
-    cmap = font.getBestCmap()
-    components = [
-        _font_geometry.glyph_path(font, cmap[0xFF01 if mark == "!" else 0xFF1F])
-        for mark in sequence
-    ]
-    component_metrics = [
-        (outline, outline.bounds[0], outline.bounds[2] - outline.bounds[0])
-        for outline in components
-    ]
-    total_width = sum(width for _, _, width in component_metrics)
-    total_width += gap * (len(sequence) - 1)
-    scale = min(1.0, (advance - 40) / total_width)
-    combined = pathops.Path()
-    cursor = (advance - total_width * scale) / 2
-    for outline, x_min, width in component_metrics:
-        combined.addPath(
-            _font_geometry.transform_path(outline,
-            Transform(scale, 0, 0, 1, cursor - scale * x_min, 0),)
-        )
-        cursor += (width + gap) * scale
-    return combined
-
-
-def slant_punctuation_outline(
-    outline: pathops.Path,
-) -> pathops.Path:
-    shear = math.tan(math.radians(PUNCTUATION_SLANT_ANGLE))
-    slanted = _font_geometry.transform_path(outline, Transform(1, 0, shear, 1, 0, 0))
-    x_min, _, x_max, _ = slanted.bounds
-    return _font_geometry.transform_path(slanted,
-    Transform(1, 0, 0, 1, 500 - (x_min + x_max) / 2, 0),)
-
-
-def punctuation_ligature_rules(
-    exclamation: str,
-    question: str,
-    ligatures: list[tuple[str, str]],
-) -> str:
-    inputs = {"!": exclamation, "?": question}
-    return "".join(
-        f"  sub {' '.join(inputs[mark] for mark in sequence)}"
-        f" by {name};\n"
-        for sequence, name in ligatures
-    )
 
 
 def add_linear_extension(
@@ -691,38 +472,6 @@ def add_linear_extension(
     return vertical, names
 
 
-def contextual_extension_rules(
-    prefix: str, base: str, start: str, middle: str, end: str
-) -> str:
-    return f"""
-  lookup {prefix}_start {{
-    ignore sub {base} [{base} {middle} {end} {start}]';
-    sub {base}' [{base} {start} {middle} {end}] by {start};
-  }} {prefix}_start;
-  lookup {prefix}_end {{
-    sub [{base} {start} {middle} {end}] {base}' by {end};
-  }} {prefix}_end;
-  sub [{start} {middle}] {start}' by {middle};
-"""
-
-
-def alternating_wave_rules(
-    prefix: str, base: str, names: list[str]
-) -> str:
-    start, middle_a, middle_b, end_a, end_b = names
-    glyphs = f"{base} {start} {middle_a} {middle_b} {end_a} {end_b}"
-    return f"""
-  lookup {prefix}_start {{
-    ignore sub {base} [{glyphs}]';
-    sub {base}' [{glyphs}] by {start};
-  }} {prefix}_start;
-  lookup {prefix}_end {{
-    sub [{glyphs}] {base}' by {end_a};
-  }} {prefix}_end;
-  sub [{start} {middle_a}] {start}' by {middle_b};
-  sub {middle_b} {start}' by {middle_a};
-  sub [{start} {middle_a}] {end_a}' by {end_b};
-"""
 
 
 def import_koburi_ruby(
@@ -883,344 +632,11 @@ def import_koburi_ruby(
     return list(substitutions.items()), vertical_maps
 
 
-def feature_source(
-    extensions: list[tuple[str, str, str, list[str]]],
-    wave: tuple[str, str, str, list[str]],
-    manga_wave: tuple[str, str, list[str]],
-    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
-    kana_marks: list[tuple[str, str, str]],
-    kana_vertical_maps: list[tuple[str, str]],
-    ruby_substitutions: list[tuple[str, str]],
-) -> str:
-    calt_rules: list[str] = []
-    vert_rules: list[str] = []
-    vrt2_rules: list[str] = []
-    for prefix, base, vertical, names in extensions:
-        h_start, h_middle, h_end, v_start, v_middle, v_end = names
-        calt_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_h", base, h_start, h_middle, h_end
-            )
-        )
-        calt_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_v", vertical, v_start, v_middle, v_end
-            )
-        )
-        vertical_maps = (
-            f"  sub {h_start} by {v_start};\n"
-            f"  sub {h_middle} by {v_middle};\n"
-            f"  sub {h_end} by {v_end};\n"
-        )
-        vert_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_vert", base, v_start, v_middle, v_end
-            )
-            + vertical_maps
-        )
-        vrt2_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_vrt2", base, v_start, v_middle, v_end
-            )
-            + vertical_maps
-        )
-
-    wave_prefix, wave_base, wave_vertical, wave_names = wave
-    horizontal_wave_names = wave_names[:5]
-    vertical_wave_names = wave_names[5:]
-    calt_rules.append(
-        alternating_wave_rules(
-            f"{wave_prefix}_h", wave_base, horizontal_wave_names
-        )
-    )
-    calt_rules.append(
-        alternating_wave_rules(
-            f"{wave_prefix}_v", wave_vertical, vertical_wave_names
-        )
-    )
-    wave_vertical_maps = "".join(
-        f"  sub {horizontal} by {vertical};\n"
-        for horizontal, vertical in zip(
-            horizontal_wave_names, vertical_wave_names, strict=True
-        )
-    )
-    vert_rules.append(
-        alternating_wave_rules(
-            f"{wave_prefix}_vert", wave_base, vertical_wave_names
-        )
-        + wave_vertical_maps
-    )
-    vrt2_rules.append(
-        alternating_wave_rules(
-            f"{wave_prefix}_vrt2", wave_base, vertical_wave_names
-        )
-        + wave_vertical_maps
-    )
-
-    manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
-    (
-        manga_wave_start,
-        manga_wave_middle,
-        manga_wave_end,
-        manga_wave_vertical_isolated,
-        manga_wave_vertical_start,
-        manga_wave_vertical_middle,
-        manga_wave_vertical_end,
-    ) = manga_wave_names
-    calt_rules.append(
-        contextual_extension_rules(
-            f"{manga_wave_prefix}_h",
-            manga_wave_base,
-            manga_wave_start,
-            manga_wave_middle,
-            manga_wave_end,
-        )
-    )
-    manga_wave_vertical_maps = (
-        f"  sub {manga_wave_base} by {manga_wave_vertical_isolated};\n"
-        f"  sub {manga_wave_start} by {manga_wave_vertical_start};\n"
-        f"  sub {manga_wave_middle} by {manga_wave_vertical_middle};\n"
-        f"  sub {manga_wave_end} by {manga_wave_vertical_end};\n"
-    )
-    vert_rules.append(
-        contextual_extension_rules(
-            f"{manga_wave_prefix}_vert",
-            manga_wave_base,
-            manga_wave_vertical_start,
-            manga_wave_vertical_middle,
-            manga_wave_vertical_end,
-        )
-        + manga_wave_vertical_maps
-    )
-    vrt2_rules.append(
-        contextual_extension_rules(
-            f"{manga_wave_prefix}_vrt2",
-            manga_wave_base,
-            manga_wave_vertical_start,
-            manga_wave_vertical_middle,
-            manga_wave_vertical_end,
-        )
-        + manga_wave_vertical_maps
-    )
-
-    kana_vertical_rules = "".join(
-        f"  sub {horizontal} by {vertical};\n"
-        for horizontal, vertical in kana_vertical_maps
-    )
-    vert_rules.append(kana_vertical_rules)
-    vrt2_rules.append(kana_vertical_rules)
-
-    punctuation_names = dict(punctuation_variants)
-    ccmp_rules = punctuation_ligature_rules(
-        punctuation_names["!"][0],
-        punctuation_names["?"][0],
-        [
-            (sequence, names[0])
-            for sequence, names in punctuation_variants
-            if len(sequence) > 1
-        ],
-    )
-    ccmp_rules += "".join(
-        f"  sub {base} {mark} by {output};\n"
-        for base, mark, output in kana_marks
-    )
-    alternate_rules = "".join(
-        f"  sub {names[0]} from [{' '.join(names[1:])}];\n"
-        for _, names in punctuation_variants
-    )
-    stylistic_set_rules = [
-        "".join(
-            f"  sub {names[0]} by {names[index]};\n"
-            for _, names in punctuation_variants
-        )
-        for index in range(1, 4)
-    ]
-    ruby_rules = "".join(
-        f"  sub {normal} by {ruby};\n"
-        for normal, ruby in ruby_substitutions
-    )
-
-    return (
-        "languagesystem DFLT dflt;\n\n"
-        f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
-        f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
-        f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
-        f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"
-        f"feature ss02 {{\n{stylistic_set_rules[1]}}} ss02;\n\n"
-        f"feature ss03 {{\n{stylistic_set_rules[2]}}} ss03;\n\n"
-        f"feature ruby {{\n{ruby_rules}}} ruby;\n\n"
-        f"feature vert {{\n{''.join(vert_rules)}}} vert;\n\n"
-        f"feature vrt2 {{\n{''.join(vrt2_rules)}}} vrt2;\n"
-    )
 
 
-def shift_nested_lookup_indices(value: object, amount: int, seen: set[int]) -> None:
-    if value is None or isinstance(value, (str, bytes, int, float, bool)):
-        return
-    identity = id(value)
-    if identity in seen:
-        return
-    seen.add(identity)
-
-    if value.__class__.__name__ in {"SubstLookupRecord", "PosLookupRecord"}:
-        value.LookupListIndex += amount
-    if isinstance(value, (list, tuple)):
-        for item in value:
-            shift_nested_lookup_indices(item, amount, seen)
-    elif hasattr(value, "__dict__"):
-        for item in vars(value).values():
-            shift_nested_lookup_indices(item, amount, seen)
 
 
-def all_langsys(script_list: object):
-    for script_record in script_list.ScriptRecord:
-        script = script_record.Script
-        if script.DefaultLangSys is not None:
-            yield script.DefaultLangSys
-        for lang_record in script.LangSysRecord:
-            yield lang_record.LangSys
 
-
-def merge_features(font: TTFont, source: str) -> None:
-    patch_font = TTFont()
-    patch_font.setGlyphOrder(font.getGlyphOrder())
-    addOpenTypeFeaturesFromString(patch_font, source, tables={"GSUB"})
-
-    old = font["GSUB"].table
-    patch = patch_font["GSUB"].table
-    new_lookups = patch.LookupList.Lookup
-    shift = len(new_lookups)
-
-    for lookup in old.LookupList.Lookup:
-        shift_nested_lookup_indices(lookup, shift, set())
-    for record in old.FeatureList.FeatureRecord:
-        record.Feature.LookupListIndex = [
-            index + shift for index in record.Feature.LookupListIndex
-        ]
-    if getattr(old, "FeatureVariations", None) is not None:
-        for variation in old.FeatureVariations.FeatureVariationRecord:
-            substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
-            for substitution in substitutions:
-                substitution.Feature.LookupListIndex = [
-                    index + shift for index in substitution.Feature.LookupListIndex
-                ]
-
-    old.LookupList.Lookup = new_lookups + old.LookupList.Lookup
-    old.LookupList.LookupCount = len(old.LookupList.Lookup)
-
-    patch_by_tag = {
-        record.FeatureTag: record.Feature.LookupListIndex
-        for record in patch.FeatureList.FeatureRecord
-    }
-    old_by_tag: dict[str, list[object]] = {}
-    for record in old.FeatureList.FeatureRecord:
-        old_by_tag.setdefault(record.FeatureTag, []).append(record)
-
-    for tag, lookup_indices in patch_by_tag.items():
-        if tag in old_by_tag:
-            for record in old_by_tag[tag]:
-                record.Feature.LookupListIndex = (
-                    lookup_indices + record.Feature.LookupListIndex
-                )
-                record.Feature.LookupCount = len(record.Feature.LookupListIndex)
-            continue
-
-        patch_record = next(
-            record for record in patch.FeatureList.FeatureRecord if record.FeatureTag == tag
-        )
-        feature_index = next(
-            (
-                index
-                for index, record in enumerate(old.FeatureList.FeatureRecord)
-                if record.FeatureTag > tag
-            ),
-            len(old.FeatureList.FeatureRecord),
-        )
-        for langsys in all_langsys(old.ScriptList):
-            langsys.FeatureIndex = sorted(
-                [
-                    index + 1 if index >= feature_index else index
-                    for index in langsys.FeatureIndex
-                ]
-                + [feature_index]
-            )
-            langsys.FeatureCount = len(langsys.FeatureIndex)
-            if langsys.ReqFeatureIndex != 0xFFFF and langsys.ReqFeatureIndex >= feature_index:
-                langsys.ReqFeatureIndex += 1
-        if getattr(old, "FeatureVariations", None) is not None:
-            for variation in old.FeatureVariations.FeatureVariationRecord:
-                substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
-                for substitution in substitutions:
-                    if substitution.FeatureIndex >= feature_index:
-                        substitution.FeatureIndex += 1
-        old.FeatureList.FeatureRecord.insert(
-            feature_index, copy.deepcopy(patch_record)
-        )
-        old.FeatureList.FeatureCount = len(old.FeatureList.FeatureRecord)
-
-
-def set_name(font: TTFont, name_id: int, value: str) -> None:
-    name_table = font["name"]
-    matching = [record for record in name_table.names if record.nameID == name_id]
-    if matching:
-        for record in matching:
-            name_table.setName(
-                value,
-                name_id,
-                record.platformID,
-                record.platEncID,
-                record.langID,
-            )
-    else:
-        name_table.setName(value, name_id, 3, 1, 0x409)
-
-
-def set_japanese_name(font: TTFont, name_id: int, value: str) -> None:
-    font["name"].setName(value, name_id, 3, 1, 0x411)
-
-
-def rename_font(
-    font: TTFont,
-    copyright_notice: str,
-    font_notice: str,
-    identity: FontIdentity,
-) -> None:
-    legacy_style = "Bold" if identity.style == "Bold" else "Regular"
-    set_name(font, 0, copyright_notice)
-    set_name(font, 1, identity.legacy_family)
-    set_name(font, 2, legacy_style)
-    set_name(
-        font,
-        3,
-        f"{VERSION_NUMBER};NOBIGOE;{identity.postscript_name}",
-    )
-    set_name(font, 4, identity.full_name)
-    set_name(font, 5, VERSION)
-    set_name(font, 6, identity.postscript_name)
-    set_name(font, 16, identity.family)
-    set_name(font, 17, identity.style)
-    set_japanese_name(font, 1, identity.japanese_legacy_family)
-    set_japanese_name(font, 4, identity.japanese_full_name)
-    set_japanese_name(font, 16, identity.japanese_family)
-    set_japanese_name(font, 17, identity.style)
-
-    font["OS/2"].usWeightClass = identity.weight_class
-    font["OS/2"].fsSelection &= ~((1 << 5) | (1 << 6))
-    if identity.style == "Regular":
-        font["OS/2"].fsSelection |= 1 << 6
-    elif identity.style == "Bold":
-        font["OS/2"].fsSelection |= 1 << 5
-    font["head"].macStyle &= ~1
-    if identity.style == "Bold":
-        font["head"].macStyle |= 1
-
-    if "CFF " in font:
-        cff = font["CFF "].cff
-        cff.fontNames = [identity.postscript_name]
-        top = cff.topDictIndex[0]
-        top.Notice = font_notice.encode("latin-1", "replace").decode("latin-1")
-        top.FamilyName = identity.family
-        top.FullName = identity.full_name
 
 
 def autohint_latin_glyphs(
@@ -1943,66 +1359,3 @@ def build(
     font.save(output_path, reorderTables=True)
     if autohint:
         autohint_latin_glyphs(output_path, latin_import.glyph_names)
-
-
-def main() -> None:
-    args = parse_args()
-    if args.base == "koburi" and args.weight != "Regular":
-        raise ValueError("GenEi Koburi Mincho is available in Regular only")
-    if args.base == "koburi" and args.latin_source is not None:
-        raise ValueError("--latin-source is available for the Noto base only")
-    if args.base == "koburi" and args.ruby_source is not None:
-        raise ValueError("--ruby-source is available for the Noto base only")
-    if args.base == "koburi" and args.latin_family != "libertinus":
-        raise ValueError("--latin-family is available for the Noto base only")
-    if (
-        args.base == "noto"
-        and args.latin_family == "noto"
-        and args.latin_source is not None
-    ):
-        raise ValueError("--latin-source cannot be combined with --latin-family noto")
-    identity = font_identity(args.base, args.weight)
-    latin_profile = latin_build_profile(
-        args.latin_family if args.base == "noto" else "noto",
-        args.weight,
-    )
-    if args.output is not None:
-        output_path = args.output
-    elif args.base == "noto" and args.latin_family != "libertinus":
-        output_path = (
-            Path("dist")
-            / "comparison"
-            / f"{identity.postscript_name}-{args.latin_family}.otf"
-        )
-    else:
-        output_path = default_output_path(identity, args.base)
-    sources = SourceCache(args.cache_dir).resolve(
-        args.base,
-        args.weight,
-        SourceOverrides(
-            source=args.source,
-            latin_source=args.latin_source,
-            ruby_source=args.ruby_source,
-            punctuation_source=args.punctuation_source,
-            sans_source=args.sans_source,
-        ),
-        latin_family=args.latin_family,
-    )
-
-    build(
-        sources.source,
-        sources.latin_source,
-        sources.ruby_source,
-        sources.punctuation_source,
-        sources.sans_source,
-        output_path,
-        identity,
-        latin_profile,
-        args.face,
-        args.base,
-        args.autohint,
-    )
-
-
-if __name__ == "__main__":
-    main()

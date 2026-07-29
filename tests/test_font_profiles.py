@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from font_profiles import (
+from nobigoe_font.profiles import (
     DirectSource,
     KOBURI_ARCHIVE_SHA256,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,

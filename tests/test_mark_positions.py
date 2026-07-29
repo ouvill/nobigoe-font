@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import unittest
 
-from mark_positioning import (
+from nobigoe_font.marks import (
     KOBURI_GENERATED_MARK_PAIRS,
     KOBURI_NATIVE_MARK_PAIRS,
     MARK_POSITION_DIRECTORY,

@@ -33,7 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version=$(python3 -c 'from font_profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          version=$(PYTHONPATH=src python3 -c 'from nobigoe_font.profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
           tag="v${version}"
           release_json=""
           if release_json=$(gh release view "$tag" \
@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v2-${{ hashFiles('font_profiles.py', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v2-${{ hashFiles('src/nobigoe_font/profiles.py', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -134,7 +134,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version=$(uv run python -c 'from font_profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          version=$(uv run python -c 'from nobigoe_font.profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
           mkdir -p /tmp/font-release
           gh release download "v${version}" \
             --repo "$GITHUB_REPOSITORY" \

@@ -9,8 +9,8 @@ import math
 import unicodedata
 from typing import Protocol
 
-from font_profiles import LatinBuildProfile, LatinGlyphClass, LatinTransform
-import font_geometry as _font_geometry
+from .profiles import LatinBuildProfile, LatinGlyphClass, LatinTransform
+from . import geometry as _font_geometry
 import pathops
 from fontTools import subset
 from fontTools.merge import Merger

@@ -9,7 +9,7 @@ from typing import Literal, TypeAlias, TypedDict, cast
 
 from fontTools.misc.transform import Transform
 
-from font_profiles import (
+from .profiles import (
     BaseType,
     KOBURI_TTF_MEMBER,
     KOBURI_TTF_SHA256,

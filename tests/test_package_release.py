@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from package_release import ARCHIVE_TIMESTAMP, ReleaseSpec, package_release
+from nobigoe_font.release import ARCHIVE_TIMESTAMP, ReleaseSpec, package_release
 
 
 class ReleasePackagingTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class ReleasePackagingTests(unittest.TestCase):
                 document.write_text(document.name)
             spec = ReleaseSpec("Family-v1", "Family-v1.zip", (font.name,))
 
-            with patch("package_release.DOCUMENTS", documents):
+            with patch("nobigoe_font.release.DOCUMENTS", documents):
                 archive_path = package_release(spec, dist)
                 first_bytes = archive_path.read_bytes()
                 package_release(spec, dist)
@@ -53,7 +53,7 @@ class ReleasePackagingTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             spec = ReleaseSpec("Missing-v1", "Missing-v1.zip", ("missing.otf",))
-            with patch("package_release.DOCUMENTS", ()):
+            with patch("nobigoe_font.release.DOCUMENTS", ()):
                 with self.assertRaisesRegex(FileNotFoundError, "missing.otf"):
                     package_release(spec, root)
 
