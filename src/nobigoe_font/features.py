@@ -263,17 +263,29 @@ def merge_features(font: TTFont, source: str) -> None:
         record.FeatureTag: record.Feature.LookupListIndex
         for record in patch.FeatureList.FeatureRecord
     }
-    old_by_tag: dict[str, list[object]] = {}
-    for record in old.FeatureList.FeatureRecord:
-        old_by_tag.setdefault(record.FeatureTag, []).append(record)
 
     for tag, lookup_indices in patch_by_tag.items():
-        if tag in old_by_tag:
-            for record in old_by_tag[tag]:
-                record.Feature.LookupListIndex = (
-                    lookup_indices + record.Feature.LookupListIndex
-                )
-                record.Feature.LookupCount = len(record.Feature.LookupListIndex)
+        feature_records = old.FeatureList.FeatureRecord
+        matching_records = [
+            record for record in feature_records if record.FeatureTag == tag
+        ]
+        for record in matching_records:
+            record.Feature.LookupListIndex = (
+                lookup_indices + record.Feature.LookupListIndex
+            )
+            record.Feature.LookupCount = len(record.Feature.LookupListIndex)
+
+        missing_langsys = []
+        for langsys in all_langsys(old.ScriptList):
+            referenced_indices = list(langsys.FeatureIndex)
+            if langsys.ReqFeatureIndex != 0xFFFF:
+                referenced_indices.append(langsys.ReqFeatureIndex)
+            if not any(
+                feature_records[index].FeatureTag == tag
+                for index in referenced_indices
+            ):
+                missing_langsys.append(langsys)
+        if not missing_langsys:
             continue
 
         patch_record = next(
@@ -284,19 +296,20 @@ def merge_features(font: TTFont, source: str) -> None:
         feature_index = next(
             (
                 index
-                for index, record in enumerate(old.FeatureList.FeatureRecord)
+                for index, record in enumerate(feature_records)
                 if record.FeatureTag > tag
             ),
-            len(old.FeatureList.FeatureRecord),
+            len(feature_records),
         )
+        missing_ids = {id(langsys) for langsys in missing_langsys}
         for langsys in all_langsys(old.ScriptList):
-            langsys.FeatureIndex = sorted(
-                [
-                    index + 1 if index >= feature_index else index
-                    for index in langsys.FeatureIndex
-                ]
-                + [feature_index]
-            )
+            shifted_indices = [
+                index + 1 if index >= feature_index else index
+                for index in langsys.FeatureIndex
+            ]
+            if id(langsys) in missing_ids:
+                shifted_indices.append(feature_index)
+            langsys.FeatureIndex = sorted(shifted_indices)
             langsys.FeatureCount = len(langsys.FeatureIndex)
             if (
                 langsys.ReqFeatureIndex != 0xFFFF
@@ -309,7 +322,5 @@ def merge_features(font: TTFont, source: str) -> None:
                 for substitution in substitutions:
                     if substitution.FeatureIndex >= feature_index:
                         substitution.FeatureIndex += 1
-        old.FeatureList.FeatureRecord.insert(
-            feature_index, copy.deepcopy(patch_record)
-        )
-        old.FeatureList.FeatureCount = len(old.FeatureList.FeatureRecord)
+        feature_records.insert(feature_index, copy.deepcopy(patch_record))
+        old.FeatureList.FeatureCount = len(feature_records)

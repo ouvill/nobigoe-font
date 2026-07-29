@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import shutil
+import subprocess
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,7 +17,12 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
 from nobigoe_font.hinting import autohint_latin_glyphs
-from nobigoe_font.features import feature_source
+from nobigoe_font.features import (
+    alternating_wave_rules,
+    contextual_extension_rules,
+    feature_source,
+    merge_features,
+)
 from nobigoe_font.pipeline import (
     import_koburi_ruby,
     make_manga_wave_parts,
@@ -39,6 +47,7 @@ from nobigoe_font.operations import (
     feature_ligatures,
     feature_single_substitutions,
     import_latin_font,
+    remove_repeated_ligatures,
     tt_glyph,
 )
 from nobigoe_font.profiles import (
@@ -538,6 +547,196 @@ class TrueTypeBuildTests(unittest.TestCase):
             feature_single_substitutions(font, "vert")[output],
             vertical_output,
         )
+
+    def test_horizontal_choon_calt_is_added_to_kana_script(self) -> None:
+        glyph_order = [
+            ".notdef",
+            "choon",
+            "old.alt",
+            "choon.start",
+            "choon.middle",
+            "choon.end",
+            "choon.vert",
+        ]
+        font = named_true_type_font(glyph_order, {0x30FC: "choon"})
+        addOpenTypeFeaturesFromString(
+            font,
+            """
+            languagesystem kana dflt;
+            languagesystem latn dflt;
+            feature calt {
+              script latn;
+              sub choon by old.alt;
+            } calt;
+            feature vert {
+              script kana;
+              sub choon by choon.vert;
+            } vert;
+            """,
+            tables={"GSUB"},
+        )
+
+        merge_features(
+            font,
+            "languagesystem DFLT dflt;\n"
+            "feature calt {\n"
+            + contextual_extension_rules(
+                "choon_h",
+                "choon",
+                "choon.start",
+                "choon.middle",
+                "choon.end",
+            )
+            + "} calt;\n",
+        )
+
+        gsub = font["GSUB"].table
+        feature_records = gsub.FeatureList.FeatureRecord
+        kana = next(
+            record.Script
+            for record in gsub.ScriptList.ScriptRecord
+            if record.ScriptTag == "kana"
+        )
+        self.assertIsNotNone(kana.DefaultLangSys)
+        self.assertIn(
+            "calt",
+            {
+                feature_records[index].FeatureTag
+                for index in kana.DefaultLangSys.FeatureIndex
+            },
+        )
+
+    @unittest.skipUnless(shutil.which("hb-shape"), "hb-shape is not installed")
+    def test_all_horizontal_extension_symbols_shape_to_calt_parts(self) -> None:
+        cmap = {
+            0x30FC: "choon",
+            0x2015: "dash",
+            0x301C: "wave",
+            0xFF5E: "wave",
+            0x3030: "manga-wave",
+        }
+        expected = {
+            0x30FC: ["choon.start", "choon.middle", "choon.end"],
+            0x2015: ["dash.start", "dash.middle", "dash.end"],
+            0x301C: ["wave.start", "wave.middle-b", "wave.end-a"],
+            0xFF5E: ["wave.start", "wave.middle-b", "wave.end-a"],
+            0x3030: ["manga-wave.start", "manga-wave.middle", "manga-wave.end"],
+        }
+        generated_names = [
+            *expected[0x30FC],
+            *expected[0x2015],
+            "wave.start",
+            "wave.middle-a",
+            "wave.middle-b",
+            "wave.end-a",
+            "wave.end-b",
+            *expected[0x3030],
+        ]
+        glyph_order = list(
+            dict.fromkeys(
+                [
+                    ".notdef",
+                    *cmap.values(),
+                    "old.alt",
+                    "choon.vert",
+                    "dash.two",
+                    "dash.three",
+                    *generated_names,
+                ]
+            )
+        )
+        font = named_true_type_font(glyph_order, cmap)
+        addOpenTypeFeaturesFromString(
+            font,
+            """
+            languagesystem DFLT dflt;
+            languagesystem kana dflt;
+            languagesystem latn dflt;
+            feature ccmp {
+              script DFLT;
+              sub dash dash dash by dash.three;
+              sub dash dash by dash.two;
+            } ccmp;
+            feature calt {
+              script latn;
+              sub choon by old.alt;
+            } calt;
+            feature vert {
+              script DFLT;
+              sub choon by choon.vert;
+              script kana;
+              sub choon by choon.vert;
+            } vert;
+            """,
+            tables={"GSUB"},
+        )
+        self.assertEqual(remove_repeated_ligatures(font, "ccmp", "dash"), 2)
+
+        calt_source = (
+            "languagesystem DFLT dflt;\n"
+            "feature calt {\n"
+            + contextual_extension_rules(
+                "choon_h",
+                "choon",
+                "choon.start",
+                "choon.middle",
+                "choon.end",
+            )
+            + contextual_extension_rules(
+                "dash_h",
+                "dash",
+                "dash.start",
+                "dash.middle",
+                "dash.end",
+            )
+            + alternating_wave_rules(
+                "wave_h",
+                "wave",
+                [
+                    "wave.start",
+                    "wave.middle-a",
+                    "wave.middle-b",
+                    "wave.end-a",
+                    "wave.end-b",
+                ],
+            )
+            + contextual_extension_rules(
+                "manga_wave_h",
+                "manga-wave",
+                "manga-wave.start",
+                "manga-wave.middle",
+                "manga-wave.end",
+            )
+            + "} calt;\n"
+        )
+        merge_features(font, calt_source)
+
+        with TemporaryDirectory() as temporary:
+            path = Path(temporary) / "extensions.ttf"
+            font.save(path)
+            for codepoint, enabled_glyphs in expected.items():
+                text = chr(codepoint) * 3
+                for calt, expected_glyphs in (
+                    (0, [cmap[codepoint]] * 3),
+                    (1, enabled_glyphs),
+                ):
+                    shaped = subprocess.run(
+                        [
+                            "hb-shape",
+                            "--output-format=json",
+                            f"--features=calt={calt}",
+                            str(path),
+                            text,
+                        ],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    actual_glyphs = [
+                        record["g"] for record in json.loads(shaped.stdout)
+                    ]
+                    with self.subTest(codepoint=codepoint, calt=calt):
+                        self.assertEqual(actual_glyphs, expected_glyphs)
 
     def test_fallback_unicode_mapping_preserves_a_native_pua_glyph(
         self,
