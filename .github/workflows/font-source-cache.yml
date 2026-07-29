@@ -1,0 +1,51 @@
+name: Warm pinned font source cache
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/font-source-cache.yml
+      - src/nobigoe_font/profiles.py
+      - src/nobigoe_font/sources.py
+  schedule:
+    # GitHub may evict caches that have not been accessed for seven days.
+    - cron: "17 4 * * 1,5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: font-source-cache
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    name: Verify release font sources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache pinned font sources
+        uses: actions/cache@v4
+        with:
+          path: .cache/font-sources
+          key: font-sources-${{ runner.os }}-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/sources.py') }}
+          restore-keys: |
+            font-sources-${{ runner.os }}-
+
+      - name: Resolve and verify release font sources
+        env:
+          PYTHONPATH: src
+        run: |
+          python3 - <<'PY'
+          from nobigoe_font.profiles import NOTO_WEIGHT_CLASSES
+          from nobigoe_font.sources import SourceCache
+
+          cache = SourceCache()
+          for weight in NOTO_WEIGHT_CLASSES:
+              print(f"Resolving {weight}")
+              cache.resolve("noto", weight)
+          PY
