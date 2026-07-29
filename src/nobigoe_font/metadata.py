@@ -58,6 +58,7 @@ def rename_font(
         font["OS/2"].fsSelection |= 1 << 6
     elif identity.style == "Bold":
         font["OS/2"].fsSelection |= 1 << 5
+    font["head"].fontRevision = float(VERSION_NUMBER)
     font["head"].macStyle &= ~1
     if identity.style == "Bold":
         font["head"].macStyle |= 1

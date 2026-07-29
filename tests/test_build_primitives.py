@@ -20,6 +20,7 @@ from nobigoe_font.pipeline import (
     make_manga_wave_parts,
     make_wave_parts,
 )
+from nobigoe_font.metadata import rename_font
 from nobigoe_font.punctuation import (
     make_punctuation_ligature,
     shippori_upright_punctuation_paths,
@@ -40,7 +41,11 @@ from nobigoe_font.operations import (
     import_latin_font,
     tt_glyph,
 )
-from nobigoe_font.profiles import LatinBuildProfile
+from nobigoe_font.profiles import (
+    LatinBuildProfile,
+    VERSION_NUMBER,
+    font_identity,
+)
 from nobigoe_font.geometry import (
     bounds,
     adjust_outline_weight,
@@ -141,6 +146,24 @@ def ascii_true_type_font(width: int, role: str) -> TTFont:
         )
     addOpenTypeFeaturesFromString(font, features, tables={"GSUB"})
     return font
+
+
+class FontMetadataTests(unittest.TestCase):
+    def test_rename_font_sets_open_type_revision(self) -> None:
+        font = minimal_true_type_font()
+
+        rename_font(
+            font,
+            "Copyright",
+            "Notice",
+            font_identity("noto", "Regular"),
+        )
+
+        self.assertAlmostEqual(
+            font["head"].fontRevision,
+            float(VERSION_NUMBER),
+            places=4,
+        )
 
 
 class FontGeometryTests(unittest.TestCase):
