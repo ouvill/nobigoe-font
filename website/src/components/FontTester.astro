@@ -187,10 +187,13 @@
 
     const updateFeatures = () => {
       const features = [
+        '"ccmp" 1',
+        '"calt" 1',
+        canvas.classList.contains("is-vertical") && '"vrt2" 1',
         punctuation && `"${punctuation}" 1`,
         ruby && '"ruby" 1',
       ].filter(Boolean);
-      editor.style.fontFeatureSettings = features.join(", ") || "normal";
+      editor.style.fontFeatureSettings = features.join(", ");
     };
 
     size.addEventListener("input", () => {
@@ -221,6 +224,7 @@
           button.dataset.writing === "vertical",
         );
         activate(writingButtons, button);
+        updateFeatures();
       });
     }
 
