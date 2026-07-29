@@ -78,12 +78,12 @@
   </div>
 
   <details class="tester-advanced">
-    <summary>感嘆符・疑問符やルビの字形も変更する</summary>
+    <summary>感嘆符・疑問符の字形を変更する</summary>
     <div>
       <fieldset class="control">
         <legend>「！？」「？？」の書体</legend>
         <p>連続する感嘆符・疑問符だけに適用します。</p>
-        <div class="choice-group choice-group--four" data-punctuation-styles>
+        <div class="choice-group" data-punctuation-styles>
           <button
             class="is-active"
             type="button"
@@ -92,28 +92,6 @@
           >
           <button type="button" data-feature="ss01" aria-pressed="false"
             >斜体明朝</button
-          >
-          <button type="button" data-feature="ss02" aria-pressed="false"
-            >ゴシック</button
-          >
-          <button type="button" data-feature="ss03" aria-pressed="false"
-            >斜体ゴシック</button
-          >
-        </div>
-      </fieldset>
-
-      <fieldset class="control">
-        <legend>ルビ用の小さい字形</legend>
-        <p>ルビとして組むときだけ「使う」を選びます。</p>
-        <div class="choice-group" data-ruby-modes>
-          <button
-            class="is-active"
-            type="button"
-            data-ruby="normal"
-            aria-pressed="true">使わない</button
-          >
-          <button type="button" data-ruby="ruby" aria-pressed="false"
-            >使う</button
           >
         </div>
       </fieldset>
@@ -163,16 +141,10 @@
         "[data-punctuation-styles] button",
       ),
     ];
-    const rubyButtons = [
-      ...document.querySelectorAll<HTMLButtonElement>(
-        "[data-ruby-modes] button",
-      ),
-    ];
     const sampleButtons = [
       ...document.querySelectorAll<HTMLButtonElement>("[data-sample]"),
     ];
     let punctuation = "";
-    let ruby = false;
 
     const activate = (
       buttons: HTMLButtonElement[],
@@ -191,7 +163,6 @@
         '"calt" 1',
         canvas.classList.contains("is-vertical") && '"vrt2" 1',
         punctuation && `"${punctuation}" 1`,
-        ruby && '"ruby" 1',
       ].filter(Boolean);
       editor.style.fontFeatureSettings = features.join(", ");
     };
@@ -232,14 +203,6 @@
       button.addEventListener("click", () => {
         punctuation = button.dataset.feature || "";
         activate(punctuationButtons, button);
-        updateFeatures();
-      });
-    }
-
-    for (const button of rubyButtons) {
-      button.addEventListener("click", () => {
-        ruby = button.dataset.ruby === "ruby";
-        activate(rubyButtons, button);
         updateFeatures();
       });
     }

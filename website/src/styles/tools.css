@@ -223,7 +223,7 @@
 
 .tester-advanced > div {
   display: grid;
-  grid-template-columns: 1.25fr 0.75fr;
+  grid-template-columns: 1fr;
   border-top: 1px solid var(--line);
 }
 
@@ -235,11 +235,6 @@
   margin: 0 0 12px;
   color: var(--muted);
   font-size: 12px;
-}
-
-.choice-group--four {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
 }
 
 .tester-workspace {

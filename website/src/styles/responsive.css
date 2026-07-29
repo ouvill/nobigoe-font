@@ -66,15 +66,6 @@
     border-left: 0;
   }
 
-  .reading-showcase {
-    grid-template-columns: 1fr;
-  }
-
-  .vertical-specimen {
-    border-top: 1px solid var(--line-strong);
-    border-left: 0;
-  }
-
   .download-section {
     grid-template-columns: 1fr;
   }
@@ -151,196 +142,6 @@
     top: 70px;
   }
 
-  .hero-copy {
-    padding-top: 68px;
-    padding-bottom: 68px;
-  }
-
-  .hero-overline {
-    display: grid;
-    gap: 5px;
-  }
-
-  .hero-copy h1 {
-    margin: 36px 0 24px;
-    font-size: clamp(39px, 11vw, 43px);
-  }
-
-  .hero-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .hero-specimen {
-    padding-top: 54px;
-    padding-bottom: 54px;
-  }
-
-  .hero-specimen h2 {
-    font-size: 30px;
-  }
-
-  .hero-symbols article {
-    grid-template-columns: 76px minmax(0, 1fr);
-    gap: 12px;
-    padding: 16px;
-  }
-
-  .hero-symbols strong {
-    font-size: clamp(30px, 9vw, 38px);
-  }
-
-  .hero-family-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-family-strip article {
-    grid-template-columns: 80px 1fr;
-    gap: 5px 14px;
-    padding-top: 18px;
-    padding-bottom: 18px;
-  }
-
-  .hero-family-strip article + article {
-    border-top: 1px solid var(--line-strong);
-    border-left: 0;
-  }
-
-  .hero-family-strip small {
-    grid-column: 2;
-  }
-
-  .capability-summary > header,
-  .explore-section > header {
-    display: block;
-  }
-
-  .capability-summary header > p,
-  .explore-section > header > p {
-    margin-bottom: 12px;
-  }
-
-  .capability-summary h2,
-  .explore-section > header h2 {
-    font-size: 32px;
-  }
-
-  .wave-mechanism {
-    grid-template-columns: 1fr;
-  }
-
-  .wave-mechanism__sample {
-    padding: 32px 20px;
-  }
-
-  .wave-mechanism__sample p {
-    font-size: clamp(44px, 12.5vw, 49px);
-  }
-
-  .extension-notes {
-    grid-template-columns: 1fr;
-  }
-
-  .capability-list,
-  .family-cards,
-  .explore-links {
-    grid-template-columns: 1fr;
-  }
-
-  .capability-list article,
-  .extension-notes article {
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: 18px;
-    padding: 24px 20px;
-  }
-
-  .capability-glyph {
-    font-size: 29px;
-  }
-
-  .section-heading h2 {
-    font-size: clamp(34px, 9.5vw, 44px);
-  }
-
-  .section-description {
-    font-size: 15px;
-  }
-
-  .family-card {
-    padding: 28px 24px;
-  }
-
-  .family-card + .family-card,
-  .explore-card + .explore-card {
-    border-top: 1px solid var(--line-strong);
-    border-left: 0;
-  }
-
-  .family-card header h3 {
-    font-size: 30px;
-  }
-
-  .weight-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-    padding: 18px 0;
-  }
-
-  .weight-label {
-    justify-content: flex-start;
-    gap: 12px;
-  }
-
-  .weight-japanese,
-  .weight-latin {
-    overflow: hidden;
-    font-size: 27px;
-    text-overflow: clip;
-  }
-
-  .regular-specimen__header,
-  .regular-specimen__block {
-    padding-right: 22px;
-    padding-left: 22px;
-  }
-
-  .kana-specimen {
-    grid-template-columns: 1fr;
-    gap: 26px;
-  }
-
-  .kana-specimen p {
-    font-size: clamp(24px, 7.3vw, 28px);
-  }
-
-  .compatibility-glyphs {
-    font-size: clamp(28px, 8vw, 32px);
-  }
-
-  .latin-regular-specimen p {
-    font-size: clamp(25px, 7.7vw, 30px);
-  }
-
-  .reading-notes {
-    padding: 24px;
-  }
-
-  .vertical-specimen {
-    min-height: 560px;
-    padding: 34px 20px;
-  }
-
-  .vertical-specimen > p {
-    max-width: 100%;
-    height: 17em;
-    font-size: clamp(21px, 5.8vw, 25px);
-  }
-
-  .explore-card {
-    min-height: 0;
-    padding: 30px 24px;
-  }
-
   .package-list {
     grid-template-columns: 1fr;
   }
@@ -389,8 +190,7 @@
     margin: 0 0 4px;
   }
 
-  .tester-panel,
-  .tester-advanced > div {
+  .tester-panel {
     grid-template-columns: 1fr;
   }
 
@@ -401,18 +201,6 @@
 
   .tester-advanced .control + .control {
     border-top: 1px solid var(--line);
-  }
-
-  .choice-group--four {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .choice-group--four button:nth-child(3) {
-    border-left: 1px solid var(--line-strong);
-  }
-
-  .choice-group--four button:nth-child(n + 3) {
-    border-top: 0;
   }
 
   .tester-workspace {
