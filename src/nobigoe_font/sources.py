@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from font_profiles import (
+from .profiles import (
     BaseType,
     DirectSource,
     FontSource,

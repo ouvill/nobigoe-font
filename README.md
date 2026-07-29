@@ -113,19 +113,21 @@ uv sync
 
 ### コード構成
 
-`build_font.py`はCLIと生成手順のオーケストレーションに限定し、変更理由が異なる処理を次のモジュールへ分割しています。
+Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライン、フォント操作、設定データをインストール可能な1パッケージとして管理しています。
 
 | モジュール | 責務 |
 |---|---|
-| `font_profiles.py` | ファミリー、ウェイト、固定取得元の型付き定義 |
-| `font_sources.py` | 明示ローカルパスとSHA-256検証済みキャッシュの解決 |
-| `mark_positioning.py` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
-| `font_geometry.py` | 輪郭変換、記号合成、ハート濁点の白抜き |
-| `font_operations.py` | 欧文字形・GDEF・GSUB・GPOSの変換と結合、cmap参照、CFF／TrueTypeグリフ操作 |
+| `cli.py` | `nobigoe-build`の引数検証と入出力の解決 |
+| `pipeline.py` | フォント生成手順のオーケストレーション |
+| `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
+| `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
+| `geometry.py` / `operations.py` | 輪郭変換、cmap、CFF／TrueType、欧文レイアウトの操作 |
+| `punctuation.py` / `features.py` | 漫画約物の合成とOpenType機能の生成・結合 |
+| `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
 
 ### 自動取得して生成
 
-引数を省略すると、欧文にLibertinus Serifを使用するRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JP、Noto Sans JP、STIX Two Textは固定コミットまたはタグ、Libertinus Serif、Source Serif 4、源暎こぶり明朝、対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
+引数を省略すると、欧文にLibertinus Serifを使用するRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JP、Noto Sans JP、STIX Two Textは固定コミットまたはタグ、Libertinus Serif、Source Serif 4、源暎こぶり明朝、対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`src/nobigoe_font/profiles.py`へ集約しています。
 
 Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです。和文と欧文の高さを厳密に追従させて横幅まで変形するのではなく、Noto Serif JPの和文とおおむね高さが揃う等方拡大を実マスターごとに固定しています。Regular由来のExtraLight・Light・Regular・Mediumは1.119倍、Semiboldは1.129倍、Bold由来のBold・Blackは1.138倍です。同じマスターから作るウェイトでは輪郭と送り幅に同じ倍率を使い、個々の欧文字形の送り幅を共通化することで、拡大率に由来する文字列幅の逆転をなくしています。そのうえで細い横画をほぼ保ち、太い縦画を中心に-13〜+6 unitsのウェイト別輪郭補正を行います。同じ変換を通常字形、`ccmp`・`locl`異体字、標準合字へ適用します。
 
@@ -137,22 +139,22 @@ Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです�
 
 ```sh
 # Noto版Regular
-uv run python build_font.py
+uv run nobigoe-build
 
 # 取り込んだ欧文字形だけをAFDKOで再ヒント
-uv run python build_font.py --autohint
+uv run nobigoe-build --autohint
 
 # Noto版の全7ウェイト
 for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-  uv run python build_font.py --weight "$weight" --autohint
+  uv run nobigoe-build --weight "$weight" --autohint
 done
 
 # 源暎こぶり明朝版Regular
-uv run python build_font.py --base koburi
+uv run nobigoe-build --base koburi
 
 # Regularの欧文候補を比較用ディレクトリへ生成
 for latin in noto libertinus stix-two-text source-serif-4; do
-  uv run python build_font.py \
+  uv run nobigoe-build \
     --latin-family "$latin" \
     --output "dist/comparison/NobigoeMincho-Regular-$latin.otf"
 done
@@ -167,7 +169,7 @@ done
 2ファミリーを混在させず、フォント、README、OFL、第三者通知、SHA-256マニフェストをそれぞれの再現可能なZIPへまとめます。先に上記の全フォントを生成してください。
 
 ```sh
-uv run python package_release.py
+uv run nobigoe-package
 ```
 
 ```text
@@ -177,12 +179,12 @@ dist/NobigoeKoburiMincho-v1.027.zip
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`font_profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.027`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.027`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 
 ```sh
-uv run python build_font.py \
+uv run nobigoe-build \
   --source /path/to/NotoSerifJP-Regular.otf \
   --latin-source /path/to/LibertinusSerif-Regular.otf \
   --punctuation-source /path/to/ShipporiMincho-OTF-Regular.otf \
@@ -209,14 +211,14 @@ uv run python -m unittest discover -s tests -v
 共通の基準配置191列は、字種と記号ごとに次の4ファイルへ分割しています。Noto版はこの値を使用し、源暎こぶり明朝版は後述の専用レイヤーを重ねます。
 
 ```text
-mark_positions/hiragana_dakuten.json
-mark_positions/hiragana_handakuten.json
-mark_positions/katakana_dakuten.json
-mark_positions/katakana_handakuten.json
-mark_positions/koburi.json
+src/nobigoe_font/mark_positions/hiragana_dakuten.json
+src/nobigoe_font/mark_positions/hiragana_handakuten.json
+src/nobigoe_font/mark_positions/katakana_dakuten.json
+src/nobigoe_font/mark_positions/katakana_handakuten.json
+src/nobigoe_font/mark_positions/koburi.json
 ```
 
-各字の `horizontal` と `vertical` は `[scale, x, y]` です。`scale` は結合記号の等方倍率、`x` と `y` は拡大後の平行移動量で、正の値は右・上へ移動します。`build_font.py` は共通4ファイルの記号種、キー集合、配列長、正の倍率を検証し、191列の不足や重複があれば生成を停止します。Noto版で生成する167列は、実際のウェイトの輪郭で基字との交差も検査します。交差時は記号の大きさを変えず、基字と記号の中心関係から求めた上・横・斜めの外向き候補を比較し、縦メトリクス内で輪郭が離れる最短距離の移動を採用します。
+各字の `horizontal` と `vertical` は `[scale, x, y]` です。`scale` は結合記号の等方倍率、`x` と `y` は拡大後の平行移動量で、正の値は右・上へ移動します。`nobigoe-build`は共通4ファイルの記号種、キー集合、配列長、正の倍率を検証し、191列の不足や重複があれば生成を停止します。Noto版で生成する167列は、実際のウェイトの輪郭で基字との交差も検査します。交差時は記号の大きさを変えず、基字と記号の中心関係から求めた上・横・斜めの外向き候補を比較し、縦メトリクス内で輪郭が離れる最短距離の移動を採用します。
 
 ```json
 "30A1": {
@@ -227,9 +229,9 @@ mark_positions/koburi.json
 
 Version 1.015の配置値は、[源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html)の一体型濁点・半濁点字形を比較基準にしています。同フォントの1024 units/emの輪郭寸法と基字からの相対位置を1000 units/emへ正規化し、Nobigoe Minchoの各基字へ移植しました。源暎こぶり明朝のフォントデータや輪郭自体は取り込んでいません。
 
-長音濁点はManga1の191列には含まれないため、`mark_positioning.py`の`CHOON_DAKUTEN_MARK_CENTERS`で横組・縦組の記号中心を管理します。この値も源暎こぶり明朝のU+E0DBを1000 units/emへ正規化したものです。
+長音濁点はManga1の191列には含まれないため、`src/nobigoe_font/marks.py`の`CHOON_DAKUTEN_MARK_CENTERS`で横組・縦組の記号中心を管理します。この値も源暎こぶり明朝のU+E0DBを1000 units/emへ正規化したものです。
 
-`mark_positions/koburi.json` は、源暎こぶり明朝に一体字形がない103列だけを上書きします。源暎こぶり明朝v6.1の既存88列から、基字に対する記号の相対位置と寸法を通常仮名・小書き仮名、濁点・半濁点、横組・縦組ごとに測定して配置へ反映しています。元フォントの88列は専用レイヤーで上書きせず、元の一体字形をそのまま使用します。設定ファイルには測定元のSHA-256、units/em、GPOS機能、対象数も記録し、ビルド時に検証します。
+`src/nobigoe_font/mark_positions/koburi.json`は、源暎こぶり明朝に一体字形がない103列だけを上書きします。源暎こぶり明朝v6.1の既存88列から、基字に対する記号の相対位置と寸法を通常仮名・小書き仮名、濁点・半濁点、横組・縦組ごとに測定して配置へ反映しています。元フォントの88列は専用レイヤーで上書きせず、元の一体字形をそのまま使用します。設定ファイルには測定元のSHA-256、units/em、GPOS機能、対象数も記録し、ビルド時に検証します。
 
 Noto Serif JPに既存一体字形がある24列は元の輪郭と縦組字形を優先します。該当列にも完全な191キー集合を検証するための設定値がありますが、生成輪郭には適用されません。U+31F7 `ㇷ` + U+309Aもこの24列に含まれます。
 

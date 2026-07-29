@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Package the two Nobigoe font families as separate release archives."""
 
 from __future__ import annotations
@@ -9,7 +8,7 @@ import hashlib
 from pathlib import Path
 import zipfile
 
-from font_profiles import NOTO_WEIGHT_CLASSES, VERSION_NUMBER
+from .profiles import NOTO_WEIGHT_CLASSES, VERSION_NUMBER
 
 ARCHIVE_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 DOCUMENTS = (Path("README.md"), Path("OFL.txt"), Path("THIRD_PARTY_NOTICES.md"))

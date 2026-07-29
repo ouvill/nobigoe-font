@@ -40,7 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/font-sources
-          key: font-sources-${{ runner.os }}-${{ hashFiles('font_profiles.py', 'font_sources.py') }}
+          key: font-sources-${{ runner.os }}-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/sources.py') }}
           restore-keys: |
             font-sources-${{ runner.os }}-
 
@@ -56,7 +56,7 @@ jobs:
         run: |
           uv run python - <<'PY'
           import os
-          from font_profiles import VERSION_NUMBER
+          from nobigoe_font.profiles import VERSION_NUMBER
 
           expected = f"v{VERSION_NUMBER}"
           actual = os.environ["RELEASE_TAG"]
@@ -73,9 +73,9 @@ jobs:
       - name: Build both font families
         run: |
           for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            uv run python build_font.py --weight "$weight" --autohint
+            uv run nobigoe-build --weight "$weight" --autohint
           done
-          uv run python build_font.py --base koburi
+          uv run nobigoe-build --base koburi
 
       - name: Validate generated fonts
         run: |
@@ -87,7 +87,7 @@ jobs:
 
       - name: Package release archives
         run: |
-          uv run python package_release.py
+          uv run nobigoe-package
           cd dist
           sha256sum NobigoeMincho-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
 

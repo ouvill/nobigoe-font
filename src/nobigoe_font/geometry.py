@@ -11,7 +11,7 @@ from fontTools.pens.filterPen import DecomposingFilterPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-from mark_positioning import (
+from .marks import (
     DEFAULT_MARK_TRANSFORM,
     HEART_DAKUTEN_CLEARANCE_RATIO,
     HEART_DAKUTEN_CLEARANCE_STEPS,
