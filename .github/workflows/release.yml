@@ -29,11 +29,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Cache pinned font sources
         uses: actions/cache@v4
@@ -49,11 +50,11 @@ jobs:
           sudo apt-get install --yes libharfbuzz-bin opentype-sanitizer
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: uv sync --locked
 
       - name: Validate release tag
         run: |
-          python - <<'PY'
+          uv run python - <<'PY'
           import os
           from font_profiles import VERSION_NUMBER
 
@@ -67,14 +68,14 @@ jobs:
           PY
 
       - name: Run tests
-        run: python -m unittest discover -s tests
+        run: uv run python -m unittest discover -s tests
 
       - name: Build both font families
         run: |
           for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            python build_font.py --weight "$weight"
+            uv run python build_font.py --weight "$weight" --autohint
           done
-          python build_font.py --base koburi
+          uv run python build_font.py --base koburi
 
       - name: Validate generated fonts
         run: |
@@ -86,7 +87,7 @@ jobs:
 
       - name: Package release archives
         run: |
-          python package_release.py
+          uv run python package_release.py
           cd dist
           sha256sum NobigoeMincho-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
 

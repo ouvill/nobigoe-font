@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-`Nobigoe Mincho`（のびごえ明朝）と`Nobigoe Koburi Mincho`（のびごえこぶり明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。
+`Nobigoe Mincho`（のびごえ明朝）と`Nobigoe Koburi Mincho`（のびごえこぶり明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。STIX Two TextとSource Serif 4は、`--latin-family`で明示した比較ビルドだけに取り込みます。
 
 ## Noto Serif JP
 
@@ -23,7 +23,7 @@
 
 ### 使用箇所と改変
 
-各ウェイトを対応する`Nobigoe Mincho`の和文ベースとして使用しています。欧文字形とそのメトリクスはLibertinus Serifへ置換し、それ以外の既存字形・メトリクス・OpenTypeテーブルを保持しています。伸長記号、Manga1方式の感嘆符・疑問符合字、濁点・半濁点付き仮名、ルビ、小書きコを追加し、ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータを元フォントと区別できる名前へ変更しています。
+各ウェイトを対応する`Nobigoe Mincho`の和文ベースとして使用しています。欧文字形とそのメトリクスは選択した欧文プロファイルへ置換するか、`--latin-family noto`ではNoto Serif JPのまま保持します。それ以外の既存字形・メトリクス・OpenTypeテーブルを保持しています。伸長記号、Manga1方式の感嘆符・疑問符合字、濁点・半濁点付き仮名、ルビ、小書きコを追加し、ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータを元フォントと区別できる名前へ変更しています。
 
 
 ## Libertinus Serif
@@ -45,6 +45,44 @@
 ### 使用箇所と改変
 
 Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended Additionalと、英文で使用するダッシュ、引用符、省略記号などの字形・水平メトリクスを使用します。標準の `fi`・`fl`・`ffi`・`ffl` 合字と、Noto Serif JPの `locl` が既定で選ぶ引用符・数字にも対応するLibertinus Serif字形を移植します。Libertinus Serifにない文字はNoto Serif JPの字形を保持します。Libertinus Serifが提供する3ウェイトを上表の対応で使用し、Noto Serif JPの欧文原字を基準に、大文字の輪郭高さ中央値と大文字・小文字・数字の送り幅あたりの輪郭面積を測定して、全7ウェイトの大きさと太さを補正します。Noto Serif JP側のグリフ名とOpenTypeテーブルへ調整後の輪郭と水平メトリクスを移植します。源暎こぶり明朝版には取り込みません。
+
+## STIX Two Text
+
+- Project: [STIX Fonts](https://github.com/stipub/stixfonts)
+- Version: `2.13 b171`
+- Tag: [`v2.13b171`](https://github.com/stipub/stixfonts/releases/tag/v2.13b171)
+- Source directory: `fonts/static_otf/`
+- Copyright: `Copyright 2001-2021 The STIX Fonts Project Authors (https://github.com/stipub/stixfonts)`
+- License: SIL Open Font License 1.1
+
+| Source file | Used for | SHA-256 |
+|---|---|---|
+| `STIXTwoText-Regular.otf` | Regular | `c4864ca6ec071c2d31d0d8309001faa1ee3517fffb53a31a405a697b71f52ca1` |
+| `STIXTwoText-Medium.otf` | Medium | `9cc9f870852a46d708907b96ed024b8d0067a05276d939bfe0b7e89752afc8d9` |
+| `STIXTwoText-SemiBold.otf` | SemiBold | `896d80fbfd67e86ead7e2d593d631eab9bb142ee96dcd8e7aa8dff95ddda0f2a` |
+| `STIXTwoText-Bold.otf` | Bold | `7ef76c666a6704f76ed3fa27bcdda55b36e558b5c2c93b49b03d854db96bdeb5` |
+
+### 使用箇所と改変
+
+`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。輪郭と水平メトリクスを1.110倍してNoto Serif JP側のグリフへ移植します。STIX Two TextにネイティブソースがあるRegular、Medium、SemiBold、Boldだけを対象とし、源暎こぶり明朝版には取り込みません。
+
+## Source Serif 4
+
+- Project: [Source Serif](https://github.com/adobe-fonts/source-serif)
+- Version: `4.005`
+- Archive: `source-serif-4.005_Desktop.zip`
+- Download: <https://github.com/adobe-fonts/source-serif/releases/download/4.005R/source-serif-4.005_Desktop.zip>
+- Archive SHA-256: `549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425`
+- Copyright: `© 2014 - 2023 Adobe (http://www.adobe.com/), with Reserved Font Name ‘Source’.`
+- License: SIL Open Font License 1.1
+
+| Source file | SHA-256 |
+|---|---|
+| `SourceSerif4Variable-Roman.ttf` | `14d360ee1b76655da9276628b229e11671bc1f5d1083636144db6677d452cf55` |
+
+### 使用箇所と改変
+
+`--latin-family source-serif-4`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。可変フォントを`opsz=20`、Nobigoeの各ウェイトに対応する`wght=200–900`で静的に実体化し、輪郭と水平メトリクスを1.088倍してNoto Serif JP側のグリフへ移植します。TrueType複合字形は構成要素を分解してOpenType/CFF輪郭へ変換します。源暎こぶり明朝版には取り込みません。
 
 ## 源暎こぶり明朝
 
@@ -116,4 +154,4 @@ Adobe-Manga1-0は、伸長記号、感嘆符・疑問符シーケンス、濁点
 
 ## License Distribution
 
-Noto Serif JP、Libertinus Serif、源暎こぶり明朝、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。
+Noto Serif JP、Libertinus Serif、STIX Two Text、Source Serif 4、源暎こぶり明朝、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。

@@ -1,6 +1,6 @@
 # のびごえ明朝 (Nobigoe Mincho)
 
-Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号、感嘆符・疑問符合字と異体字、濁点・半濁点付き仮名を追加するフォント生成プロジェクトです。Noto版の欧文はLibertinus Serifの字形とメトリクスを使用します。
+Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号、感嘆符・疑問符合字と異体字、濁点・半濁点付き仮名を追加するフォント生成プロジェクトです。Noto版の既定の欧文はLibertinus Serifの字形とメトリクスを使用します。
 
 制作: [Ouvill](https://blog.ouvill.net) · [X / @ouvill](https://twitter.com/ouvill) · [GitHub](https://github.com/ouvill) · [開発を支援](https://github.com/sponsors/ouvill)
 
@@ -83,7 +83,9 @@ Noto版では、Noto Serif JPに一体字形がある24列は既存輪郭を使�
 | 用途 | フォント | バージョン |
 |---|---|---:|
 | Noto版の本文、長音、ダッシュ、波線 | [Noto Serif JP](https://github.com/notofonts/noto-cjk) | 2.003 |
-| Noto版の欧文 | [Libertinus Serif](https://github.com/alerque/libertinus) | 7.051 |
+| Noto版の既定欧文 | [Libertinus Serif](https://github.com/alerque/libertinus) | 7.051 |
+| 比較用欧文候補 | [STIX Two Text](https://github.com/stipub/stixfonts) | 2.13 b171 |
+| 比較用欧文候補 | [Source Serif 4](https://github.com/adobe-fonts/source-serif) | 4.005 |
 | 源暎こぶり明朝版の本文、長音、ダッシュ、波線、および両版のルビ専用字形 | [源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html) | 6.1 |
 | Manga1感嘆符・疑問符合字の記号輪郭 | [Shippori Mincho OTF 5ウェイト（しっぽり明朝）](https://fontdasu.com/shippori-mincho/) | 3.300 |
 | Manga1感嘆符・疑問符合字のゴシック異体字 | [Noto Sans JP](https://github.com/notofonts/noto-cjk) | 2.004 |
@@ -94,17 +96,20 @@ Noto版では、Noto Serif JPに一体字形がある24列は既存輪郭を使�
 
 ### 必要環境
 
-- Python 3
+- Python 3.13
+- `uv`
 - `fonttools`
 - `skia-pathops`
 - OpenType SanitizerとHarfBuzz（検証する場合）
+- AFDKOの`otfautohint`（`--autohint`を使用する場合）
 
-Python依存関係をインストールします。
+Python依存関係をuvで同期します。Python 3.13を使用します。
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+uv sync
 ```
+
+`--autohint`を使用する場合もAFDKOは通常依存に含まれるため、`uv run`から`otfautohint`を実行できます。通常のビルドには不要です。
 
 ### コード構成
 
@@ -116,28 +121,44 @@ python3 -m venv .venv
 | `font_sources.py` | 明示ローカルパスとSHA-256検証済みキャッシュの解決 |
 | `mark_positioning.py` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
 | `font_geometry.py` | 輪郭変換、記号合成、ハート濁点の白抜き |
-| `font_operations.py` | GSUB・cmap参照とCFF／TrueTypeグリフの追加・置換 |
+| `font_operations.py` | 欧文字形・GDEF・GSUB・GPOSの変換と結合、cmap参照、CFF／TrueTypeグリフ操作 |
 
 ### 自動取得して生成
 
-引数を省略するとRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JPとNoto Sans JPは固定コミット、Libertinus Serif、源暎こぶり明朝、対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
+引数を省略すると、欧文にLibertinus Serifを使用するRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JP、Noto Sans JP、STIX Two Textは固定コミットまたはタグ、Libertinus Serif、Source Serif 4、源暎こぶり明朝、対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`font_profiles.py`へ集約しています。
 
 Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです。和文と欧文の高さを厳密に追従させて横幅まで変形するのではなく、Noto Serif JPの和文とおおむね高さが揃う等方拡大を実マスターごとに固定しています。Regular由来のExtraLight・Light・Regular・Mediumは1.119倍、Semiboldは1.129倍、Bold由来のBold・Blackは1.138倍です。同じマスターから作るウェイトでは輪郭と送り幅に同じ倍率を使い、個々の欧文字形の送り幅を共通化することで、拡大率に由来する文字列幅の逆転をなくしています。そのうえで細い横画をほぼ保ち、太い縦画を中心に-13〜+6 unitsのウェイト別輪郭補正を行います。同じ変換を通常字形、`ccmp`・`locl`異体字、標準合字へ適用します。
 
+欧文ソースからはBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Combining Diacritical Marks、Latin Extended Additionalと、欧文組版で使うダッシュ、引用符、分数スラッシュ、マイナス記号などを取り込みます。Unicodeに直接割り当てられた字形だけでなく、`ccmp`、`locl`、`liga`、`dlig`、`frac`、`lnum`、`onum`、`pnum`、`tnum`、`subs`、`sups`、`zero`などのGSUB出力字形、`kern`、`mark`、`mkmk`のGPOS、GDEFの字形クラスとMarkAttachClassも同じ倍率・ベースライン補正で移植します。和文ソース側の縦組・仮名・約物機能は維持します。
+
+`--autohint`を指定すると、生成後にAFDKO `otfautohint`を実行します。処理対象は今回取り込んだ欧文字形だけに限定し、Noto Serif JP由来の和文字形の既存ヒントには触れません。`otfautohint`が見つからない場合はエラーにして、未ヒントの成果物を正常終了として扱いません。
+
+`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍で取り込みます。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。
+
 ```sh
 # Noto版Regular
-.venv/bin/python build_font.py
+uv run python build_font.py
+
+# 取り込んだ欧文字形だけをAFDKOで再ヒント
+uv run python build_font.py --autohint
 
 # Noto版の全7ウェイト
 for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-  .venv/bin/python build_font.py --weight "$weight"
+  uv run python build_font.py --weight "$weight" --autohint
 done
 
 # 源暎こぶり明朝版Regular
-.venv/bin/python build_font.py --base koburi
+uv run python build_font.py --base koburi
+
+# Regularの欧文候補を比較用ディレクトリへ生成
+for latin in noto libertinus stix-two-text source-serif-4; do
+  uv run python build_font.py \
+    --latin-family "$latin" \
+    --output "dist/comparison/NobigoeMincho-Regular-$latin.otf"
+done
 ```
 
-出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--output`を省略して既定以外の欧文候補を指定した場合は、既存配布フォントを上書きせず`dist/comparison/NobigoeMincho-<Weight>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
 公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。
 
@@ -146,7 +167,7 @@ done
 2ファミリーを混在させず、フォント、README、OFL、第三者通知、SHA-256マニフェストをそれぞれの再現可能なZIPへまとめます。先に上記の全フォントを生成してください。
 
 ```sh
-.venv/bin/python package_release.py
+uv run python package_release.py
 ```
 
 ```text
@@ -161,7 +182,7 @@ dist/NobigoeKoburiMincho-v1.027.zip
 ### ローカルの元フォントを使用
 
 ```sh
-.venv/bin/python build_font.py \
+uv run python build_font.py \
   --source /path/to/NotoSerifJP-Regular.otf \
   --latin-source /path/to/LibertinusSerif-Regular.otf \
   --punctuation-source /path/to/ShipporiMincho-OTF-Regular.otf \
@@ -169,7 +190,7 @@ dist/NobigoeKoburiMincho-v1.027.zip
   --output dist/NobigoeMincho-Regular.otf
 ```
 
-`--source`、`--latin-source`、`--punctuation-source`、`--sans-source` の一部だけを指定した場合、指定しなかったフォントだけを自動取得します。`--latin-source`はNoto版だけに適用されます。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。源暎こぶり明朝版へローカルファイルを渡す場合は`--base koburi --source /path/to/GenEiKoburiMin6-R.ttf`とします。
+`--source`、`--latin-source`、`--punctuation-source`、`--sans-source` の一部だけを指定した場合、指定しなかったフォントだけを自動取得します。`--latin-source`はNoto版だけに適用され、`--latin-family`で選択したプロファイルの倍率・補正・可変軸設定を使用します。`source-serif-4`へローカルファイルを指定する場合は`wght`と`opsz`を持つ可変フォントが必要です。`--latin-family noto`と`--latin-source`は併用できません。Noto Serif CJKのTTCを入力する場合は `--face` でフェイス番号を指定できます。源暎こぶり明朝版へローカルファイルを渡す場合は`--base koburi --source /path/to/GenEiKoburiMin6-R.ttf`とします。
 
 明示したローカルファイルはキャッシュより優先します。指定しなかった取得元だけキャッシュを検索し、正しいSHA-256のファイルがなければダウンロードします。キャッシュ内の不完全または不正なファイルは一時ファイルへ再取得し、検証成功後に置換します。
 
@@ -180,7 +201,7 @@ dist/NobigoeKoburiMincho-v1.027.zip
 生成設定、命名、固定取得元とTrueType字形追加処理の単体テストを実行します。
 
 ```sh
-.venv/bin/python -m unittest discover -s tests -v
+uv run python -m unittest discover -s tests -v
 ```
 
 ### 濁点・半濁点の位置を調整
@@ -229,7 +250,7 @@ npm run dev
 配信用Webfont（`website/src/assets/fonts/*.woff2`）は生成物のためGit管理に含めません。リポジトリ直下から標準版Regularを更新する場合は、次のコマンドを使用します。
 
 ```sh
-.venv/bin/pyftsubset dist/NobigoeMincho-Regular.otf \
+uv run pyftsubset dist/NobigoeMincho-Regular.otf \
   --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
   --flavor=woff2 \
   --glyphs='*' \

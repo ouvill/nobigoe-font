@@ -60,29 +60,30 @@ jobs:
           path: website/src/assets/fonts/*.woff2
           key: astro-webfonts-v2-${{ hashFiles('font_profiles.py', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
-      - name: Set up Python
+      - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v5
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Install webfont dependencies
         if: steps.webfont-cache.outputs.cache-hit != 'true'
-        run: python -m pip install -r requirements.txt
+        run: uv sync --locked
 
       - name: Download released fonts
         if: steps.webfont-cache.outputs.cache-hit != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version=$(python -c 'from font_profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          version=$(uv run python -c 'from font_profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
           mkdir -p /tmp/font-release
           gh release download "v${version}" \
             --repo "$GITHUB_REPOSITORY" \
             --pattern '*.zip' \
             --dir /tmp/font-release
-          python - <<'PY'
+          uv run python - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
 
@@ -104,7 +105,7 @@ jobs:
         if: steps.webfont-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p website/src/assets/fonts
-          python - <<'PY'
+          uv run python - <<'PY'
           import json
           from html.parser import HTMLParser
           from pathlib import Path
@@ -142,7 +143,7 @@ jobs:
               encoding="utf-8",
           )
           PY
-          pyftsubset /tmp/font-release/fonts/NobigoeMincho-Regular.otf \
+          uv run pyftsubset /tmp/font-release/fonts/NobigoeMincho-Regular.otf \
             --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
             --flavor=woff2 \
             --glyphs='*' \
@@ -152,7 +153,7 @@ jobs:
             --notdef-glyph \
             --notdef-outline \
             --recommended-glyphs
-          pyftsubset /tmp/font-release/fonts/NobigoeKoburiMincho-Regular.ttf \
+          uv run pyftsubset /tmp/font-release/fonts/NobigoeKoburiMincho-Regular.ttf \
             --output-file=website/src/assets/fonts/NobigoeKoburiMincho-Regular-showcase.woff2 \
             --flavor=woff2 \
             --glyphs='*' \
@@ -163,7 +164,7 @@ jobs:
             --notdef-outline \
             --recommended-glyphs
           for weight in ExtraLight Light Medium SemiBold Bold Black; do
-            pyftsubset "/tmp/font-release/fonts/NobigoeMincho-${weight}.otf" \
+            uv run pyftsubset "/tmp/font-release/fonts/NobigoeMincho-${weight}.otf" \
               --output-file="website/src/assets/fonts/NobigoeMincho-${weight}-showcase.woff2" \
               --flavor=woff2 \
               --text-file=/tmp/weight-showcase.txt \

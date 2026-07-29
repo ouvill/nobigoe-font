@@ -98,8 +98,10 @@ class SourceCacheTests(unittest.TestCase):
             )
             stack.enter_context(
                 patch(
-                    "font_sources.libertinus_serif_source",
-                    return_value=self.latin,
+                    "font_sources.latin_font_source",
+                    side_effect=lambda family, _weight: (
+                        None if family == "noto" else self.latin
+                    ),
                 )
             )
             stack.enter_context(
@@ -139,6 +141,22 @@ class SourceCacheTests(unittest.TestCase):
             resolved.punctuation_source.read_bytes(), self.punctuation_content
         )
         self.assertEqual(resolved.sans_source.read_bytes(), self.sans_content)
+
+    def test_noto_latin_profile_keeps_the_base_latin_glyphs(self) -> None:
+        cache = SourceCache(self.cache_directory)
+        with self._pinned_sources(), patch(
+            "font_sources.urllib.request.urlretrieve",
+            side_effect=self._urlretrieve,
+        ) as retrieve:
+            resolved = cache.resolve(
+                "noto",
+                "Regular",
+                SourceOverrides(),
+                latin_family="noto",
+            )
+
+        self.assertIsNone(resolved.latin_source)
+        self.assertEqual(retrieve.call_count, 4)
 
     def test_second_resolution_reuses_the_same_cached_paths_without_network(
         self,

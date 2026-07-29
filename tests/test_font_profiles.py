@@ -5,22 +5,29 @@ from pathlib import Path
 
 from font_profiles import (
     DirectSource,
-    LIBERTINUS_ARCHIVE_SHA256,
-    LIBERTINUS_SCALE_FACTORS,
-    LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
-    KOBURI_RUBY_STROKE_ADJUSTMENTS,
     KOBURI_ARCHIVE_SHA256,
+    KOBURI_RUBY_STROKE_ADJUSTMENTS,
+    LATIN_FAMILIES,
+    LIBERTINUS_ARCHIVE_SHA256,
+    LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
+    LIBERTINUS_SCALE_FACTORS,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_ARCHIVE_SHA256,
     SHIPPORI_STROKE_ADJUSTMENTS,
+    SOURCE_SERIF_ARCHIVE_SHA256,
+    STIX_TWO_OTF_SHA256,
     VERSION_NUMBER,
     ZipMemberSource,
     default_output_path,
     font_identity,
+    latin_build_profile,
+    latin_font_source,
     libertinus_serif_source,
     noto_sans_source,
     noto_serif_source,
     shippori_source,
+    source_serif_source,
+    stix_two_text_source,
 )
 
 
@@ -154,6 +161,35 @@ class FontProfileTests(unittest.TestCase):
                 "Bold": -5,
                 "Black": 6,
             },
+        )
+
+    def test_latin_candidates_are_pinned_and_keep_libertinus_default(self) -> None:
+        self.assertEqual(
+            LATIN_FAMILIES,
+            ("noto", "libertinus", "stix-two-text", "source-serif-4"),
+        )
+        self.assertIsNone(latin_font_source("noto", "Regular"))
+        self.assertEqual(
+            latin_build_profile("libertinus", "Regular").scale_factor,
+            LIBERTINUS_SCALE_FACTORS["Regular"],
+        )
+
+        stix = stix_two_text_source("Regular")
+        self.assertIsInstance(stix, DirectSource)
+        self.assertEqual(stix.sha256, STIX_TWO_OTF_SHA256["Regular"])
+        self.assertEqual(
+            latin_build_profile("stix-two-text", "Regular").scale_factor,
+            1.110,
+        )
+        with self.assertRaisesRegex(ValueError, "no native ExtraLight"):
+            stix_two_text_source("ExtraLight")
+
+        source_serif = source_serif_source()
+        self.assertIsInstance(source_serif, ZipMemberSource)
+        self.assertEqual(len(SOURCE_SERIF_ARCHIVE_SHA256), 64)
+        self.assertEqual(
+            dict(latin_build_profile("source-serif-4", "Black").variations),
+            {"wght": 900.0, "opsz": 20.0},
         )
 
     def test_shippori_punctuation_adjustments_cover_every_noto_weight(

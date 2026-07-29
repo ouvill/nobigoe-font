@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
@@ -12,6 +14,7 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
 from build_font import (
+    autohint_latin_glyphs,
     feature_source,
     import_koburi_ruby,
     make_punctuation_ligature,
@@ -32,15 +35,16 @@ from font_operations import (
     append_ttf_glyphs,
     feature_ligatures,
     feature_single_substitutions,
-    replace_latin_glyphs,
-    replace_latin_gsub_glyphs,
+    import_latin_font,
     tt_glyph,
 )
+from font_profiles import LatinBuildProfile
 from font_geometry import (
     bounds,
     adjust_outline_weight,
     adjust_outline_horizontal_weight,
     centered_transform,
+    glyph_path,
     transform_path,
 )
 
@@ -129,10 +133,24 @@ def ascii_true_type_font(width: int, role: str) -> TTFont:
         )
     else:
         features = (
-            f"feature liga {{ sub {cmap[0x66]} {cmap[0x69]} by {fi_ligature}; }} liga;"
+            "languagesystem latn dflt;\n"
+            f"feature liga {{ sub {cmap[0x66]} {cmap[0x69]} by {fi_ligature}; }} liga;\n"
+            f"feature pnum {{ sub {cmap[0x30]} by {zero_alternate}; }} pnum;"
         )
     addOpenTypeFeaturesFromString(font, features, tables={"GSUB"})
     return font
+
+
+class FontGeometryTests(unittest.TestCase):
+    def test_glyph_path_decomposes_true_type_components(self) -> None:
+        font = minimal_true_type_font()
+        pen = TTGlyphPen(font.getGlyphSet())
+        pen.addComponent("base", Transform(1, 0, 0, 1, 50, 75))
+        font["glyf"].glyphs["composite"] = pen.glyph()
+        font["hmtx"].metrics["composite"] = (1000, 150)
+        font.setGlyphOrder([*font.getGlyphOrder(), "composite"])
+
+        self.assertEqual(glyph_path(font, "composite").bounds, (150, 175, 950, 575))
 
 
 class TrueTypeBuildTests(unittest.TestCase):
@@ -172,6 +190,22 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual((thinned.bounds[0], thinned.bounds[2]), (110.0, 890.0))
         self.assertAlmostEqual(thinned.bounds[1], 100.625)
         self.assertAlmostEqual(thinned.bounds[3], 499.375)
+
+    def test_horizontal_weight_adjustment_handles_round_isolated_contours(
+        self,
+    ) -> None:
+        outline = pathops.Path()
+        pen = outline.getPen()
+        pen.moveTo((101, 754))
+        pen.curveTo((85, 754), (72, 741), (72, 725))
+        pen.curveTo((72, 709), (85, 696), (101, 696))
+        pen.curveTo((117, 696), (130, 709), (130, 725))
+        pen.curveTo((130, 741), (117, 754), (101, 754))
+        pen.closePath()
+
+        adjusted = adjust_outline_horizontal_weight(outline, 1)
+
+        self.assertEqual(adjusted.bounds[0::2], (71.0, 131.0))
 
     def test_wave_terminals_reuse_source_glyph_margins(self) -> None:
         (
@@ -524,34 +558,52 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(rebuilt["maxp"].numGlyphs, 3)
 
 
-    def test_latin_replacement_covers_default_and_gsub_outputs(self) -> None:
+
+    def test_latin_import_merges_source_layout_and_common_numeric_features(
+        self,
+    ) -> None:
         target = ascii_true_type_font(900, "target")
         source = ascii_true_type_font(500, "source")
-
-        replaced = replace_latin_glyphs(target, source)
-        outputs = replace_latin_gsub_glyphs(target, source, replaced)
+        result = import_latin_font(
+            target,
+            source,
+            LatinBuildProfile("libertinus", 1, 0),
+        )
 
         target_cmap = target.getBestCmap()
-        source_cmap = source.getBestCmap()
-        self.assertEqual(
-            target["hmtx"].metrics[target_cmap[0x41]],
-            source["hmtx"].metrics[source_cmap[0x41]],
-        )
-        target_locl = feature_single_substitutions(target, "locl")
-        self.assertIn(target_cmap[0x30], target_locl)
-        self.assertEqual(
-            target["hmtx"].metrics[target_locl[target_cmap[0x30]]],
-            source["hmtx"].metrics[source_cmap[0x30]],
-        )
         target_liga = feature_ligatures(target, "liga")
-        source_liga = feature_ligatures(source, "liga")
-        target_fi = target_liga[(target_cmap[0x66], target_cmap[0x69])]
-        source_fi = source_liga[(source_cmap[0x66], source_cmap[0x69])]
-        self.assertIn(target_fi, outputs)
-        self.assertEqual(
-            target["hmtx"].metrics[target_fi],
-            source["hmtx"].metrics[source_fi],
+        target_pnum = feature_single_substitutions(target, "pnum")
+        self.assertIn(
+            (target_cmap[0x66], target_cmap[0x69]),
+            target_liga,
         )
+        self.assertIn(target_cmap[0x30], target_pnum)
+        self.assertIn(target_pnum[target_cmap[0x30]], result.glyph_names)
+
+    def test_autohint_limits_processing_to_imported_glyphs(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            output_path = Path(temporary_directory) / "font.otf"
+            output_path.write_bytes(b"unhinted")
+
+            def fake_run(command: list[str], check: bool) -> None:
+                self.assertTrue(check)
+                self.assertEqual(command[0], "/usr/bin/otfautohint")
+                glyph_list_path = Path(command[command.index("--glyphs-file") + 1])
+                self.assertEqual(
+                    glyph_list_path.read_text(encoding="utf-8"),
+                    "latin.A,latin.B",
+                )
+                hinted_path = Path(command[command.index("--output") + 1])
+                hinted_path.write_bytes(b"hinted")
+
+            with patch("build_font.subprocess.run", side_effect=fake_run):
+                autohint_latin_glyphs(
+                    output_path,
+                    ("latin.A", "latin.B"),
+                    executable="/usr/bin/otfautohint",
+                )
+
+            self.assertEqual(output_path.read_bytes(), b"hinted")
 
     def test_latin_replacement_scales_outlines_advances_and_gsub_outputs(
         self,
@@ -559,12 +611,10 @@ class TrueTypeBuildTests(unittest.TestCase):
         target = ascii_true_type_font(900, "target")
         source = ascii_true_type_font(500, "source")
 
-        replaced = replace_latin_glyphs(target, source, scale_factor=1.1)
-        replace_latin_gsub_glyphs(
+        import_latin_font(
             target,
             source,
-            replaced,
-            scale_factor=1.1,
+            LatinBuildProfile("libertinus", 1.1, 0),
         )
 
         target_cmap = target.getBestCmap()

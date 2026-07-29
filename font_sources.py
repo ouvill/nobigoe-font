@@ -15,9 +15,11 @@ from typing import Final
 from font_profiles import (
     BaseType,
     DirectSource,
+    FontSource,
+    LatinFamily,
     ZipMemberSource,
     koburi_source,
-    libertinus_serif_source,
+    latin_font_source,
     noto_sans_source,
     noto_serif_source,
     shippori_source,
@@ -75,6 +77,7 @@ class SourceCache:
         base: BaseType,
         weight: str,
         overrides: SourceOverrides = SourceOverrides(),
+        latin_family: LatinFamily = "libertinus",
     ) -> ResolvedSources:
         """Resolve all build inputs, downloading only missing or invalid cache data."""
 
@@ -82,9 +85,13 @@ class SourceCache:
             source = overrides.source or self._fetch_direct(
                 noto_serif_source(weight)
             )
-            latin_source = overrides.latin_source or self._fetch_zip_member(
-                libertinus_serif_source(weight)
-            )
+            if overrides.latin_source is not None:
+                latin_source = overrides.latin_source
+            else:
+                latin_spec = latin_font_source(latin_family, weight)
+                latin_source = (
+                    self._fetch(latin_spec) if latin_spec is not None else None
+                )
             secondary_weight = weight
             ruby_source = overrides.ruby_source or self._fetch_zip_member(
                 koburi_source()
@@ -113,6 +120,11 @@ class SourceCache:
             punctuation_source=punctuation_source,
             sans_source=sans_source,
         )
+
+    def _fetch(self, source: FontSource) -> Path:
+        if isinstance(source, DirectSource):
+            return self._fetch_direct(source)
+        return self._fetch_zip_member(source)
 
     def _fetch_direct(self, source: DirectSource) -> Path:
         return self._download(
