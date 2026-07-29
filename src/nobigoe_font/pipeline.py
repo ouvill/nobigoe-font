@@ -1299,6 +1299,11 @@ def build(
         for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
     )
 
+    if base_type == "noto":
+        _font_operations.remove_repeated_ligatures(
+            font, "ccmp", cmap[0x2015]
+        )
+
     latin_copyright = (
         (latin_font["name"].getDebugName(0) or latin_profile.copyright)
         if latin_font

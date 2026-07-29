@@ -143,6 +143,40 @@ def feature_ligatures(
     return substitutions
 
 
+def remove_repeated_ligatures(
+    font: TTFont, feature_tag: str, glyph_name: str
+) -> int:
+    """Remove feature ligatures made entirely from repeated copies of one glyph."""
+
+    table = font["GSUB"].table
+    lookup_indices: list[int] = []
+    for record in table.FeatureList.FeatureRecord:
+        if record.FeatureTag == feature_tag:
+            lookup_indices.extend(record.Feature.LookupListIndex)
+
+    removed = 0
+    for index in dict.fromkeys(lookup_indices):
+        lookup = table.LookupList.Lookup[index]
+        for subtable in lookup.SubTable:
+            if lookup.LookupType == 7:
+                subtable = subtable.ExtSubTable
+            ligatures = getattr(subtable, "ligatures", None)
+            if ligatures is None or glyph_name not in ligatures:
+                continue
+            records = ligatures[glyph_name]
+            retained = [
+                ligature
+                for ligature in records
+                if any(component != glyph_name for component in ligature.Component)
+            ]
+            removed += len(records) - len(retained)
+            if retained:
+                ligatures[glyph_name] = retained
+            else:
+                del ligatures[glyph_name]
+    return removed
+
+
 def add_unicode_mapping(font: TTFont, codepoint: int, name: str) -> None:
     mapped = False
     for table in font["cmap"].tables:
