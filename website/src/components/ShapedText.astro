@@ -1,0 +1,67 @@
+---
+import { openSync, type Font } from "fontkit";
+import { resolve } from "node:path";
+
+interface Props {
+  text: string;
+  label?: string;
+  class?: string;
+}
+
+const { text, label = text, class: className } = Astro.props;
+const font = openSync(
+  resolve(process.cwd(), "src/assets/fonts/NobigoeMincho-Regular.woff2"),
+) as Font;
+const run = font.layout(text, { calt: true, ccmp: true });
+
+let penX = 0;
+let penY = 0;
+let minX = Number.POSITIVE_INFINITY;
+let minY = Number.POSITIVE_INFINITY;
+let maxX = Number.NEGATIVE_INFINITY;
+let maxY = Number.NEGATIVE_INFINITY;
+
+const paths = run.glyphs.map((glyph, index) => {
+  const position = run.positions[index];
+  const x = penX + position.xOffset;
+  const y = penY + position.yOffset;
+  const bounds = glyph.bbox;
+
+  minX = Math.min(minX, x + bounds.minX);
+  minY = Math.min(minY, y + bounds.minY);
+  maxX = Math.max(maxX, x + bounds.maxX);
+  maxY = Math.max(maxY, y + bounds.maxY);
+  penX += position.xAdvance;
+  penY += position.yAdvance;
+
+  return {
+    d: glyph.path.toSVG(),
+    transform: `translate(${x} ${y})`,
+  };
+});
+
+const padding = font.unitsPerEm * 0.025;
+const viewBox = [
+  minX - padding,
+  -maxY - padding,
+  maxX - minX + padding * 2,
+  maxY - minY + padding * 2,
+].join(" ");
+---
+
+<svg
+  class={className}
+  viewBox={viewBox}
+  preserveAspectRatio="xMinYMid meet"
+  role="img"
+  aria-label={label}
+  focusable="false"
+>
+  <g transform="scale(1 -1)" aria-hidden="true">
+    {
+      paths.map((path: { d: string; transform: string }) => (
+        <path d={path.d} transform={path.transform} fill="currentColor" />
+      ))
+    }
+  </g>
+</svg>

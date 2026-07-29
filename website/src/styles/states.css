@@ -1,4 +1,3 @@
-.fonts-loading .hero-specimen,
 .fonts-loading .weight-table,
 .fonts-loading .vertical-specimen > p,
 .fonts-loading .tester-editor,
@@ -6,13 +5,32 @@
   opacity: 0;
 }
 
-.fonts-ready .hero-specimen,
 .fonts-ready .weight-table,
 .fonts-ready .vertical-specimen > p,
 .fonts-ready .tester-editor,
-.fonts-ready .glyph-grid {
+.fonts-ready .glyph-grid,
+.fonts-failed .weight-table,
+.fonts-failed .vertical-specimen > p,
+.fonts-failed .tester-editor,
+.fonts-failed .glyph-grid {
   opacity: 1;
   transition: opacity 240ms ease;
+}
+
+.font-load-error {
+  display: none;
+  margin: 0;
+  padding: 10px var(--gutter);
+  color: var(--paper-bright);
+  background: var(--accent);
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.fonts-failed .font-load-error {
+  display: block;
 }
 
 :focus-visible {
