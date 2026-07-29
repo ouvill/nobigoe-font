@@ -122,7 +122,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
 | `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
 | `geometry.py` / `operations.py` | 輪郭変換、cmap、CFF／TrueType、欧文レイアウトの操作 |
-| `punctuation.py` / `features.py` | 漫画約物の合成とOpenType機能の生成・結合 |
+| `punctuation.py` / `features.py` | 感嘆符・疑問符合字の合成とOpenType機能の生成・結合 |
 | `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
 
 ### 自動取得して生成
