@@ -1,0 +1,146 @@
+name: Pull request checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python tests and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Verify lockfile
+        run: uv lock --check
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run tests
+        run: |
+          uv run python -m compileall -q src tests
+          uv run python -m unittest discover -s tests
+          uv run nobigoe-build --help >/dev/null
+          uv run nobigoe-package --help >/dev/null
+
+      - name: Build distribution
+        run: uv build
+
+      - name: Verify packaged configuration data
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel, = Path("dist").glob("*.whl")
+          expected = {
+              path.relative_to("src").as_posix()
+              for path in Path("src/nobigoe_font/mark_positions").rglob("*.json")
+          }
+          with ZipFile(wheel) as archive:
+              packaged = set(archive.namelist())
+          missing = sorted(expected - packaged)
+          if missing:
+              raise SystemExit("Missing packaged data: " + ", ".join(missing))
+          print(f"Verified {len(expected)} packaged configuration files")
+          PY
+
+  font-smoke:
+    name: Font build smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Cache pinned font sources
+        uses: actions/cache@v4
+        with:
+          path: .cache/font-sources
+          key: font-sources-${{ runner.os }}-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/sources.py') }}
+          restore-keys: |
+            font-sources-${{ runner.os }}-
+
+      - name: Install font validators
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libharfbuzz-bin opentype-sanitizer
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Build representative fonts
+        run: |
+          uv run nobigoe-build \
+            --weight Regular \
+            --autohint \
+            --output /tmp/NobigoeMincho-Regular.otf
+          uv run nobigoe-build \
+            --base koburi \
+            --output /tmp/NobigoeKoburiMincho-Regular.ttf
+
+      - name: Validate representative fonts
+        run: |
+          ots-sanitize \
+            /tmp/NobigoeMincho-Regular.otf \
+            /tmp/NobigoeMincho-Regular-sanitized.otf
+          ots-sanitize \
+            /tmp/NobigoeKoburiMincho-Regular.ttf \
+            /tmp/NobigoeKoburiMincho-Regular-sanitized.ttf
+          hb-shape \
+            /tmp/NobigoeMincho-Regular.otf \
+            "AVATAR あーーー！？" \
+            --features=kern,liga,calt,ccmp >/dev/null
+          hb-shape \
+            /tmp/NobigoeKoburiMincho-Regular.ttf \
+            "待ってーーー。" \
+            --direction=ttb \
+            --features=calt,vert,vrt2 >/dev/null
+
+  website:
+    name: Website checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Check Astro project
+        run: npm run check
