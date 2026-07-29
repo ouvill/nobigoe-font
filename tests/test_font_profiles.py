@@ -225,7 +225,7 @@ class FontProfileTests(unittest.TestCase):
 
 
     def test_release_version_tracks_feature_change(self) -> None:
-        self.assertEqual(VERSION_NUMBER, "1.030")
+        self.assertEqual(VERSION_NUMBER, "1.031")
 
     def test_missing_sans_weights_use_nearest_static_sources(self) -> None:
         self.assertEqual(
