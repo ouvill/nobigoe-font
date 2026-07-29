@@ -7,6 +7,7 @@ import math
 import pathops
 from fontTools.misc.transform import Transform
 from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.filterPen import DecomposingFilterPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
@@ -38,7 +39,8 @@ def rectangle(
 
 def glyph_path(font: TTFont, glyph_name: str) -> pathops.Path:
     path = pathops.Path()
-    font.getGlyphSet()[glyph_name].draw(path.getPen())
+    glyph_set = font.getGlyphSet()
+    glyph_set[glyph_name].draw(DecomposingFilterPen(path.getPen(), glyph_set))
     return path
 
 
@@ -66,6 +68,7 @@ def adjust_outline_weight(outline: pathops.Path, amount: float) -> pathops.Path:
         pathops.LineJoin.MITER_JOIN,
         4,
     )
+    boundary.convertConicsToQuads()
     operation = (
         pathops.PathOp.UNION if amount > 0 else pathops.PathOp.DIFFERENCE
     )

@@ -5,6 +5,60 @@ from pathlib import Path, PurePosixPath
 from typing import Literal, TypeAlias
 
 BaseType: TypeAlias = Literal["noto", "koburi"]
+LatinFamily: TypeAlias = Literal[
+    "noto",
+    "libertinus",
+    "stix-two-text",
+    "source-serif-4",
+]
+LATIN_FAMILIES: tuple[LatinFamily, ...] = (
+    "noto",
+    "libertinus",
+    "stix-two-text",
+    "source-serif-4",
+)
+
+LatinGlyphClass: TypeAlias = Literal[
+    "letters",
+    "figures",
+    "marks",
+    "punctuation",
+    "symbols",
+    "spacing",
+]
+
+
+@dataclass(frozen=True)
+class LatinTransform:
+    """Geometric adjustments for one class of imported Latin glyphs."""
+
+    scale_factor: float
+    horizontal_stroke_adjustment: float
+    baseline_shift: float = 0
+
+
+@dataclass(frozen=True)
+class LatinTransformOverride:
+    """Replace the default transform for one Unicode glyph class."""
+
+    glyph_class: LatinGlyphClass
+    transform: LatinTransform
+
+
+LATIN_LAYOUT_FEATURES = ("*",)
+LATIN_COMMON_LAYOUT_FEATURES = (
+    "case",
+    "frac",
+    "lnum",
+    "onum",
+    "pnum",
+    "subs",
+    "sups",
+    "tnum",
+    "zero",
+)
+
+
 
 
 @dataclass(frozen=True)
@@ -29,6 +83,35 @@ class ZipMemberSource:
     @property
     def filename(self) -> str:
         return PurePosixPath(self.member).name
+
+
+FontSource: TypeAlias = DirectSource | ZipMemberSource
+
+
+@dataclass(frozen=True)
+class LatinBuildProfile:
+    """Source-specific transformations applied while importing Latin glyphs."""
+
+    family: LatinFamily
+    scale_factor: float
+    horizontal_stroke_adjustment: float
+    variations: tuple[tuple[str, float], ...] = ()
+    copyright: str | None = None
+    baseline_shift: float = 0
+    transform_overrides: tuple[LatinTransformOverride, ...] = ()
+    layout_features: tuple[str, ...] = LATIN_LAYOUT_FEATURES
+    common_layout_features: tuple[str, ...] = LATIN_COMMON_LAYOUT_FEATURES
+
+    def transform_for(self, glyph_class: LatinGlyphClass) -> LatinTransform:
+        for override in self.transform_overrides:
+            if override.glyph_class == glyph_class:
+                return override.transform
+        return LatinTransform(
+            self.scale_factor,
+            self.horizontal_stroke_adjustment,
+            self.baseline_shift,
+        )
+
 
 NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
 NOTO_WEIGHT_CLASSES = {
@@ -119,6 +202,48 @@ LIBERTINUS_OTF_SHA256 = {
 LIBERTINUS_COPYRIGHT = (
     "Copyright © 2012-2024 The Libertinus Project Authors."
 )
+
+STIX_TWO_VERSION = "2.13b171"
+STIX_TWO_TAG = f"v{STIX_TWO_VERSION}"
+STIX_TWO_WEIGHTS = {
+    "Regular": "Regular",
+    "Medium": "Medium",
+    "SemiBold": "SemiBold",
+    "Bold": "Bold",
+}
+STIX_TWO_OTF_SHA256 = {
+    "Regular": "c4864ca6ec071c2d31d0d8309001faa1ee3517fffb53a31a405a697b71f52ca1",
+    "Medium": "9cc9f870852a46d708907b96ed024b8d0067a05276d939bfe0b7e89752afc8d9",
+    "SemiBold": "896d80fbfd67e86ead7e2d593d631eab9bb142ee96dcd8e7aa8dff95ddda0f2a",
+    "Bold": "7ef76c666a6704f76ed3fa27bcdda55b36e558b5c2c93b49b03d854db96bdeb5",
+}
+STIX_TWO_SCALE_FACTOR = 1.110
+STIX_TWO_COPYRIGHT = (
+    "Copyright 2001-2021 The STIX Fonts Project Authors "
+    "(https://github.com/stipub/stixfonts)"
+)
+SOURCE_SERIF_VERSION = "4.005"
+SOURCE_SERIF_ARCHIVE_URL = (
+    "https://github.com/adobe-fonts/source-serif/releases/download/"
+    f"{SOURCE_SERIF_VERSION}R/source-serif-{SOURCE_SERIF_VERSION}_Desktop.zip"
+)
+SOURCE_SERIF_ARCHIVE_SHA256 = (
+    "549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425"
+)
+SOURCE_SERIF_VARIABLE_MEMBER = (
+    f"source-serif-{SOURCE_SERIF_VERSION}_Desktop/VAR/"
+    "SourceSerif4Variable-Roman.ttf"
+)
+SOURCE_SERIF_VARIABLE_SHA256 = (
+    "14d360ee1b76655da9276628b229e11671bc1f5d1083636144db6677d452cf55"
+)
+SOURCE_SERIF_SCALE_FACTOR = 1.088
+SOURCE_SERIF_OPTICAL_SIZE = 20.0
+SOURCE_SERIF_COPYRIGHT = (
+    "© 2014 - 2023 Adobe (http://www.adobe.com/), "
+    "with Reserved Font Name ‘Source’."
+)
+
 KOBURI_ARCHIVE_URL = "https://okoneya.jp/font/GenEiKoburiMin_v6.1.zip"
 KOBURI_ARCHIVE_SHA256 = (
     "b17d4def22c048e704955912423c7bac8a03a3dbf1acaa722f254a7e9ece148a"
@@ -260,6 +385,80 @@ def libertinus_serif_source(weight: str) -> ZipMemberSource:
         member,
         LIBERTINUS_OTF_SHA256[libertinus_weight],
     )
+
+
+def stix_two_text_source(weight: str) -> DirectSource:
+    if weight not in STIX_TWO_WEIGHTS:
+        supported = ", ".join(STIX_TWO_WEIGHTS)
+        raise ValueError(
+            f"STIX Two Text has no native {weight} source; "
+            f"choose one of {supported}"
+        )
+    stix_weight = STIX_TWO_WEIGHTS[weight]
+    filename = f"STIXTwoText-{stix_weight}.otf"
+    url = (
+        "https://raw.githubusercontent.com/stipub/stixfonts/"
+        f"{STIX_TWO_TAG}/fonts/static_otf/{filename}"
+    )
+    return DirectSource(filename, url, STIX_TWO_OTF_SHA256[stix_weight])
+
+
+def source_serif_source() -> ZipMemberSource:
+    return ZipMemberSource(
+        f"source-serif-{SOURCE_SERIF_VERSION}_Desktop.zip",
+        SOURCE_SERIF_ARCHIVE_URL,
+        SOURCE_SERIF_ARCHIVE_SHA256,
+        SOURCE_SERIF_VARIABLE_MEMBER,
+        SOURCE_SERIF_VARIABLE_SHA256,
+    )
+
+
+def latin_font_source(
+    family: LatinFamily, weight: str
+) -> FontSource | None:
+    if family == "noto":
+        return None
+    if family == "libertinus":
+        return libertinus_serif_source(weight)
+    if family == "stix-two-text":
+        return stix_two_text_source(weight)
+    if family == "source-serif-4":
+        return source_serif_source()
+    raise ValueError(f"Unknown Latin family {family!r}")
+
+
+def latin_build_profile(
+    family: LatinFamily, weight: str
+) -> LatinBuildProfile:
+    if family == "noto":
+        return LatinBuildProfile(family, 1, 0)
+    if family == "libertinus":
+        return LatinBuildProfile(
+            family,
+            LIBERTINUS_SCALE_FACTORS[weight],
+            LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS[weight],
+            copyright=LIBERTINUS_COPYRIGHT,
+        )
+    if family == "stix-two-text":
+        stix_two_text_source(weight)
+        return LatinBuildProfile(
+            family,
+            STIX_TWO_SCALE_FACTOR,
+            0,
+            copyright=STIX_TWO_COPYRIGHT,
+        )
+    if family == "source-serif-4":
+        return LatinBuildProfile(
+            family,
+            SOURCE_SERIF_SCALE_FACTOR,
+            0,
+            (
+                ("wght", float(NOTO_WEIGHT_CLASSES[weight])),
+                ("opsz", SOURCE_SERIF_OPTICAL_SIZE),
+            ),
+            SOURCE_SERIF_COPYRIGHT,
+        )
+    raise ValueError(f"Unknown Latin family {family!r}")
 
 
 def shippori_source(weight: str) -> ZipMemberSource:

@@ -6,15 +6,17 @@ from __future__ import annotations
 import argparse
 import copy
 import math
+import shutil
+import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from font_profiles import (
     BaseType,
     FontIdentity,
-    LIBERTINUS_COPYRIGHT,
-    LIBERTINUS_SCALE_FACTORS,
-    LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
+    LATIN_FAMILIES,
+    LatinBuildProfile,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_COPYRIGHT,
     SHIPPORI_STROKE_ADJUSTMENTS,
@@ -22,6 +24,7 @@ from font_profiles import (
     VERSION_NUMBER,
     default_output_path,
     font_identity,
+    latin_build_profile,
 )
 from font_sources import DEFAULT_CACHE_DIR, SourceCache, SourceOverrides
 import font_geometry as _font_geometry
@@ -34,6 +37,7 @@ from fontTools.misc.transform import Transform
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.scaleUpem import scale_upem
+from fontTools.varLib.instancer import instantiateVariableFont
 
 
 WAVE_GLYPH_COUNT = 10
@@ -111,6 +115,15 @@ def parse_args() -> argparse.Namespace:
         help="Noto Serif JP weight",
     )
     parser.add_argument(
+        "--latin-family",
+        choices=LATIN_FAMILIES,
+        default="libertinus",
+        help=(
+            "Latin glyph source for the Noto base; "
+            "the existing Libertinus profile remains the default"
+        ),
+    )
+    parser.add_argument(
         "--source",
         type=Path,
         help="local Noto Serif JP OTF/TTC or GenEi Koburi Mincho TTF",
@@ -118,7 +131,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--latin-source",
         type=Path,
-        help="local Libertinus Serif OTF used for Noto-based Latin glyphs",
+        help="local font overriding the selected Noto-based Latin source",
     )
     parser.add_argument(
         "--ruby-source",
@@ -148,6 +161,14 @@ def parse_args() -> argparse.Namespace:
         "--face", type=int, default=0, help="TTC face index"
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--autohint",
+        action="store_true",
+        help=(
+            "run AFDKO otfautohint on imported Latin glyphs after building; "
+            "requires the otfautohint command"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1197,9 +1218,45 @@ def rename_font(
         cff = font["CFF "].cff
         cff.fontNames = [identity.postscript_name]
         top = cff.topDictIndex[0]
-        top.Notice = font_notice
+        top.Notice = font_notice.encode("latin-1", "replace").decode("latin-1")
         top.FamilyName = identity.family
         top.FullName = identity.full_name
+
+
+def autohint_latin_glyphs(
+    output_path: Path,
+    glyph_names: tuple[str, ...],
+    executable: str | None = None,
+) -> None:
+    """Autohint imported CFF glyphs without touching native Japanese glyphs."""
+
+    if not glyph_names:
+        return
+    command = executable or shutil.which("otfautohint")
+    if command is None:
+        raise RuntimeError(
+            "--autohint requires the AFDKO otfautohint command on PATH"
+        )
+    with TemporaryDirectory(
+        prefix=f".{output_path.stem}-autohint-",
+        dir=output_path.parent,
+    ) as temporary_directory:
+        temporary_path = Path(temporary_directory)
+        glyph_list_path = temporary_path / "glyphs.txt"
+        hinted_path = temporary_path / output_path.name
+        glyph_list_path.write_text(",".join(glyph_names), encoding="utf-8")
+        subprocess.run(
+            [
+                command,
+                "--glyphs-file",
+                str(glyph_list_path),
+                "--output",
+                str(hinted_path),
+                str(output_path),
+            ],
+            check=True,
+        )
+        hinted_path.replace(output_path)
 
 
 def build(
@@ -1210,13 +1267,27 @@ def build(
     sans_source_path: Path,
     output_path: Path,
     identity: FontIdentity,
+    latin_profile: LatinBuildProfile,
     face: int,
     base_type: BaseType,
+    autohint: bool = False,
 ) -> None:
+    if autohint and latin_source_path is None:
+        raise ValueError("--autohint requires an imported Latin source")
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
     if font["head"].unitsPerEm != 1000:
         scale_upem(font, 1000)
     latin_font = TTFont(latin_source_path) if latin_source_path else None
+    if latin_font and latin_profile.variations:
+        if "fvar" not in latin_font:
+            raise ValueError(
+                f"{latin_profile.family} requires a variable --latin-source"
+            )
+        instantiateVariableFont(
+            latin_font,
+            dict(latin_profile.variations),
+            inplace=True,
+        )
     if latin_font and latin_font["head"].unitsPerEm != 1000:
         scale_upem(latin_font, 1000)
     ruby_font = TTFont(ruby_source_path) if base_type == "noto" else None
@@ -1310,24 +1381,11 @@ def build(
         raise AssertionError("Expected 103 generated Koburi mark sequences")
     if len(_mark_positioning.KOBURI_HEART_MARK_PAIRS) != 2:
         raise AssertionError("Expected two Koburi Mincho heart mappings")
-    if latin_font is not None:
-        scale_factor = LIBERTINUS_SCALE_FACTORS[identity.style]
-        horizontal_weight_adjustment = LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS[
-            identity.style
-        ]
-        replaced_latin = _font_operations.replace_latin_glyphs(
-            font,
-            latin_font,
-            horizontal_weight_adjustment=horizontal_weight_adjustment,
-            scale_factor=scale_factor,
-        )
-        _font_operations.replace_latin_gsub_glyphs(
-            font,
-            latin_font,
-            replaced_latin,
-            horizontal_weight_adjustment=horizontal_weight_adjustment,
-            scale_factor=scale_factor,
-        )
+    latin_import = (
+        _font_operations.import_latin_font(font, latin_font, latin_profile)
+        if latin_font is not None
+        else None
+    )
 
     source_ccmp_ligatures = _font_operations.feature_ligatures(font, "ccmp")
     supported_mark_pairs = (
@@ -1826,7 +1884,7 @@ def build(
     )
 
     latin_copyright = (
-        (latin_font["name"].getDebugName(0) or LIBERTINUS_COPYRIGHT)
+        (latin_font["name"].getDebugName(0) or latin_profile.copyright)
         if latin_font
         else None
     )
@@ -1883,6 +1941,8 @@ def build(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path, reorderTables=True)
+    if autohint:
+        autohint_latin_glyphs(output_path, latin_import.glyph_names)
 
 
 def main() -> None:
@@ -1893,8 +1953,29 @@ def main() -> None:
         raise ValueError("--latin-source is available for the Noto base only")
     if args.base == "koburi" and args.ruby_source is not None:
         raise ValueError("--ruby-source is available for the Noto base only")
+    if args.base == "koburi" and args.latin_family != "libertinus":
+        raise ValueError("--latin-family is available for the Noto base only")
+    if (
+        args.base == "noto"
+        and args.latin_family == "noto"
+        and args.latin_source is not None
+    ):
+        raise ValueError("--latin-source cannot be combined with --latin-family noto")
     identity = font_identity(args.base, args.weight)
-    output_path = args.output or default_output_path(identity, args.base)
+    latin_profile = latin_build_profile(
+        args.latin_family if args.base == "noto" else "noto",
+        args.weight,
+    )
+    if args.output is not None:
+        output_path = args.output
+    elif args.base == "noto" and args.latin_family != "libertinus":
+        output_path = (
+            Path("dist")
+            / "comparison"
+            / f"{identity.postscript_name}-{args.latin_family}.otf"
+        )
+    else:
+        output_path = default_output_path(identity, args.base)
     sources = SourceCache(args.cache_dir).resolve(
         args.base,
         args.weight,
@@ -1905,6 +1986,7 @@ def main() -> None:
             punctuation_source=args.punctuation_source,
             sans_source=args.sans_source,
         ),
+        latin_family=args.latin_family,
     )
 
     build(
@@ -1915,8 +1997,10 @@ def main() -> None:
         sources.sans_source,
         output_path,
         identity,
+        latin_profile,
         args.face,
         args.base,
+        args.autohint,
     )
 
 
