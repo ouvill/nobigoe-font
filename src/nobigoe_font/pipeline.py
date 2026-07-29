@@ -797,6 +797,8 @@ def build(
         raise AssertionError("Expected 103 generated Koburi mark sequences")
     if len(_mark_positioning.KOBURI_HEART_MARK_PAIRS) != 2:
         raise AssertionError("Expected two Koburi Mincho heart mappings")
+    if len(_mark_positioning.PUNCTUATION_MARK_PAIRS) != 4:
+        raise AssertionError("Expected four fullwidth punctuation mark sequences")
     latin_import = (
         _font_operations.import_latin_font(font, latin_font, latin_profile)
         if latin_font is not None
@@ -878,6 +880,12 @@ def build(
         base=base_type,
         weight=identity.style,
     )
+    punctuation_mark_positions = (
+        _mark_positioning.load_punctuation_mark_positions(
+            base=base_type,
+            weight=identity.style,
+        )
+    )
     generated_mark_pairs = [
         pair for pair in supported_mark_pairs if pair not in native_mark_outputs
     ]
@@ -899,6 +907,7 @@ def build(
         + len(generated_mark_pairs)
         + len(generated_vertical_mark_pairs)
         + len(generated_heart_pairs)
+        + 2 * len(_mark_positioning.PUNCTUATION_MARK_PAIRS)
         + (KOBURI_RUBY_OUTPUT_COUNT if ruby_font else 0),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
@@ -1097,7 +1106,72 @@ def build(
         advance_override=1000,
     )
 
-    kana_start = punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
+    punctuation_mark_start = (
+        punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
+    )
+    punctuation_mark_count = len(_mark_positioning.PUNCTUATION_MARK_PAIRS)
+    punctuation_mark_names = allocated_names[
+        punctuation_mark_start
+        : punctuation_mark_start + 2 * punctuation_mark_count
+    ]
+    punctuation_mark_horizontal_names = punctuation_mark_names[
+        :punctuation_mark_count
+    ]
+    punctuation_mark_vertical_names = punctuation_mark_names[
+        punctuation_mark_count:
+    ]
+    mark_paths = {
+        codepoint: _font_geometry.glyph_path(font, cmap[codepoint])
+        for codepoint in (0x3099, 0x309A)
+    }
+    punctuation_mark_horizontal_paths = []
+    punctuation_mark_vertical_paths = []
+    for pair in _mark_positioning.PUNCTUATION_MARK_PAIRS:
+        base, mark = pair
+        punctuation_mark_horizontal_paths.append(
+            _font_geometry.compose_mark_glyph(
+                _font_geometry.glyph_path(font, cmap[base]),
+                mark_paths[mark],
+                punctuation_mark_positions[pair]["horizontal"],
+            )
+        )
+        punctuation_mark_vertical_paths.append(
+            _font_geometry.compose_mark_glyph(
+                _font_geometry.glyph_path(
+                    font,
+                    _font_operations.vertical_glyph_or_self(
+                        font, cmap[base]
+                    ),
+                ),
+                mark_paths[mark],
+                punctuation_mark_positions[pair]["vertical"],
+            )
+        )
+    _font_operations.append_glyphs(
+        font,
+        punctuation_mark_horizontal_paths + punctuation_mark_vertical_paths,
+        punctuation_mark_names,
+        cmap[0xFF01],
+        punctuation_vertical_origin,
+        add_stem_hints=False,
+        advance_override=1000,
+    )
+    punctuation_mark_outputs = dict(
+        zip(
+            _mark_positioning.PUNCTUATION_MARK_PAIRS,
+            punctuation_mark_horizontal_names,
+            strict=True,
+        )
+    )
+    punctuation_mark_vertical_maps = list(
+        zip(
+            punctuation_mark_horizontal_names,
+            punctuation_mark_vertical_names,
+            strict=True,
+        )
+    )
+
+    kana_start = punctuation_mark_start + len(punctuation_mark_names)
     small_kana_names = allocated_names[
         kana_start : kana_start + 2 * len(_mark_positioning.MANGA_MISSING_SMALL_KANA)
     ]
@@ -1129,7 +1203,8 @@ def build(
         0x1B155: (small_kana_names[1], small_kana_names[3]),
     }
     kana_vertical_maps = [
-        glyphs for glyphs in missing_small_glyphs.values()
+        *punctuation_mark_vertical_maps,
+        *missing_small_glyphs.values(),
     ]
     for codepoint, (horizontal, _) in missing_small_glyphs.items():
         _font_operations.add_unicode_mapping(font, codepoint, horizontal)
@@ -1143,10 +1218,6 @@ def build(
     generated_mark_outputs = dict(
         zip(generated_mark_pairs, generated_mark_names, strict=True)
     )
-    mark_paths = {
-        codepoint: _font_geometry.glyph_path(font, cmap[codepoint])
-        for codepoint in (0x3099, 0x309A)
-    }
     horizontal_mark_paths = []
     for base, mark in generated_mark_pairs:
         base_path = _font_geometry.glyph_path(font, cmap[base])
@@ -1298,6 +1369,10 @@ def build(
         (cmap[base], cmap[mark], heart_outputs[(base, mark)])
         for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
     )
+    punctuation_marks = [
+        (cmap[base], cmap[mark], punctuation_mark_outputs[(base, mark)])
+        for base, mark in _mark_positioning.PUNCTUATION_MARK_PAIRS
+    ]
 
     if base_type == "noto":
         _font_operations.remove_repeated_ligatures(
@@ -1356,6 +1431,7 @@ def build(
             kana_marks,
             kana_vertical_maps,
             ruby_substitutions,
+            punctuation_marks,
         ),
     )
     rename_font(font, copyright_notice, font_notice, identity)

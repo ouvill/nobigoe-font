@@ -55,6 +55,12 @@ Noto版では、Noto Serif JPに一体字形がある24列は既存輪郭を使�
 
 白ハート `♡`（U+2661）と黒ハート `♥`（U+2665）に結合濁点を続けた2列も一体字形へ置換します。私用領域の基字U+E064・U+E065でも同じ結合が働き、完成字形はそれぞれU+E0DC・U+E0DDで直接入力できます。源暎こぶり明朝版は、通常のハート、私用領域の基字、完成字形、4つの`ccmp`入力を含めて元フォントの既存字形と対応を変更せず保持します。Noto版だけは各ウェイトのハートと濁点から字形を生成し、配置後の濁点2画の中心間距離の1/3を白抜き半径として、濁点を16方向へ拡張した範囲をハートから差し引きます。
 
+全角感嘆符 `！`（U+FF01）と全角疑問符 `？`（U+FF1F）にも、結合濁点または結合半濁点を続けた4列を用意しています。`ccmp`で全角1文字幅の一体字形へ置換し、横組・縦組それぞれの専用字形を使用します。Noto版7ウェイトと源暎こぶり明朝版Regularについて、4列すべての配置を個別に記録しています。
+
+```text
+！゙ ！゚ ？゙ ？゚
+```
+
 元フォントにない場合、`𛄲`（U+1B132、Hiragana Letter Small Ko）と `𛅕`（U+1B155、Katakana Letter Small Ko）は、ベースフォントの `こ` と `コ`を既存の小書き仮名に合わせて縮小・配置した横組・縦組字形として追加します。
 
 通常のかな、数字、約物と、Manga1が規定する半濁点付き14列（`ㇷ゚`、`か゚`、`き゚`、`く゚`、`け゚`、`こ゚`、`カ゚`、`キ゚`、`ク゚`、`ケ゚`、`コ゚`、`セ゚`、`ツ゚`、`ト゚`）は、OpenTypeの `ruby` で源暎こぶり明朝のルビ専用字形へ置換します。Noto版には源暎こぶり明朝の288字形と配置を1000 units/emへ正規化して移植します。線幅は、源暎こぶり明朝で97.7%に小さく設計された通常仮名を比較時だけ原寸へ戻して輪郭面積を測り、各Notoウェイトとの差分だけをルビ字形へ適用します。ルビ字形は拡大縮小せず、小サイズ向けの抑揚を維持します。小書き仮名、小書きコ、`ㇷ゚`などには縦組専用ルビ字形も用意しています。
@@ -173,13 +179,13 @@ uv run nobigoe-package
 ```
 
 ```text
-dist/NobigoeMincho-v1.029.zip
-dist/NobigoeKoburiMincho-v1.029.zip
+dist/NobigoeMincho-v1.030.zip
+dist/NobigoeKoburiMincho-v1.030.zip
 ```
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.029`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.030`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 
@@ -208,7 +214,7 @@ uv run python -m unittest discover -s tests -v
 
 ### 濁点・半濁点の位置を調整
 
-共通の基準配置191列は、字種と記号ごとに次の4ファイルへ分割しています。Noto版はこの値を使用し、源暎こぶり明朝版は後述の専用レイヤーを重ねます。
+共通の基準配置191列は、字種と記号ごとの4ファイルへ分割しています。源暎こぶり明朝版の専用レイヤーと、感嘆符・疑問符4列のファミリー・ウェイト別配置も同じディレクトリで管理します。
 
 ```text
 src/nobigoe_font/mark_positions/hiragana_dakuten.json
@@ -216,6 +222,7 @@ src/nobigoe_font/mark_positions/hiragana_handakuten.json
 src/nobigoe_font/mark_positions/katakana_dakuten.json
 src/nobigoe_font/mark_positions/katakana_handakuten.json
 src/nobigoe_font/mark_positions/koburi.json
+src/nobigoe_font/mark_positions/punctuation.json
 ```
 
 各字の `horizontal` と `vertical` は `[scale, x, y]` です。`scale` は結合記号の等方倍率、`x` と `y` は拡大後の平行移動量で、正の値は右・上へ移動します。`nobigoe-build`は共通4ファイルの記号種、キー集合、配列長、正の倍率を検証し、191列の不足や重複があれば生成を停止します。Noto版で生成する167列は、実際のウェイトの輪郭で基字との交差も検査します。交差時は記号の大きさを変えず、基字と記号の中心関係から求めた上・横・斜めの外向き候補を比較し、縦メトリクス内で輪郭が離れる最短距離の移動を採用します。
@@ -230,6 +237,8 @@ src/nobigoe_font/mark_positions/koburi.json
 Version 1.015の配置値は、[源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html)の一体型濁点・半濁点字形を比較基準にしています。同フォントの1024 units/emの輪郭寸法と基字からの相対位置を1000 units/emへ正規化し、Nobigoe Minchoの各基字へ移植しました。源暎こぶり明朝のフォントデータや輪郭自体は取り込んでいません。
 
 長音濁点はManga1の191列には含まれないため、`src/nobigoe_font/marks.py`の`CHOON_DAKUTEN_MARK_CENTERS`で横組・縦組の記号中心を管理します。この値も源暎こぶり明朝のU+E0DBを1000 units/emへ正規化したものです。
+
+`src/nobigoe_font/mark_positions/punctuation.json`は、感嘆符・疑問符と結合濁点・半濁点の4列について、Noto版7ウェイトと源暎こぶり明朝版Regularの横組・縦組配置をすべて明示します。ビルド時にファミリー、ウェイト、4つのキー集合と各変換値を検証し、不足や未定義ウェイトがあれば生成を停止します。
 
 `src/nobigoe_font/mark_positions/koburi.json`は、源暎こぶり明朝に一体字形がない103列だけを上書きします。源暎こぶり明朝v6.1の既存88列から、基字に対する記号の相対位置と寸法を通常仮名・小書き仮名、濁点・半濁点、横組・縦組ごとに測定して配置へ反映しています。元フォントの88列は専用レイヤーで上書きせず、元の一体字形をそのまま使用します。設定ファイルには測定元のSHA-256、units/em、GPOS機能、対象数も記録し、ビルド時に検証します。
 

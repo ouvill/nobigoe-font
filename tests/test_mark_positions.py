@@ -10,7 +10,9 @@ from nobigoe_font.marks import (
     KOBURI_GENERATED_MARK_PAIRS,
     KOBURI_NATIVE_MARK_PAIRS,
     MARK_POSITION_DIRECTORY,
+    PUNCTUATION_MARK_PAIRS,
     load_mark_position_overrides,
+    load_punctuation_mark_positions,
 )
 
 
@@ -23,6 +25,48 @@ def transform_values(transform: object) -> tuple[float, float, float, float, flo
         transform.dx,
         transform.dy,
     )
+
+
+class PunctuationMarkPositionTests(unittest.TestCase):
+    def test_every_family_weight_covers_all_four_punctuation_pairs(self) -> None:
+        family_weights = {
+            "noto": (
+                "ExtraLight",
+                "Light",
+                "Regular",
+                "Medium",
+                "SemiBold",
+                "Bold",
+                "Black",
+            ),
+            "koburi": ("Regular",),
+        }
+        for family, weights in family_weights.items():
+            for weight in weights:
+                with self.subTest(family=family, weight=weight):
+                    positions = load_punctuation_mark_positions(
+                        base=family,
+                        weight=weight,
+                    )
+                    self.assertEqual(set(positions), set(PUNCTUATION_MARK_PAIRS))
+                    for pair in PUNCTUATION_MARK_PAIRS:
+                        for orientation in ("horizontal", "vertical"):
+                            self.assertGreater(
+                                positions[pair][orientation].xx,
+                                0,
+                            )
+
+    def test_unknown_family_weight_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "Unknown Noto punctuation mark position weight",
+        ):
+            load_punctuation_mark_positions(weight="Unknown")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Regular only",
+        ):
+            load_punctuation_mark_positions(base="koburi", weight="Bold")
 
 
 class NotoWeightMarkPositionOverrideTests(unittest.TestCase):

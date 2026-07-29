@@ -548,6 +548,80 @@ class TrueTypeBuildTests(unittest.TestCase):
             vertical_output,
         )
 
+    def test_feature_source_builds_punctuation_mark_substitutions(self) -> None:
+        punctuation_variants = [
+            ("!", ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3")),
+            ("?", ("question", "question.a1", "question.a2", "question.a3")),
+        ]
+        marks = ("dakuten", "handakuten")
+        outputs = [
+            "exclamation.dakuten",
+            "exclamation.handakuten",
+            "question.dakuten",
+            "question.handakuten",
+        ]
+        vertical_outputs = [f"{output}.vert" for output in outputs]
+        punctuation_marks = [
+            ("exclamation", "dakuten", outputs[0]),
+            ("exclamation", "handakuten", outputs[1]),
+            ("question", "dakuten", outputs[2]),
+            ("question", "handakuten", outputs[3]),
+        ]
+        vertical_maps = list(zip(outputs, vertical_outputs, strict=True))
+        wave_names = [f"wave.{index}" for index in range(10)]
+        manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
+        glyph_order = list(
+            dict.fromkeys(
+                [
+                    ".notdef",
+                    *marks,
+                    *outputs,
+                    *vertical_outputs,
+                    "wave.base",
+                    "wave.vert",
+                    *wave_names,
+                    "manga-wave.base",
+                    *manga_wave_names,
+                    *(
+                        name
+                        for _, names in punctuation_variants
+                        for name in names
+                    ),
+                ]
+            )
+        )
+        font = named_true_type_font(glyph_order, {})
+        source = feature_source(
+            [],
+            ("wave", "wave.base", "wave.vert", wave_names),
+            ("manga-wave", "manga-wave.base", manga_wave_names),
+            punctuation_variants,
+            [],
+            vertical_maps,
+            [],
+            punctuation_marks,
+        )
+
+        addOpenTypeFeaturesFromString(font, source, tables={"GSUB"})
+
+        ccmp = feature_ligatures(font, "ccmp")
+        self.assertEqual(
+            {
+                (base, mark): ccmp[(base, mark)]
+                for base, mark, _ in punctuation_marks
+            },
+            {
+                (base, mark): output
+                for base, mark, output in punctuation_marks
+            },
+        )
+        vert = feature_single_substitutions(font, "vert")
+        self.assertEqual(
+            {output: vert[output] for output in outputs},
+            dict(vertical_maps),
+        )
+
+
     def test_horizontal_choon_calt_is_added_to_kana_script(self) -> None:
         glyph_order = [
             ".notdef",

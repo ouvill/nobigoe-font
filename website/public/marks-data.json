@@ -2031,5 +2031,45 @@
     "codepoints": "U+2665 + U+3099",
     "koburiPua": "U+E0DD",
     "koburiBasePua": "U+E065"
+  },
+  {
+    "base": "！",
+    "mark": "゙",
+    "glyph": "！゙",
+    "type": "dakuten",
+    "script": "symbol",
+    "small": false,
+    "vertical": true,
+    "codepoints": "U+FF01 + U+3099"
+  },
+  {
+    "base": "！",
+    "mark": "゚",
+    "glyph": "！゚",
+    "type": "handakuten",
+    "script": "symbol",
+    "small": false,
+    "vertical": true,
+    "codepoints": "U+FF01 + U+309A"
+  },
+  {
+    "base": "？",
+    "mark": "゙",
+    "glyph": "？゙",
+    "type": "dakuten",
+    "script": "symbol",
+    "small": false,
+    "vertical": true,
+    "codepoints": "U+FF1F + U+3099"
+  },
+  {
+    "base": "？",
+    "mark": "゚",
+    "glyph": "？゚",
+    "type": "handakuten",
+    "script": "symbol",
+    "small": false,
+    "vertical": true,
+    "codepoints": "U+FF1F + U+309A"
   }
 ]
