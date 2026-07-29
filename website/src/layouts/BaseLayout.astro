@@ -49,9 +49,17 @@ const ogImage = new URL(`${base}/assets/x-introduction.png`, Astro.site);
   <body class={pageClass}>
     <a class="skip-link" href="#main">本文へ移動</a>
     <SiteHeader />
+    <p class="font-load-error" role="status">
+      Webフォントを読み込めなかったため、固定見本以外は代替書体で表示しています。
+    </p>
     <main id="main"><slot /></main>
     <SiteFooter />
     <script is:inline>
+      const setFontState = (state) => {
+        document.documentElement.classList.remove("fonts-loading");
+        document.documentElement.classList.add(state);
+      };
+
       Promise.all([
         document.fonts.load('48px "Nobigoe"', "声を、つなぐ。ーーー"),
         document.fonts.load(
@@ -59,10 +67,14 @@ const ogImage = new URL(`${base}/assets/x-introduction.png`, Astro.site);
           "声を、どこまでも。 Voice, ever onward.",
         ),
         document.fonts.load('32px "Nobigoe Koburi"', "雨の音が、静かに続く。"),
-      ]).finally(() => {
-        document.documentElement.classList.remove("fonts-loading");
-        document.documentElement.classList.add("fonts-ready");
-      });
+      ])
+        .then((loadedFaces) => {
+          if (loadedFaces.some((faces) => faces.length === 0)) {
+            throw new Error("A required webfont did not load.");
+          }
+          setFontState("fonts-ready");
+        })
+        .catch(() => setFontState("fonts-failed"));
     </script>
   </body>
 </html>

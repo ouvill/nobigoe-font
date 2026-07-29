@@ -44,6 +44,7 @@
 }
 
 .tester-introduction,
+.tester-browser-note,
 .tester-samples,
 .tester-panel,
 .tester-advanced,
@@ -81,6 +82,23 @@
   margin: 14px 0 0;
   color: var(--ink-soft);
   font-size: 15px;
+}
+
+.tester-browser-note {
+  margin-bottom: 24px;
+  padding: 14px 18px;
+  border-left: 3px solid var(--accent);
+  color: var(--ink-soft);
+  background: var(--accent-light);
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.tester-browser-note a {
+  color: inherit;
+  font-weight: 700;
+  text-underline-offset: 0.2em;
 }
 
 .tester-samples {

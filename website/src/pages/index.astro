@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SectionHeading from "../components/SectionHeading.astro";
+import ShapedText from "../components/ShapedText.astro";
 import WeightSpecimen from "../components/WeightSpecimen.astro";
 import { SITE } from "../data/site";
 
@@ -41,15 +42,33 @@ const koburiCompatibilityGlyphs = Array.from(
       <div class="hero-symbols">
         <article>
           <span>長音</span>
-          <strong>あーーーーーー</strong>
+          <strong
+            ><ShapedText
+              class="shaped-text"
+              text="あーーーーーー"
+              label="あに続く、つながった6文字の長音"
+            /></strong
+          >
         </article>
         <article class="hero-symbols__wave">
           <span>波ダッシュ</span>
-          <strong>ざわ〜〜〜〜〜</strong>
+          <strong
+            ><ShapedText
+              class="shaped-text"
+              text="ざわ〜〜〜〜〜"
+              label="ざわに続く、つながった5文字の波ダッシュ"
+            /></strong
+          >
         </article>
         <article>
           <span>Wavy Dash</span>
-          <strong>波紋〰〰〰〰</strong>
+          <strong
+            ><ShapedText
+              class="shaped-text"
+              text="波紋〰〰〰〰"
+              label="波紋に続く、つながった4文字のWavy Dash"
+            /></strong
+          >
         </article>
       </div>
       <p class="hero-specimen-note">横組・縦組の両方に対応</p>
@@ -81,7 +100,13 @@ const koburiCompatibilityGlyphs = Array.from(
         aria-label="波ダッシュを6文字続けた見本"
       >
         <span>波ダッシュ「〜」 / U+301C WAVE DASH</span>
-        <p>〜〜〜〜〜〜</p>
+        <p>
+          <ShapedText
+            class="shaped-text"
+            text="〜〜〜〜〜〜"
+            label="つながった6文字の波ダッシュ"
+          />
+        </p>
         <div
           class="wave-parity"
           aria-label="奇数番目と偶数番目の波形を交互に使用"
@@ -100,7 +125,13 @@ const koburiCompatibilityGlyphs = Array.from(
     </article>
     <div class="extension-notes">
       <article>
-        <p class="capability-glyph">あーーーー</p>
+        <p class="capability-glyph">
+          <ShapedText
+            class="shaped-text"
+            text="あーーーー"
+            label="あに続く、つながった4文字の長音"
+          />
+        </p>
         <div>
           <h3>長音「ー」</h3><p>
             始端・中間・終端の字形を使い分け、一本の線として伸ばします。
@@ -108,7 +139,13 @@ const koburiCompatibilityGlyphs = Array.from(
         </div>
       </article>
       <article>
-        <p class="capability-glyph">波紋〰〰〰</p>
+        <p class="capability-glyph">
+          <ShapedText
+            class="shaped-text"
+            text="波紋〰〰〰"
+            label="波紋に続く、つながった3文字のWavy Dash"
+          />
+        </p>
         <div>
           <h3>Wavy Dash「〰」 / U+3030</h3><p>
             一文字に4半波を収めた細かな波が、そのまま連続します。
@@ -119,7 +156,13 @@ const koburiCompatibilityGlyphs = Array.from(
     <h3 class="other-features-title">そのほかの収録機能</h3>
     <div class="capability-list">
       <article>
-        <p class="capability-glyph">が　き゚</p>
+        <p class="capability-glyph">
+          <ShapedText
+            class="shaped-text"
+            text="が　き゚"
+            label="結合濁点付きの「か」と結合半濁点付きの「き」"
+          />
+        </p>
         <div>
           <h3>濁点・半濁点を合成</h3><p>
             かなの後ろに結合文字を入力すると、一体の字形になります。
@@ -127,7 +170,13 @@ const koburiCompatibilityGlyphs = Array.from(
         </div>
       </article>
       <article>
-        <p class="capability-glyph">！？　？？？</p>
+        <p class="capability-glyph">
+          <ShapedText
+            class="shaped-text"
+            text="！？　？？？"
+            label="一文字幅にまとまった感嘆符と疑問符"
+          />
+        </p>
         <div>
           <h3>連続する約物を一文字幅に</h3><p>
             感嘆符と疑問符の組み合わせを、全角一文字へ収めます。
