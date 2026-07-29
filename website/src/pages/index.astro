@@ -5,6 +5,14 @@ import WeightSpecimen from "../components/WeightSpecimen.astro";
 import { SITE } from "../data/site";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const punctuationRows = [
+  ["？？", "？？？"],
+  ["！！", "！！！", "！！！！", "！！！！！"],
+  ["？！", "！？"],
+  ["？？！", "？！？", "！？？"],
+  ["！！？", "！？！", "？！！"],
+  ["！！？？", "？？！！"],
+];
 ---
 
 <BaseLayout pageClass="home-page">
@@ -266,21 +274,45 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       </p>
     </header>
 
-    <div class="punctuation-layout">
-      <div class="punctuation-stage" aria-label="感嘆符と疑問符の合字見本">
-        <p>？？　？？？</p>
-        <p>！！　！！！　！！！！　！！！！！</p>
-        <p>？！　！？</p>
-        <p>？？！　？！？　！？？</p>
-        <p>！！？　！？！　？！！</p>
-        <p>！！？？　？？！！</p>
-      </div>
-      <div class="punctuation-variants">
-        <p class="variant-mincho"><span>明朝</span><strong>！！？</strong></p>
-        <p class="variant-mincho-italic">
-          <span>斜体明朝</span><strong>！！？</strong>
-        </p>
-      </div>
+    <div
+      class="punctuation-comparison"
+      aria-label="感嘆符と疑問符の16通りの合字を明朝と斜体明朝で比較"
+    >
+      {
+        [
+          {
+            id: "punctuation-mincho",
+            name: "明朝",
+            feature: "ccmp",
+            className: "punctuation-specimen--mincho",
+          },
+          {
+            id: "punctuation-mincho-italic",
+            name: "斜体明朝",
+            feature: "ccmp + ss01",
+            className: "punctuation-specimen--mincho-italic",
+          },
+        ].map((variant) => (
+          <section
+            class={`punctuation-specimen ${variant.className}`}
+            aria-labelledby={variant.id}
+          >
+            <header>
+              <h3 id={variant.id}>{variant.name}</h3>
+              <p>{variant.feature}</p>
+            </header>
+            <ul aria-label={`${variant.name}の16通り`}>
+              {punctuationRows.map((row) => (
+                <li>
+                  {row.map((sequence) => (
+                    <span>{sequence}</span>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      }
     </div>
   </section>
 
