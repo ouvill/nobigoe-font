@@ -773,7 +773,9 @@
   height: 17em;
   margin: 0 auto;
   font-family: "Nobigoe Koburi", var(--serif);
-  font-feature-settings: "calt" 1;
+  font-feature-settings:
+    "calt" 1,
+    "vrt2" 1;
   font-size: clamp(23px, 2.4vw, 34px);
   letter-spacing: 0;
   line-height: 2.05;

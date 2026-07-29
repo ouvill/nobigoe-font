@@ -278,6 +278,10 @@
 .tester-workspace.is-vertical .tester-editor {
   width: 100%;
   max-height: 560px;
+  font-feature-settings:
+    "ccmp" 1,
+    "calt" 1,
+    "vrt2" 1;
   writing-mode: vertical-rl;
 }
 
@@ -399,6 +403,10 @@
 
 .glyph-grid.is-vertical .glyph-character {
   writing-mode: vertical-rl;
+  font-feature-settings:
+    "ccmp" 1,
+    "calt" 1,
+    "vrt2" 1;
 }
 
 .glyph-meta {
