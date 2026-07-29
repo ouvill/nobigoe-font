@@ -567,67 +567,75 @@
   color: #e5a796;
 }
 
-.punctuation-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
-  border: 1px solid var(--line-strong);
-}
-
-.punctuation-stage {
-  display: grid;
-  align-content: center;
-  gap: 17px;
-  min-height: 460px;
-  padding: clamp(32px, 5vw, 68px);
-  color: var(--paper-bright);
-  background: var(--accent);
-  font-feature-settings: "ccmp" 1;
-}
-
-.punctuation-stage p {
-  margin: 0;
-  font-size: clamp(35px, 4.1vw, 58px);
-  letter-spacing: 0.1em;
-  line-height: 1.2;
-}
-
-.punctuation-variants {
+.punctuation-comparison {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--line-strong);
   background: var(--paper);
 }
 
-.punctuation-variants p {
-  display: grid;
-  min-height: 230px;
-  place-items: center;
-  align-content: center;
-  gap: 16px;
-  margin: 0;
+.punctuation-specimen {
+  min-width: 0;
 }
 
-.punctuation-variants p:nth-child(even) {
+.punctuation-specimen + .punctuation-specimen {
   border-left: 1px solid var(--line-strong);
 }
 
-.punctuation-variants p:nth-child(n + 3) {
-  border-top: 1px solid var(--line-strong);
+.punctuation-specimen header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px clamp(22px, 3vw, 38px);
+  border-bottom: 1px solid var(--line-strong);
 }
 
-.punctuation-variants span {
+.punctuation-specimen h3,
+.punctuation-specimen header p {
+  margin: 0;
+}
+
+.punctuation-specimen h3 {
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.punctuation-specimen header p {
   color: var(--muted);
   font-family: var(--sans);
   font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-.punctuation-variants strong {
-  font-size: clamp(54px, 5vw, 72px);
-  font-weight: 400;
-  line-height: 1;
+.punctuation-specimen ul {
+  display: grid;
+  align-content: center;
+  gap: 17px;
+  min-height: 460px;
+  margin: 0;
+  padding: clamp(32px, 5vw, 68px);
+  list-style: none;
 }
 
-.variant-mincho-italic {
+.punctuation-specimen li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vw, 42px);
+  font-size: clamp(35px, 4.1vw, 58px);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.punctuation-specimen--mincho ul {
+  font-feature-settings:
+    "ccmp" 1,
+    "ss01" 0;
+}
+
+.punctuation-specimen--mincho-italic ul {
   font-feature-settings:
     "ccmp" 1,
     "ss01" 1;
@@ -1008,8 +1016,7 @@
     margin-top: -18px;
   }
 
-  .marks-showcase,
-  .punctuation-layout {
+  .marks-showcase {
     grid-template-columns: 1fr;
   }
 
@@ -1211,25 +1218,28 @@
     grid-row: 1 / span 2;
   }
 
-  .punctuation-stage {
+  .punctuation-comparison {
+    grid-template-columns: 1fr;
+  }
+
+  .punctuation-specimen + .punctuation-specimen {
+    border-top: 1px solid var(--line-strong);
+    border-left: 0;
+  }
+
+  .punctuation-specimen header {
+    padding: 16px 20px;
+  }
+
+  .punctuation-specimen ul {
+    gap: 14px;
     min-height: 340px;
     padding: 34px 20px;
   }
 
-  .punctuation-stage p {
+  .punctuation-specimen li {
+    gap: clamp(14px, 5vw, 22px);
     font-size: clamp(29px, 9.4vw, 38px);
-  }
-
-  .punctuation-variants {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .punctuation-variants p {
-    min-height: 160px;
-  }
-
-  .punctuation-variants strong {
-    font-size: 52px;
   }
 
   .family-card__sample {
