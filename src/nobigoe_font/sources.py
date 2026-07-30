@@ -82,15 +82,13 @@ class SourceCache:
         """Resolve all build inputs, downloading only missing or invalid cache data."""
 
         if base == "noto":
-            source = overrides.source or self._fetch_direct(
-                noto_serif_source(weight)
-            )
+            source = overrides.source or self._fetch_direct(noto_serif_source(weight))
             if overrides.latin_source is not None:
                 latin_source = overrides.latin_source
             else:
                 latin_spec = latin_font_source(latin_family, weight)
                 latin_source = (
-                    self._fetch(latin_spec) if latin_spec is not None else None
+                    self.fetch(latin_spec) if latin_spec is not None else None
                 )
             secondary_weight = weight
             ruby_source = overrides.ruby_source or self._fetch_zip_member(
@@ -106,9 +104,8 @@ class SourceCache:
         else:
             raise ValueError(f"Unknown base type {base!r}")
 
-        punctuation_source = (
-            overrides.punctuation_source
-            or self._fetch_zip_member(shippori_source(secondary_weight))
+        punctuation_source = overrides.punctuation_source or self._fetch_zip_member(
+            shippori_source(secondary_weight)
         )
         sans_source = overrides.sans_source or self._fetch_direct(
             noto_sans_source(secondary_weight)
@@ -121,7 +118,9 @@ class SourceCache:
             sans_source=sans_source,
         )
 
-    def _fetch(self, source: FontSource) -> Path:
+    def fetch(self, source: FontSource) -> Path:
+        """Return a pinned source from the verified persistent cache."""
+
         if isinstance(source, DirectSource):
             return self._fetch_direct(source)
         return self._fetch_zip_member(source)

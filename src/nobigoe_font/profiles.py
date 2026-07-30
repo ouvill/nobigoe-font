@@ -114,6 +114,9 @@ class LatinBuildProfile:
 
 
 NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
+NOTO_SERIF_VARIABLE_SHA256 = (
+    "39701fd096bc51204a8444c6c2659f007b29674a13eb62ddfa470638fe8179cd"
+)
 NOTO_WEIGHT_CLASSES = {
     "ExtraLight": 200,
     "Light": 300,
@@ -229,7 +232,7 @@ SOURCE_SERIF_ARCHIVE_SHA256 = (
     "549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425"
 )
 SOURCE_SERIF_VARIABLE_MEMBER = (
-    f"source-serif-{SOURCE_SERIF_VERSION}_Desktop/VAR/" "SourceSerif4Variable-Roman.ttf"
+    f"source-serif-{SOURCE_SERIF_VERSION}_Desktop/VAR/SourceSerif4Variable-Roman.ttf"
 )
 SOURCE_SERIF_VARIABLE_SHA256 = (
     "14d360ee1b76655da9276628b229e11671bc1f5d1083636144db6677d452cf55"
@@ -237,7 +240,7 @@ SOURCE_SERIF_VARIABLE_SHA256 = (
 SOURCE_SERIF_SCALE_FACTOR = 1.088
 SOURCE_SERIF_OPTICAL_SIZE = 20.0
 SOURCE_SERIF_COPYRIGHT = (
-    "© 2014 - 2023 Adobe (http://www.adobe.com/), " "with Reserved Font Name ‘Source’."
+    "© 2014 - 2023 Adobe (http://www.adobe.com/), with Reserved Font Name ‘Source’."
 )
 
 KOBURI_ARCHIVE_URL = "https://okoneya.jp/font/GenEiKoburiMin_v6.1.zip"
@@ -360,6 +363,15 @@ def noto_serif_source(weight: str) -> DirectSource:
     return DirectSource(filename, url, NOTO_SERIF_SHA256[weight])
 
 
+def noto_serif_variable_source() -> DirectSource:
+    filename = "NotoSerifJP-VF.otf"
+    url = (
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/"
+        f"{NOTO_COMMIT}/Serif/Variable/OTF/Subset/{filename}"
+    )
+    return DirectSource(filename, url, NOTO_SERIF_VARIABLE_SHA256)
+
+
 def noto_sans_source(weight: str) -> DirectSource:
     sans_weight = NOTO_SANS_WEIGHTS[weight]
     filename = f"NotoSansJP-{sans_weight}.otf"
@@ -399,8 +411,7 @@ def stix_two_text_source(weight: str) -> DirectSource:
     if weight not in STIX_TWO_WEIGHTS:
         supported = ", ".join(STIX_TWO_WEIGHTS)
         raise ValueError(
-            f"STIX Two Text has no native {weight} source; "
-            f"choose one of {supported}"
+            f"STIX Two Text has no native {weight} source; choose one of {supported}"
         )
     stix_weight = STIX_TWO_WEIGHTS[weight]
     filename = f"STIXTwoText-{stix_weight}.otf"
