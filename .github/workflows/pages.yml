@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v6.1.0
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v6-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v6-${{ hashFiles('src/nobigoe_font/**/*.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -200,17 +200,63 @@ jobs:
               + "".join(chr(codepoint) for codepoint in range(0x309D, 0x30A0))
               + "\U0001B132"
           )
+          katakana = (
+              "".join(chr(codepoint) for codepoint in range(0x30A1, 0x30FB))
+              + "".join(chr(codepoint) for codepoint in range(0x30FD, 0x3100))
+              + "".join(chr(codepoint) for codepoint in range(0x31F0, 0x3200))
+          )
           Path("/tmp/weight-showcase.txt").write_text(
               "声を、どこまでも。Voice, ever onward."
               + "春の雨が野の道をぬらし、遠い家の灯りがゆっくり揺れていた。"
               + "夜はまだ静かに続いている。"
               + "永漢字山川雨月語本"
               + hiragana
+              + katakana
               + catalog_text
               + "".join(parser.parts),
               encoding="utf-8",
           )
           PY
+          uv run nobigoe-build \
+            --build-variable-kana /tmp/NobigoeNovelKanaDesign-VF.ttf
+          mkdir -p /tmp/novel-kana-web
+          uv run python - <<'PY'
+          from pathlib import Path
+
+          from nobigoe_font.profiles import NOTO_WEIGHT_CLASSES
+          from nobigoe_font.variable_kana import export_variable_kana_instance
+
+          source = Path("/tmp/NobigoeNovelKanaDesign-VF.ttf")
+          destination = Path("/tmp/novel-kana-web")
+          for name, weight in NOTO_WEIGHT_CLASSES.items():
+              export_variable_kana_instance(
+                  source,
+                  weight,
+                  destination / f"NobigoeNovelKana-{name}.ttf",
+              )
+          PY
+          uv run pyftsubset /tmp/NobigoeNovelKanaDesign-VF.ttf \
+            --output-file=website/src/assets/fonts/NobigoeNovelKanaDesign-VF.woff2 \
+            --flavor=woff2 \
+            --text-file=/tmp/weight-showcase.txt \
+            --layout-features='*' \
+            --name-IDs='*' \
+            --name-languages='*' \
+            --notdef-glyph \
+            --notdef-outline \
+            --recommended-glyphs
+          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+            uv run pyftsubset "/tmp/novel-kana-web/NobigoeNovelKana-${weight}.ttf" \
+              --output-file="website/src/assets/fonts/NobigoeNovelMincho-${weight}-showcase.woff2" \
+              --flavor=woff2 \
+              --text-file=/tmp/weight-showcase.txt \
+              --layout-features='*' \
+              --name-IDs='*' \
+              --name-languages='*' \
+              --notdef-glyph \
+              --notdef-outline \
+              --recommended-glyphs
+          done
           uv run pyftsubset /tmp/font-release/fonts/NobigoeMincho-Regular.otf \
             --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
             --flavor=woff2 \
@@ -260,8 +306,9 @@ jobs:
           test -f website/site-dist/index.html
           test -f website/site-dist/tester/index.html
           test -f website/site-dist/glyphs/index.html
-          test ! -e website/site-dist/compare/index.html
-          test -z "$(find website/site-dist/_assets -name '*NobigoeNovelMincho*' -print -quit)"
+          test -f website/site-dist/compare/index.html
+          test "$(find website/site-dist/_assets -name '*NobigoeNovelMincho*' | wc -l)" -eq 7
+          test "$(find website/site-dist/_assets -name '*NobigoeNovelKanaDesign*' | wc -l)" -eq 1
           test -f website/site-dist/marks-data.json
           test -f website/site-dist/nobigoe-mincho-vertical-specimen.pdf
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"
