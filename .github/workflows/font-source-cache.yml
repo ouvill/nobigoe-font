@@ -26,10 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Cache pinned font sources
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: .cache/font-sources
           key: font-sources-${{ runner.os }}-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/sources.py') }}

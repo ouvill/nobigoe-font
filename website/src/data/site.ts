@@ -10,7 +10,7 @@ export const SITE = {
     socialHandle: "@ouvill",
     socialUrl: "https://twitter.com/ouvill",
   },
-  version: "1.034",
+  version: import.meta.env.PUBLIC_FONT_VERSION,
   releaseUrl: "https://github.com/ouvill/nobigoe-font/releases",
   repositoryUrl: "https://github.com/ouvill/nobigoe-font",
   supportUrl: "https://github.com/sponsors/ouvill",

@@ -281,8 +281,6 @@ SHIPPORI_COPYRIGHT = (
     "Copyright (c) 2021, The Shippori Mincho Project Authors "
     "(https://github.com/fontdasu/ShipporiMincho)"
 )
-VERSION_NUMBER = "1.034"
-VERSION = f"Version {VERSION_NUMBER}"
 
 
 @dataclass(frozen=True)

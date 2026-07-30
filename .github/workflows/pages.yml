@@ -26,14 +26,14 @@ jobs:
       available: ${{ steps.release.outputs.available }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Check matching release assets
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version=$(PYTHONPATH=src python3 -c 'from nobigoe_font.profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          version=$(PYTHONPATH=src python3 -m nobigoe_font.version)
           tag="v${version}"
           release_json=""
           if release_json=$(gh release view "$tag" \
@@ -88,15 +88,15 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6.0.0
         with:
           enablement: true
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: "22"
           cache: npm
@@ -112,18 +112,19 @@ jobs:
 
       - name: Restore generated webfonts
         id: webfont-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v5-${{ hashFiles('src/nobigoe_font/profiles.py', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v6-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: uv.lock
+          prune-cache: true
 
       - name: Install webfont dependencies
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -134,7 +135,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version=$(uv run python -c 'from nobigoe_font.profiles import VERSION_NUMBER; print(VERSION_NUMBER)')
+          version=$(uv run python -m nobigoe_font.version)
           mkdir -p /tmp/font-release
           gh release download "v${version}" \
             --repo "$GITHUB_REPOSITORY" \
@@ -266,7 +267,7 @@ jobs:
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: website/site-dist
 
@@ -282,4 +283,4 @@ jobs:
     steps:
       - name: Deploy Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.0

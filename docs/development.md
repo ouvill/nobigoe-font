@@ -94,6 +94,14 @@ done
 
 公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
 
+リリース版番号の唯一の正本は`src/nobigoe_font/version.json`です。新しい版ではこのファイルの`version`だけを`N.NNN`形式で更新し、`uv lock`を実行してください。Pythonパッケージのメタデータ、生成フォント、配布ZIP、公開サイト、GitHub Actionsは同じ値を読み取るため、`pyproject.toml`、Webサイト、テスト、説明文へ版番号を転記する必要はありません。
+
+```sh
+uv lock
+uv lock --check
+uv run python -m unittest discover -s tests
+```
+
 ## 配布ZIPを作成
 
 既定では安定版2ファミリーだけを、フォント、README、OFL、第三者通知、SHA-256マニフェストを含む再現可能なZIPへまとめます。先にNoto版と源暎こぶり明朝版を生成してください。
@@ -103,8 +111,8 @@ uv run nobigoe-package
 ```
 
 ```text
-dist/NobigoeMincho-v1.034.zip
-dist/NobigoeKoburiMincho-v1.034.zip
+dist/NobigoeMincho-v<version>.zip
+dist/NobigoeKoburiMincho-v<version>.zip
 ```
 
 ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
@@ -114,12 +122,18 @@ uv run nobigoe-package --include-experimental
 ```
 
 ```text
-dist/NobigoeNovelMincho-v1.034.zip
+dist/NobigoeNovelMincho-v<version>.zip
 ```
 
 ## GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.034`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/version.json`と同じ`vN.NNN`タグで起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。次のように正本からタグ名を取得して注釈付きタグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+
+```sh
+version=$(PYTHONPATH=src python3 -m nobigoe_font.version)
+git tag -a "v${version}" -m "v${version}"
+git push origin main "v${version}"
+```
 
 ## ローカルの元フォントを使用
 

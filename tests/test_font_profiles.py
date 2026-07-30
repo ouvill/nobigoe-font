@@ -17,7 +17,6 @@ from nobigoe_font.profiles import (
     SHIPPORI_STROKE_ADJUSTMENTS,
     SOURCE_SERIF_ARCHIVE_SHA256,
     STIX_TWO_OTF_SHA256,
-    VERSION_NUMBER,
     ZipMemberSource,
     default_output_path,
     font_identity,
@@ -30,6 +29,7 @@ from nobigoe_font.profiles import (
     source_serif_source,
     stix_two_text_source,
 )
+from nobigoe_font.version import VERSION, VERSION_NUMBER
 
 
 class FontProfileTests(unittest.TestCase):
@@ -223,8 +223,9 @@ class FontProfileTests(unittest.TestCase):
             },
         )
 
-    def test_release_version_tracks_feature_change(self) -> None:
-        self.assertEqual(VERSION_NUMBER, "1.034")
+    def test_release_version_uses_font_revision_format(self) -> None:
+        self.assertRegex(VERSION_NUMBER, r"^[0-9]+\.[0-9]{3}$")
+        self.assertEqual(VERSION, f"Version {VERSION_NUMBER}")
 
     def test_missing_sans_weights_use_nearest_static_sources(self) -> None:
         self.assertEqual(noto_sans_source("ExtraLight").filename, "NotoSansJP-Thin.otf")
