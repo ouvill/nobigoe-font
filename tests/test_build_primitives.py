@@ -22,6 +22,9 @@ from nobigoe_font.features import (
     contextual_extension_rules,
     feature_source,
     merge_features,
+    phased_wave_rules,
+    repeated_glyph_rules,
+    selected_run_rules,
 )
 from nobigoe_font.pipeline import (
     COMBINING_MARK_INPUTS,
@@ -34,6 +37,9 @@ from nobigoe_font.pipeline import (
     SPACING_MARK_INPUTS,
     mark_ligature_rules,
     make_manga_wave_parts,
+    make_sine_wave_tile,
+    stroke_band,
+    make_relaxed_wave_parts,
     make_wave_parts,
 )
 from nobigoe_font.metadata import rename_font
@@ -254,6 +260,32 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         self.assertEqual(adjusted.bounds[0::2], (71.0, 131.0))
 
+    def test_wave_stroke_matches_source_phase_weight(self) -> None:
+        source = pathops.Path()
+        pen = source.getPen()
+        pen.moveTo((0, 425))
+        pen.lineTo((250, 475))
+        pen.lineTo((500, 410))
+        pen.lineTo((750, 325))
+        pen.lineTo((1000, 275))
+        pen.lineTo((1000, 225))
+        pen.lineTo((750, 275))
+        pen.lineTo((500, 340))
+        pen.lineTo((250, 425))
+        pen.lineTo((0, 375))
+        pen.closePath()
+
+        wave = make_sine_wave_tile(source, 1000, half_waves=2)
+        widths = []
+        for position in (250, 500, 750):
+            low, high = stroke_band(wave, "horizontal", position)
+            widths.append(high - low)
+        peak_width, crossing_width, trough_width = widths
+
+        self.assertAlmostEqual(peak_width, 50, delta=2)
+        self.assertAlmostEqual(crossing_width, 56, delta=2)
+        self.assertAlmostEqual(trough_width, 50, delta=2)
+
     def test_wave_terminals_reuse_source_glyph_margins(self) -> None:
         (
             horizontal_start,
@@ -275,7 +307,24 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(vertical_end.bounds[1], -20)
         self.assertEqual(vertical_middle.bounds[1::2], (-120, 880))
 
-        manga_isolated, manga_parts = make_manga_wave_parts(rectangle_path(), 1000, 880)
+        relaxed = make_relaxed_wave_parts(rectangle_path(), 1000, 880)
+        self.assertEqual(len(relaxed), 20)
+        self.assertEqual(relaxed[0].bounds[0::2], (100, 900))
+        self.assertEqual(relaxed[1].bounds[0], 100)
+        for middle in relaxed[2:6]:
+            self.assertEqual(middle.bounds[0::2], (0, 1000))
+        for end in relaxed[6:10]:
+            self.assertEqual(end.bounds[2], 900)
+        self.assertEqual(relaxed[10].bounds[1::2], (-20, 780))
+        self.assertEqual(relaxed[11].bounds[3], 780)
+        for middle in relaxed[12:16]:
+            self.assertEqual(middle.bounds[1::2], (-120, 880))
+        for end in relaxed[16:20]:
+            self.assertEqual(end.bounds[1], -20)
+
+        manga_isolated, manga_parts = make_manga_wave_parts(
+            rectangle_path(), 1000, 880
+        )
         (
             manga_start,
             manga_middle,
@@ -523,6 +572,11 @@ class TrueTypeBuildTests(unittest.TestCase):
         output = "choon.dakuten"
         vertical_output = f"{output}.vert"
         wave_names = [f"wave.{index}" for index in range(10)]
+        relaxed_wave_names = [
+            f"wave-relaxed.{index}" for index in range(20)
+        ]
+        relaxed_wave_selector = "asciitilde"
+        relaxed_wave_seed = "wave-relaxed.seed"
         manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
         punctuation_variants = [
             (
@@ -543,6 +597,9 @@ class TrueTypeBuildTests(unittest.TestCase):
                     "wave.base",
                     "wave.vert",
                     *wave_names,
+                    *relaxed_wave_names,
+                    relaxed_wave_selector,
+                    relaxed_wave_seed,
                     "manga-wave.base",
                     *manga_wave_names,
                     *(name for _, names in punctuation_variants for name in names),
@@ -560,6 +617,14 @@ class TrueTypeBuildTests(unittest.TestCase):
         source = feature_source(
             [],
             ("wave", "wave.base", "wave.vert", wave_names),
+            (
+                "wave-relaxed",
+                "wave.base",
+                "wave.vert",
+                relaxed_wave_selector,
+                relaxed_wave_seed,
+                relaxed_wave_names,
+            ),
             ("manga-wave", "manga-wave.base", manga_wave_names),
             punctuation_variants,
             mark_ligature_rules(
@@ -585,6 +650,12 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(ccmp[(base, mark)], output)
         self.assertNotIn((base, spacing_mark), ccmp)
         self.assertEqual(liga[(base, spacing_mark)], output)
+        self.assertEqual(
+            feature_ligatures(font, "ccmp")[
+                (relaxed_wave_selector, "wave.base")
+            ],
+            relaxed_wave_seed,
+        )
         self.assertEqual(
             feature_single_substitutions(font, "vert")[output],
             vertical_output,
@@ -660,6 +731,11 @@ class TrueTypeBuildTests(unittest.TestCase):
         ]
         vertical_maps = list(zip(outputs, vertical_outputs, strict=True))
         wave_names = [f"wave.{index}" for index in range(10)]
+        relaxed_wave_names = [
+            f"wave-relaxed.{index}" for index in range(20)
+        ]
+        relaxed_wave_selector = "asciitilde"
+        relaxed_wave_seed = "wave-relaxed.seed"
         manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
         glyph_order = list(
             dict.fromkeys(
@@ -671,6 +747,9 @@ class TrueTypeBuildTests(unittest.TestCase):
                     "wave.base",
                     "wave.vert",
                     *wave_names,
+                    *relaxed_wave_names,
+                    relaxed_wave_selector,
+                    relaxed_wave_seed,
                     "manga-wave.base",
                     *manga_wave_names,
                     *(name for _, names in punctuation_variants for name in names),
@@ -681,6 +760,14 @@ class TrueTypeBuildTests(unittest.TestCase):
         source = feature_source(
             [],
             ("wave", "wave.base", "wave.vert", wave_names),
+            (
+                "wave-relaxed",
+                "wave.base",
+                "wave.vert",
+                relaxed_wave_selector,
+                relaxed_wave_seed,
+                relaxed_wave_names,
+            ),
             ("manga-wave", "manga-wave.base", manga_wave_names),
             punctuation_variants,
             [],
@@ -764,6 +851,7 @@ class TrueTypeBuildTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("hb-shape"), "hb-shape is not installed")
     def test_all_horizontal_extension_symbols_shape_to_calt_parts(self) -> None:
         cmap = {
+            0x7E: "asciitilde",
             0x30FC: "choon",
             0x2015: "dash",
             0x301C: "wave",
@@ -786,6 +874,17 @@ class TrueTypeBuildTests(unittest.TestCase):
             "wave.end-a",
             "wave.end-b",
             *expected[0x3030],
+            "wave-relaxed.isolated",
+            "wave-relaxed.start",
+            "wave-relaxed.middle-0",
+            "wave-relaxed.middle-1",
+            "wave-relaxed.middle-2",
+            "wave-relaxed.middle-3",
+            "wave-relaxed.end-0",
+            "wave-relaxed.end-1",
+            "wave-relaxed.end-2",
+            "wave-relaxed.end-3",
+            "wave-relaxed.seed",
         ]
         glyph_order = list(
             dict.fromkeys(
@@ -829,7 +928,21 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         calt_source = (
             "languagesystem DFLT dflt;\n"
+            "feature ccmp {\n"
+            "  sub asciitilde wave by wave-relaxed.seed;\n"
+            "} ccmp;\n"
+            "feature ss04 {\n"
+            + repeated_glyph_rules(
+                "wave_relaxed_style", "wave", "wave-relaxed.isolated"
+            )
+            + "} ss04;\n"
             "feature calt {\n"
+            + selected_run_rules(
+                "wave_relaxed_selector",
+                "wave",
+                "wave-relaxed.seed",
+                "wave-relaxed.isolated",
+            )
             + contextual_extension_rules(
                 "choon_h",
                 "choon",
@@ -862,6 +975,21 @@ class TrueTypeBuildTests(unittest.TestCase):
                 "manga-wave.middle",
                 "manga-wave.end",
             )
+            + phased_wave_rules(
+                "wave_relaxed_h",
+                "wave-relaxed.isolated",
+                [
+                    "wave-relaxed.start",
+                    "wave-relaxed.middle-0",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.middle-2",
+                    "wave-relaxed.middle-3",
+                    "wave-relaxed.end-0",
+                    "wave-relaxed.end-1",
+                    "wave-relaxed.end-2",
+                    "wave-relaxed.end-3",
+                ],
+            )
             + "} calt;\n"
         )
         merge_features(font, calt_source)
@@ -892,6 +1020,100 @@ class TrueTypeBuildTests(unittest.TestCase):
                     ]
                     with self.subTest(codepoint=codepoint, calt=calt):
                         self.assertEqual(actual_glyphs, expected_glyphs)
+
+            relaxed_sequences = {
+                1: ["wave"],
+                2: ["wave-relaxed.start", "wave-relaxed.end-1"],
+                3: [
+                    "wave-relaxed.start",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.end-2",
+                ],
+                4: [
+                    "wave-relaxed.start",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.middle-2",
+                    "wave-relaxed.end-3",
+                ],
+                5: [
+                    "wave-relaxed.start",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.middle-2",
+                    "wave-relaxed.middle-3",
+                    "wave-relaxed.end-0",
+                ],
+                6: [
+                    "wave-relaxed.start",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.middle-2",
+                    "wave-relaxed.middle-3",
+                    "wave-relaxed.middle-0",
+                    "wave-relaxed.end-1",
+                ],
+            }
+            for length, expected_glyphs in relaxed_sequences.items():
+                shaped = subprocess.run(
+                    [
+                        "hb-shape",
+                        "--output-format=json",
+                        "--features=calt=1,ss04=1",
+                        str(path),
+                        chr(0x301C) * length,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                actual_glyphs = [
+                    record["g"] for record in json.loads(shaped.stdout)
+                ]
+                with self.subTest(relaxed_length=length):
+                    self.assertEqual(actual_glyphs, expected_glyphs)
+
+            for selector_codepoint in (0x301C, 0xFF5E):
+                for length, expected_glyphs in relaxed_sequences.items():
+                    selector_expected = (
+                        ["wave-relaxed.seed"]
+                        if length == 1
+                        else expected_glyphs
+                    )
+                    shaped = subprocess.run(
+                        [
+                            "hb-shape",
+                            "--output-format=json",
+                            "--features=calt=1,ss04=0",
+                            str(path),
+                            "~" + chr(selector_codepoint) * length,
+                        ],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    actual_glyphs = [
+                        record["g"] for record in json.loads(shaped.stdout)
+                    ]
+                    with self.subTest(
+                        selector_codepoint=selector_codepoint,
+                        selector_length=length,
+                    ):
+                        self.assertEqual(actual_glyphs, selector_expected)
+
+            shaped_tilde = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1,ss04=0",
+                    str(path),
+                    "~",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                [record["g"] for record in json.loads(shaped_tilde.stdout)],
+                ["asciitilde"],
+            )
 
     def test_fallback_unicode_mapping_preserves_a_native_pua_glyph(
         self,
