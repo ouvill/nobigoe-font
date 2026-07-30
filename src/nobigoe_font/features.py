@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.ttLib import TTFont
@@ -51,6 +51,7 @@ def feature_source(
     kana_marks: list[tuple[str, str, str]],
     kana_vertical_maps: list[tuple[str, str]],
     ruby_substitutions: list[tuple[str, str]],
+    punctuation_marks: Sequence[tuple[str, str, str]] = (),
 ) -> str:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -174,7 +175,7 @@ def feature_source(
     )
     ccmp_rules += "".join(
         f"  sub {base} {mark} by {output};\n"
-        for base, mark, output in kana_marks
+        for base, mark, output in (*kana_marks, *punctuation_marks)
     )
     alternate_rules = "".join(
         f"  sub {names[0]} from [{' '.join(names[1:])}];\n"

@@ -143,7 +143,7 @@
       .share-side {
         display: grid;
         min-width: 0;
-        grid-template-rows: auto repeat(3, 1fr);
+        grid-template-rows: auto repeat(4, 1fr);
         padding: 38px 36px 26px;
         background: var(--sage-light);
         border-left: 1px solid var(--line);
@@ -486,18 +486,21 @@
       }
       .length-board {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         min-height: 0;
         background: var(--line);
         gap: 1px;
       }
       .length-column {
         min-width: 0;
-        padding: 28px 46px 30px;
+        padding: 28px 28px 30px;
         background: var(--paper);
       }
-      .length-column:last-child {
+      .length-column:nth-child(2) {
         background: var(--sage-light);
+      }
+      .length-column:last-child {
+        background: var(--paper-light);
       }
       .length-heading {
         display: flex;
@@ -506,9 +509,9 @@
         margin-bottom: 18px;
         color: var(--sage);
         font-family: var(--sans);
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.08em;
       }
       .length-heading strong {
         color: var(--ink);
@@ -523,7 +526,7 @@
       }
       .length-row {
         display: grid;
-        grid-template-columns: 46px minmax(0, 1fr);
+        grid-template-columns: 38px minmax(0, 1fr);
         align-items: center;
         min-height: 102px;
         border-top: 1px solid var(--line);
@@ -531,15 +534,15 @@
       .length-row span {
         color: var(--muted);
         font-family: var(--sans);
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.06em;
       }
       .length-row p {
         margin: 0;
         overflow: visible;
         font-feature-settings: "calt" 1;
-        font-size: 45px;
+        font-size: 34px;
         letter-spacing: 0;
         line-height: 1.2;
         white-space: nowrap;
@@ -877,8 +880,12 @@
           <aside class="share-side">
             <p class="share-side-kicker">これも入っています</p>
             <div class="share-feature">
-              <span>波線も</span>
+              <span>WAVE DASH「〜」も</span>
               <p>ざわ〜〜〜〜</p>
+            </div>
+            <div class="share-feature">
+              <span>WAVY DASH「〰」も</span>
+              <p>ざわ〰〰〰〰</p>
             </div>
             <div class="share-feature">
               <span>濁点も</span>
@@ -900,7 +907,7 @@
       <section
         class="artboard extension-card"
         id="extension-card"
-        aria-label="可変長の伸長記号紹介画像"
+        aria-label="長音符、WAVE DASH、WAVY DASHの可変長紹介画像"
       >
         <header class="extension-header">
           <div>
@@ -931,7 +938,7 @@
           </section>
           <section class="length-column">
             <div class="length-heading">
-              <span>波線</span><strong>〜</strong>
+              <span>WAVE DASH</span><strong>〜</strong>
             </div>
             <div class="length-list">
               <div class="length-row">
@@ -945,6 +952,25 @@
               <div class="length-row">
                 <span>6字</span>
                 <p>ざわ〜〜〜〜〜〜</p>
+              </div>
+            </div>
+          </section>
+          <section class="length-column">
+            <div class="length-heading">
+              <span>WAVY DASH</span><strong>〰</strong>
+            </div>
+            <div class="length-list">
+              <div class="length-row">
+                <span>2字</span>
+                <p>ざわ〰〰</p>
+              </div>
+              <div class="length-row">
+                <span>4字</span>
+                <p>ざわ〰〰〰〰</p>
+              </div>
+              <div class="length-row">
+                <span>6字</span>
+                <p>ざわ〰〰〰〰〰〰</p>
               </div>
             </div>
           </section>

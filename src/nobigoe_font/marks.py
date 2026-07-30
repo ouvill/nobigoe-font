@@ -92,6 +92,12 @@ MANGA_MARK_PAIRS: tuple[MarkPair, ...] = tuple(
     + [(base, 0x309A) for base in MANGA_HANDAKUTEN_BASES]
 )
 CHOON_DAKUTEN_PAIR: MarkPair = (0x30FC, 0x3099)
+PUNCTUATION_MARK_PAIRS: tuple[MarkPair, ...] = (
+    (0xFF01, 0x3099),
+    (0xFF01, 0x309A),
+    (0xFF1F, 0x3099),
+    (0xFF1F, 0x309A),
+)
 CHOON_DAKUTEN_PUA = 0xE0DB
 # Mark centers measured from GenEi Koburi Mincho's native U+E0DB
 # horizontal and vertical glyphs, normalized from 1024 to 1000 units/em.
@@ -178,6 +184,19 @@ MANGA_MISSING_SMALL_KANA = (0x1B132, 0x1B155)
 KOBURI_MARK_POSITION_FILENAME = "koburi.json"
 NOTO_WEIGHT_POSITION_DIRECTORY = "weights"
 NOTO_WEIGHT_POSITION_STYLES = frozenset(NOTO_WEIGHT_CLASSES)
+PUNCTUATION_MARK_POSITION_FILENAME = "punctuation.json"
+PUNCTUATION_MARK_POSITION_STYLES: dict[BaseType, tuple[str, ...]] = {
+    "noto": (
+        "ExtraLight",
+        "Light",
+        "Regular",
+        "Medium",
+        "SemiBold",
+        "Bold",
+        "Black",
+    ),
+    "koburi": ("Regular",),
+}
 KOBURI_NATIVE_MARK_PAIRS: frozenset[MarkPair] = frozenset(
     KOBURI_PUA_MARK_PAIRS
 )
@@ -549,3 +568,80 @@ def load_mark_position_overrides(
         ).items():
             loaded[pair].update(orientations)
     return loaded
+
+
+def load_punctuation_mark_positions(
+    directory: Path = MARK_POSITION_DIRECTORY,
+    *,
+    base: BaseType = "noto",
+    weight: str = "Regular",
+) -> MarkPositionMap:
+    path = directory / PUNCTUATION_MARK_POSITION_FILENAME
+    data = _require_object_keys(
+        path,
+        "root",
+        _load_mark_position_json(path),
+        set(PUNCTUATION_MARK_POSITION_STYLES),
+    )
+    expected_pairs = set(PUNCTUATION_MARK_PAIRS)
+    loaded: dict[BaseType, dict[str, MarkPositionMap]] = {}
+    for family, expected_weights in PUNCTUATION_MARK_POSITION_STYLES.items():
+        raw_weights = _require_object_keys(
+            path,
+            family,
+            data[family],
+            set(expected_weights),
+        )
+        family_positions: dict[str, MarkPositionMap] = {}
+        for style in expected_weights:
+            raw_positions = _require_json_object(
+                path,
+                f"{family}.{style}",
+                raw_weights[style],
+            )
+            parsed_positions: dict[MarkPair, object] = {
+                _parse_mark_position_pair(path, pair_key): orientations
+                for pair_key, orientations in raw_positions.items()
+            }
+            actual_pairs = set(parsed_positions)
+            if actual_pairs != expected_pairs:
+                missing = expected_pairs - actual_pairs
+                extra = actual_pairs - expected_pairs
+                details = [
+                    *(
+                        f"missing U+{pair_base:04X}+U+{pair_mark:04X}"
+                        for pair_base, pair_mark in sorted(missing)
+                    ),
+                    *(
+                        f"extra U+{pair_base:04X}+U+{pair_mark:04X}"
+                        for pair_base, pair_mark in sorted(extra)
+                    ),
+                ]
+                raise ValueError(
+                    f"{path}: {family}.{style} {', '.join(details)}"
+                )
+            family_positions[style] = {
+                pair: _parse_mark_position(
+                    path,
+                    (
+                        f"{family}.{style}."
+                        f"U+{pair[0]:04X}+U+{pair[1]:04X}"
+                    ),
+                    raw_orientations,
+                )
+                for pair, raw_orientations in parsed_positions.items()
+            }
+        loaded[family] = family_positions
+
+    if base not in PUNCTUATION_MARK_POSITION_STYLES:
+        raise ValueError(f"Unknown punctuation mark position base {base!r}")
+    if weight not in PUNCTUATION_MARK_POSITION_STYLES[base]:
+        if base == "koburi":
+            raise ValueError(
+                "GenEi Koburi Mincho punctuation mark positions are "
+                "Regular only"
+            )
+        raise ValueError(
+            f"Unknown Noto punctuation mark position weight {weight!r}"
+        )
+    return loaded[base][weight]
