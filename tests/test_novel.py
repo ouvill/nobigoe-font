@@ -28,6 +28,7 @@ from nobigoe_font.novel import (
     NOVEL_VERTICAL_STEM_MASTER_PROFILES,
     NOVEL_SMALL_KO_CODEPOINT,
     SMALL_HIRAGANA_CODEPOINTS,
+    _KA_OVERLAP_SLIVER_MAX_AREA,
     _round_terminal_path_for_cff,
     apply_novel_hiragana,
     novel_group_for_codepoint,
@@ -68,11 +69,38 @@ def _ka_topology_path() -> pathops.Path:
     pen.lineTo((244, 316))
     pen.curveTo((208, 240), (176, 174), (134, 104))
     pen.closePath()
+    pen.moveTo((330, 320))
+    pen.lineTo((350, 370))
+    pen.lineTo((370, 350))
+    pen.closePath()
     pen.moveTo((350, 340))
     pen.lineTo((390, 450))
     pen.lineTo((430, 410))
     pen.closePath()
     return path
+
+
+def _contained_sliver_indices(outline: pathops.Path) -> tuple[int, ...]:
+    contours = tuple(outline.contours)
+    main_index = min(
+        range(len(contours)),
+        key=lambda index: contours[index].bounds[1],
+    )
+    main_contour = pathops.Path()
+    contours[main_index].draw(main_contour.getPen())
+    return tuple(
+        index
+        for index, contour in enumerate(contours)
+        if index != main_index
+        and contour.clockwise
+        and contour.area <= _KA_OVERLAP_SLIVER_MAX_AREA
+        and main_contour.contains(
+            (
+                sum(x for x, _ in contour.points) / len(contour.points),
+                sum(y for _, y in contour.points) / len(contour.points),
+            )
+        )
+    )
 
 
 def _ka_topology_charstring():
@@ -214,7 +242,10 @@ class NovelDesignTests(unittest.TestCase):
         before_contours = tuple(outline.contours)
         after_contours = tuple(shortened.contours)
 
-        self.assertEqual(len(after_contours), len(before_contours) - 1)
+        self.assertEqual(
+            len(after_contours),
+            len(before_contours) - len(_contained_sliver_indices(outline)),
+        )
         main_recording = RecordingPen()
         after_contours[0].draw(main_recording)
         curve_indices = tuple(
@@ -260,11 +291,12 @@ class NovelDesignTests(unittest.TestCase):
                 before_contours[0].points[index],
                 after_contours[0].points,
             )
-        self.assertEqual(after_contours[1].points, before_contours[2].points)
+        self.assertEqual(after_contours[1].points, before_contours[3].points)
         self.assertEqual(
             after_contours[1].clockwise,
-            before_contours[2].clockwise,
+            before_contours[3].clockwise,
         )
+        self.assertEqual(_contained_sliver_indices(shortened), ())
 
         cap_deltas = tuple(
             (
@@ -365,28 +397,21 @@ class NovelDesignTests(unittest.TestCase):
                     before_contours[0].points[index],
                     after_contours[0].points,
                 )
-            companion_indices = tuple(
-                index
-                for index, contour in enumerate(before_contours[1:], start=1)
-                if contour.bounds[1] < 300
-            )
+            sliver_indices = _contained_sliver_indices(before)
             protected_index = next(
                 index
-                for index, contour in enumerate(before_contours[1:], start=1)
-                if contour.bounds[1] >= 300
+                for index in range(1, len(before_contours))
+                if index not in sliver_indices
             )
             self.assertEqual(
                 len(after_contours),
-                len(before_contours) - len(companion_indices),
+                len(before_contours) - len(sliver_indices),
             )
-            self.assertFalse(
-                any(
-                    contour.clockwise and contour.bounds[1] < 300
-                    for contour in after_contours[1:]
-                )
-            )
+            self.assertEqual(_contained_sliver_indices(after), ())
             protected_after = next(
-                contour for contour in after_contours[1:] if contour.bounds[1] >= 300
+                contour
+                for contour in after_contours[1:]
+                if contour.area > _KA_OVERLAP_SLIVER_MAX_AREA
             )
             self.assertEqual(
                 protected_after.points,

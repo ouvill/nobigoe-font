@@ -56,6 +56,8 @@ _KA_TERMINAL_FULL_PROJECTION = 90
 _KA_TERMINAL_FADE_PROJECTION = 280
 _KA_TERMINAL_COMPANION_CLEARANCE = 16
 _KA_TERMINAL_FADE_HANDLE_RATIO = 0.22
+# Noto's nested overlap seams top out at 1195.95 square units across all masters.
+_KA_OVERLAP_SLIVER_MAX_AREA = 1500
 _KA_TERMINAL_MIN_Y_TOLERANCE = 0.001
 _HORIZONTAL_ANCHORS: Mapping[NovelGlyphGroup, tuple[float, float]] = {
     group: (500, 370) for group in _GROUPS
@@ -504,21 +506,22 @@ def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
         )
         + _KA_TERMINAL_COMPANION_CLEARANCE
     )
-    candidate = _KaTerminalArc(
-        contour_index,
-        strengths,
-        translation,
-        cap_center,
-        axis_unit,
-        companion_lateral_limit,
-        frozenset(),
-    )
+    # Type 2 exposes overlap seams as small clockwise contours nested inside
+    # the main stroke; detached marks remain outside and are preserved.
+    main_contour = pathops.Path()
+    contours[contour_index].draw(main_contour.getPen())
     omitted_contours = frozenset(
         index
         for index, contour in enumerate(contours)
         if index != contour_index
         and contour.clockwise
-        and any(candidate.companion_strength(point) for point in contour.points)
+        and contour.area <= _KA_OVERLAP_SLIVER_MAX_AREA
+        and main_contour.contains(
+            (
+                sum(x for x, _ in contour.points) / len(contour.points),
+                sum(y for _, y in contour.points) / len(contour.points),
+            )
+        )
     )
     return _KaTerminalArc(
         contour_index,
