@@ -572,7 +572,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         relaxed_wave_names = [
             f"wave-relaxed.{index}" for index in range(20)
         ]
-        relaxed_wave_selector = "asciitilde"
+        relaxed_wave_selector = "manga-wave.base"
         relaxed_wave_seed = "wave-relaxed.seed"
         manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
         punctuation_variants = [
@@ -647,8 +647,12 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(ccmp[(base, mark)], output)
         self.assertNotIn((base, spacing_mark), ccmp)
         self.assertEqual(liga[(base, spacing_mark)], output)
+        self.assertNotIn(
+            (relaxed_wave_selector, "wave.base"),
+            feature_ligatures(font, "ccmp"),
+        )
         self.assertEqual(
-            feature_ligatures(font, "ccmp")[
+            feature_ligatures(font, "liga")[
                 (relaxed_wave_selector, "wave.base")
             ],
             relaxed_wave_seed,
@@ -731,7 +735,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         relaxed_wave_names = [
             f"wave-relaxed.{index}" for index in range(20)
         ]
-        relaxed_wave_selector = "asciitilde"
+        relaxed_wave_selector = "manga-wave.base"
         relaxed_wave_seed = "wave-relaxed.seed"
         manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
         glyph_order = list(
@@ -925,9 +929,9 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         calt_source = (
             "languagesystem DFLT dflt;\n"
-            "feature ccmp {\n"
-            "  sub asciitilde wave by wave-relaxed.seed;\n"
-            "} ccmp;\n"
+            "feature liga {\n"
+            "  sub manga-wave wave by wave-relaxed.seed;\n"
+            "} liga;\n"
             "feature ss04 {\n"
             + repeated_glyph_rules(
                 "wave_relaxed_style", "wave", "wave-relaxed.isolated"
@@ -1047,6 +1051,15 @@ class TrueTypeBuildTests(unittest.TestCase):
                     "wave-relaxed.middle-0",
                     "wave-relaxed.end-1",
                 ],
+                7: [
+                    "wave-relaxed.start",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.middle-2",
+                    "wave-relaxed.middle-3",
+                    "wave-relaxed.middle-0",
+                    "wave-relaxed.middle-1",
+                    "wave-relaxed.end-2",
+                ],
             }
             for length, expected_glyphs in relaxed_sequences.items():
                 shaped = subprocess.run(
@@ -1068,19 +1081,15 @@ class TrueTypeBuildTests(unittest.TestCase):
                     self.assertEqual(actual_glyphs, expected_glyphs)
 
             for selector_codepoint in (0x301C, 0xFF5E):
-                for length, expected_glyphs in relaxed_sequences.items():
-                    selector_expected = (
-                        ["wave-relaxed.seed"]
-                        if length == 1
-                        else expected_glyphs
-                    )
+                for length in range(1, 7):
+                    selector_expected = relaxed_sequences[length + 1]
                     shaped = subprocess.run(
                         [
                             "hb-shape",
                             "--output-format=json",
-                            "--features=calt=1,ss04=0",
+                            "--features=calt=1,liga=1,ss04=0",
                             str(path),
-                            "~" + chr(selector_codepoint) * length,
+                            "〰" + chr(selector_codepoint) * length,
                         ],
                         check=True,
                         capture_output=True,
@@ -1095,13 +1104,30 @@ class TrueTypeBuildTests(unittest.TestCase):
                     ):
                         self.assertEqual(actual_glyphs, selector_expected)
 
+            shaped_without_liga = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1,liga=0,ss04=0",
+                    str(path),
+                    "〰〜〜",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                [record["g"] for record in json.loads(shaped_without_liga.stdout)],
+                ["manga-wave", "wave.start", "wave.end-b"],
+            )
+
             shaped_tilde = subprocess.run(
                 [
                     "hb-shape",
                     "--output-format=json",
-                    "--features=calt=1,ss04=0",
+                    "--features=calt=1,liga=1,ss04=0",
                     str(path),
-                    "~",
+                    "~〜〜",
                 ],
                 check=True,
                 capture_output=True,
@@ -1109,7 +1135,7 @@ class TrueTypeBuildTests(unittest.TestCase):
             )
             self.assertEqual(
                 [record["g"] for record in json.loads(shaped_tilde.stdout)],
-                ["asciitilde"],
+                ["asciitilde", "wave.start", "wave.end-b"],
             )
 
     def test_fallback_unicode_mapping_preserves_a_native_pua_glyph(
