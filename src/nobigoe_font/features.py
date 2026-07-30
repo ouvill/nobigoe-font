@@ -43,9 +43,58 @@ def alternating_wave_rules(prefix: str, base: str, names: list[str]) -> str:
 """
 
 
+def phased_wave_rules(prefix: str, base: str, names: list[str]) -> str:
+    (
+        start,
+        middle_0,
+        middle_1,
+        middle_2,
+        middle_3,
+        end_0,
+        end_1,
+        end_2,
+        end_3,
+    ) = names
+    glyphs = " ".join((base, *names))
+    return f"""
+  lookup {prefix}_start {{
+    ignore sub {base} [{glyphs}]';
+    sub {base}' [{glyphs}] by {start};
+  }} {prefix}_start;
+  lookup {prefix}_end {{
+    sub [{glyphs}] {base}' by {end_0};
+  }} {prefix}_end;
+  lookup {prefix}_cycle {{
+    sub {start} {start}' by {middle_1};
+    sub {middle_1} {start}' by {middle_2};
+    sub {middle_2} {start}' by {middle_3};
+    sub {middle_3} {start}' by {middle_0};
+    sub {middle_0} {start}' by {middle_1};
+  }} {prefix}_cycle;
+  lookup {prefix}_end_phase {{
+    sub [{start} {middle_0}] {end_0}' by {end_1};
+    sub {middle_1} {end_0}' by {end_2};
+    sub {middle_2} {end_0}' by {end_3};
+  }} {prefix}_end_phase;
+"""
+
+
+def repeated_glyph_rules(prefix: str, base: str, replacement: str) -> str:
+    glyphs = f"{base} {replacement}"
+    return f"""
+  lookup {prefix}_forward {{
+    sub {base}' [{glyphs}] by {replacement};
+  }} {prefix}_forward;
+  lookup {prefix}_backward {{
+    sub [{glyphs}] {base}' by {replacement};
+  }} {prefix}_backward;
+"""
+
+
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
+    relaxed_wave: tuple[str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
     punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
     kana_marks: list[tuple[str, str, str]],
@@ -109,6 +158,64 @@ def feature_source(
     vrt2_rules.append(
         alternating_wave_rules(f"{wave_prefix}_vrt2", wave_base, vertical_wave_names)
         + wave_vertical_maps
+    )
+
+    (
+        relaxed_wave_prefix,
+        relaxed_wave_source,
+        relaxed_wave_vertical_source,
+        relaxed_wave_names,
+    ) = relaxed_wave
+    relaxed_horizontal_names = relaxed_wave_names[:10]
+    relaxed_vertical_names = relaxed_wave_names[10:]
+    relaxed_horizontal_base = relaxed_horizontal_names[0]
+    relaxed_vertical_base = relaxed_vertical_names[0]
+    relaxed_horizontal_parts = relaxed_horizontal_names[1:]
+    relaxed_vertical_parts = relaxed_vertical_names[1:]
+    calt_rules.append(
+        phased_wave_rules(
+            f"{relaxed_wave_prefix}_h",
+            relaxed_horizontal_base,
+            relaxed_horizontal_parts,
+        )
+    )
+    calt_rules.append(
+        phased_wave_rules(
+            f"{relaxed_wave_prefix}_v",
+            relaxed_vertical_base,
+            relaxed_vertical_parts,
+        )
+    )
+    relaxed_vertical_maps = "".join(
+        f"  sub {horizontal} by {vertical};\n"
+        for horizontal, vertical in zip(
+            relaxed_horizontal_names, relaxed_vertical_names, strict=True
+        )
+    )
+    vert_rules.append(
+        phased_wave_rules(
+            f"{relaxed_wave_prefix}_vert",
+            relaxed_horizontal_base,
+            relaxed_vertical_parts,
+        )
+        + relaxed_vertical_maps
+    )
+    vrt2_rules.append(
+        phased_wave_rules(
+            f"{relaxed_wave_prefix}_vrt2",
+            relaxed_horizontal_base,
+            relaxed_vertical_parts,
+        )
+        + relaxed_vertical_maps
+    )
+    relaxed_wave_rules = repeated_glyph_rules(
+        f"{relaxed_wave_prefix}_h_style",
+        relaxed_wave_source,
+        relaxed_horizontal_base,
+    ) + repeated_glyph_rules(
+        f"{relaxed_wave_prefix}_v_style",
+        relaxed_wave_vertical_source,
+        relaxed_vertical_base,
     )
 
     manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
@@ -201,6 +308,7 @@ def feature_source(
         "languagesystem DFLT dflt;\n\n"
         f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature liga {{\n{liga_rules}}} liga;\n\n"
+        f"feature ss04 {{\n{relaxed_wave_rules}}} ss04;\n\n"
         f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
         f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
         f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"

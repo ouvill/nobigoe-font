@@ -61,8 +61,10 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 
 WAVE_GLYPH_COUNT = 10
+RELAXED_WAVE_GLYPH_COUNT = 20
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
+WAVE_STROKE_MODULATION = 0.3
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
 KOBURI_RUBY_RULE_COUNT = 289
@@ -451,6 +453,10 @@ def make_sine_wave_tile(
     taper_start: bool = False,
     taper_end: bool = False,
     half_waves: float = 3,
+    phase_offset_half_waves: float = 0,
+    terminal_phase_extension_half_waves: float = (
+        WAVE_TERMINAL_EXTENSION_HALF_WAVES
+    ),
     taper_fraction: float = 1 / 4,
     start_margin: float = 0,
     end_margin: float = 0,
@@ -467,6 +473,11 @@ def make_sine_wave_tile(
     sample_trough_min, sample_trough_max = stroke_band(
         source, "horizontal", sample_trough_position
     )
+    sample_crossing_min, sample_crossing_max = stroke_band(
+        source,
+        "horizontal",
+        (sample_peak_position + sample_trough_position) / 2,
+    )
     peak_center = (sample_peak_min + sample_peak_max) / 2
     trough_center = (sample_trough_min + sample_trough_max) / 2
     baseline = (peak_center + trough_center) / 2
@@ -474,7 +485,7 @@ def make_sine_wave_tile(
     thickness = (
         (sample_peak_max - sample_peak_min) + (sample_trough_max - sample_trough_min)
     ) / 2
-    half_stroke = thickness / 2
+    crossing_thickness = sample_crossing_max - sample_crossing_min
     direction = -1 if inverted else 1
     normal_phase_velocity = half_waves * math.pi / advance
     taper_length = advance * taper_fraction
@@ -483,7 +494,7 @@ def make_sine_wave_tile(
     start_taper_length = taper_length - drawing_start
     end_taper_length = drawing_end - (advance - taper_length)
 
-    terminal_phase_extension = WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
+    terminal_phase_extension = terminal_phase_extension_half_waves * math.pi
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
@@ -495,7 +506,10 @@ def make_sine_wave_tile(
         return 30 * progress**2 * (progress - 1) ** 2
 
     def phase_at(position: float) -> tuple[float, float]:
-        phase = normal_phase_velocity * position
+        phase = (
+            phase_offset_half_waves * math.pi
+            + normal_phase_velocity * position
+        )
         phase_velocity = normal_phase_velocity
         correction_start = taper_length
         correction_end = advance - taper_length
@@ -541,7 +555,11 @@ def make_sine_wave_tile(
                 max(0.0, (drawing_end - position) / end_taper_length),
             )
             scale *= smoothstep(progress)
-        return half_stroke * scale
+        phase, _ = phase_at(position)
+        phase_thickness = thickness + (
+            crossing_thickness - thickness
+        ) * WAVE_STROKE_MODULATION * abs(math.cos(phase))
+        return phase_thickness / 2 * scale
 
     breakpoints = {drawing_start, drawing_end}
     if taper_start:
@@ -550,10 +568,11 @@ def make_sine_wave_tile(
         breakpoints.add(advance - taper_length)
     phase_start, _ = phase_at(drawing_start)
     phase_end, _ = phase_at(drawing_end)
-    for index in range(-8, 16):
-        target = math.pi / 2 + index * math.pi
-        if not phase_start < target < phase_end:
-            continue
+    quarter_wave = math.pi / 2
+    first_quarter = math.floor(phase_start / quarter_wave) + 1
+    last_quarter = math.ceil(phase_end / quarter_wave)
+    for index in range(first_quarter, last_quarter):
+        target = index * quarter_wave
         lower = drawing_start
         upper = drawing_end
         for _ in range(32):
@@ -649,6 +668,79 @@ def make_wave_parts(
     )
     vertical = tuple(
         _font_geometry.transform_path(outline, vertical_phase_flip)
+        for outline in horizontal
+    )
+    return horizontal + vertical
+
+
+def make_relaxed_wave_parts(
+    source: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, ...]:
+    source_x_min, _, source_x_max, _ = source.bounds
+    start_margin = max(0.0, source_x_min)
+    end_margin = max(0.0, advance - source_x_max)
+    parameters = {
+        "half_waves": 2.5,
+        "terminal_phase_extension_half_waves": 0,
+    }
+    phase_offsets = (-0.25, 0.25, 0.75, 1.25)
+    horizontal_isolated = make_sine_wave_tile(
+        source,
+        advance,
+        taper_start=True,
+        taper_end=True,
+        start_margin=start_margin,
+        end_margin=end_margin,
+        phase_offset_half_waves=phase_offsets[0],
+        **parameters,
+    )
+    horizontal_start = make_sine_wave_tile(
+        source,
+        advance,
+        taper_start=True,
+        start_margin=start_margin,
+        phase_offset_half_waves=phase_offsets[0],
+        **parameters,
+    )
+    horizontal_middle = tuple(
+        make_sine_wave_tile(
+            source,
+            advance,
+            phase_offset_half_waves=phase_offset,
+            **parameters,
+        )
+        for phase_offset in phase_offsets
+    )
+    horizontal_end = tuple(
+        make_sine_wave_tile(
+            source,
+            advance,
+            taper_end=True,
+            end_margin=end_margin,
+            phase_offset_half_waves=phase_offset,
+            **parameters,
+        )
+        for phase_offset in phase_offsets
+    )
+    horizontal = (
+        horizontal_isolated,
+        horizontal_start,
+        *horizontal_middle,
+        *horizontal_end,
+    )
+    tile_center_y = (
+        horizontal_middle[0].bounds[1] + horizontal_middle[0].bounds[3]
+    ) / 2
+    vertical_rotation = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + tile_center_y,
+        vertical_origin,
+    )
+    vertical = tuple(
+        _font_geometry.transform_path(outline, vertical_rotation)
         for outline in horizontal
     )
     return horizontal + vertical
@@ -1182,6 +1274,7 @@ def build(
         font,
         NEW_GLYPH_COUNT * len(linear_codepoints)
         + WAVE_GLYPH_COUNT
+        + RELAXED_WAVE_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
         + PUNCTUATION_ALTERNATE_COUNT
@@ -1226,12 +1319,36 @@ def build(
     )
     wave = ("wave", wave_base, wave_vertical, wave_names)
 
+    relaxed_wave_start = wave_start + WAVE_GLYPH_COUNT
+    relaxed_wave_names = allocated_names[
+        relaxed_wave_start : relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
+    ]
+    relaxed_wave_parts = make_relaxed_wave_parts(
+        _font_geometry.glyph_path(font, wave_base),
+        1000,
+        wave_vertical_origin,
+    )
+    _font_operations.append_glyphs(
+        font,
+        list(relaxed_wave_parts),
+        relaxed_wave_names,
+        wave_base,
+        wave_vertical_origin,
+        add_stem_hints=False,
+    )
+    relaxed_wave = (
+        "relaxed_wave",
+        wave_base,
+        wave_vertical,
+        relaxed_wave_names,
+    )
+
     manga_wave_base = cmap[0x3030]
     _, _, _, manga_wave_y_max = _font_geometry.bounds(font, manga_wave_base)
     manga_wave_vertical_origin = round(
         font["vmtx"].metrics[manga_wave_base][1] + manga_wave_y_max
     )
-    manga_wave_start = wave_start + WAVE_GLYPH_COUNT
+    manga_wave_start = relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
     manga_wave_names = allocated_names[
         manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     ]
@@ -1764,6 +1881,7 @@ def build(
         feature_source(
             extensions,
             wave,
+            relaxed_wave,
             manga_wave,
             punctuation_variants,
             kana_marks,
