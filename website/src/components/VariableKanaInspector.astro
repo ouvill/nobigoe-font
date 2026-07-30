@@ -1,12 +1,8 @@
 ---
-import { WEIGHTS } from "../data/site";
+import { NOVEL_PROSE_SPECIMEN, WEIGHTS } from "../data/site";
 import variableFontUrl from "../assets/fonts/NobigoeNovelKanaDesign-VF.woff2?url";
 const weightPosition = (weight: number) =>
   `${((weight - 200) / (900 - 200)) * 100}%`;
-const horizontalSpecimen =
-  "春の雨が野の道をぬらし、窓辺のラジオから静かな音が流れていた。";
-const verticalSpecimen =
-  "雨の夜、アカシアの葉が揺れる。かなとカナの筆端を、縦の流れで確かめる。";
 const hiraganaRows = [
   "あいうえお　ぁぃぅぇぉ",
   "かきくけこ　がぎぐげご　ゕゖ",
@@ -127,7 +123,7 @@ const katakanaRows = [
           <h4 id="variable-horizontal-title">横組</h4>
           <p>wght <span data-variable-specimen-value>400</span></p>
         </header>
-        <p lang="ja" data-variable-specimen>{horizontalSpecimen}</p>
+        <p lang="ja" data-variable-specimen>{NOVEL_PROSE_SPECIMEN}</p>
       </section>
 
       <section
@@ -138,7 +134,7 @@ const katakanaRows = [
           <h4 id="variable-vertical-title">縦組</h4>
           <p>wght <span data-variable-specimen-value>400</span></p>
         </header>
-        <p lang="ja" data-variable-specimen>{verticalSpecimen}</p>
+        <p lang="ja" data-variable-specimen>{NOVEL_PROSE_SPECIMEN}</p>
       </section>
 
       <section
