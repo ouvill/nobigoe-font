@@ -5,6 +5,8 @@ from pathlib import Path, PurePosixPath
 from typing import Literal, TypeAlias
 
 BaseType: TypeAlias = Literal["noto", "koburi"]
+KanaStyle: TypeAlias = Literal["noto", "novel"]
+KANA_STYLES: tuple[KanaStyle, ...] = ("noto", "novel")
 LatinFamily: TypeAlias = Literal[
     "noto",
     "libertinus",
@@ -57,8 +59,6 @@ LATIN_COMMON_LAYOUT_FEATURES = (
     "tnum",
     "zero",
 )
-
-
 
 
 @dataclass(frozen=True)
@@ -199,9 +199,7 @@ LIBERTINUS_OTF_SHA256 = {
     "Semibold": "a4b3f28e85881db34695c1f005e4c79233a6caf3a2bd286c9b418c025fb99308",
     "Bold": "0264914210ed51b3231ebc92ce529e9f2e166ba9eebf0cd4a579558690a27b64",
 }
-LIBERTINUS_COPYRIGHT = (
-    "Copyright © 2012-2024 The Libertinus Project Authors."
-)
+LIBERTINUS_COPYRIGHT = "Copyright © 2012-2024 The Libertinus Project Authors."
 
 STIX_TWO_VERSION = "2.13b171"
 STIX_TWO_TAG = f"v{STIX_TWO_VERSION}"
@@ -231,8 +229,7 @@ SOURCE_SERIF_ARCHIVE_SHA256 = (
     "549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425"
 )
 SOURCE_SERIF_VARIABLE_MEMBER = (
-    f"source-serif-{SOURCE_SERIF_VERSION}_Desktop/VAR/"
-    "SourceSerif4Variable-Roman.ttf"
+    f"source-serif-{SOURCE_SERIF_VERSION}_Desktop/VAR/" "SourceSerif4Variable-Roman.ttf"
 )
 SOURCE_SERIF_VARIABLE_SHA256 = (
     "14d360ee1b76655da9276628b229e11671bc1f5d1083636144db6677d452cf55"
@@ -240,8 +237,7 @@ SOURCE_SERIF_VARIABLE_SHA256 = (
 SOURCE_SERIF_SCALE_FACTOR = 1.088
 SOURCE_SERIF_OPTICAL_SIZE = 20.0
 SOURCE_SERIF_COPYRIGHT = (
-    "© 2014 - 2023 Adobe (http://www.adobe.com/), "
-    "with Reserved Font Name ‘Source’."
+    "© 2014 - 2023 Adobe (http://www.adobe.com/), " "with Reserved Font Name ‘Source’."
 )
 
 KOBURI_ARCHIVE_URL = "https://okoneya.jp/font/GenEiKoburiMin_v6.1.zip"
@@ -249,9 +245,7 @@ KOBURI_ARCHIVE_SHA256 = (
     "b17d4def22c048e704955912423c7bac8a03a3dbf1acaa722f254a7e9ece148a"
 )
 KOBURI_TTF_MEMBER = "GenEiKoburiMin_v6.1a/GenEiKoburiMin6-R.ttf"
-KOBURI_TTF_SHA256 = (
-    "c27fb4039ac9fae19152716992b5b9d07558e24f6cccea7b0c1abd0109235166"
-)
+KOBURI_TTF_SHA256 = "c27fb4039ac9fae19152716992b5b9d07558e24f6cccea7b0c1abd0109235166"
 SHIPPORI_ARCHIVE_URL = "https://fontdasu.com/download/shippori3.zip"
 SHIPPORI_ARCHIVE_SHA256 = (
     "dbdcab920d82238bda26296bccd9630906b427ee91b31f5da2dde8e47b0b202e"
@@ -320,7 +314,23 @@ class FontIdentity:
         return self.japanese_full_name
 
 
-def font_identity(base: BaseType, weight: str) -> FontIdentity:
+def font_identity(
+    base: BaseType,
+    weight: str,
+    kana_style: KanaStyle = "noto",
+) -> FontIdentity:
+    if kana_style == "novel":
+        if base != "noto":
+            raise ValueError("--kana-style novel requires --base noto")
+        return FontIdentity(
+            "Nobigoe Novel Mincho",
+            "のびごえ小説明朝",
+            weight,
+            NOTO_WEIGHT_CLASSES[weight],
+            f"NobigoeNovelMincho-{weight}",
+        )
+    if kana_style != "noto":
+        raise ValueError(f"Unknown kana style {kana_style!r}")
     if base == "koburi":
         return FontIdentity(
             "Nobigoe Koburi Mincho",
@@ -413,9 +423,7 @@ def source_serif_source() -> ZipMemberSource:
     )
 
 
-def latin_font_source(
-    family: LatinFamily, weight: str
-) -> FontSource | None:
+def latin_font_source(family: LatinFamily, weight: str) -> FontSource | None:
     if family == "noto":
         return None
     if family == "libertinus":
@@ -427,9 +435,7 @@ def latin_font_source(
     raise ValueError(f"Unknown Latin family {family!r}")
 
 
-def latin_build_profile(
-    family: LatinFamily, weight: str
-) -> LatinBuildProfile:
+def latin_build_profile(family: LatinFamily, weight: str) -> LatinBuildProfile:
     if family == "noto":
         return LatinBuildProfile(family, 1, 0)
     if family == "libertinus":

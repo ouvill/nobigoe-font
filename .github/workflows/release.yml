@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag matching font_profiles.VERSION_NUMBER (for example v1.033)"
+        description: "Release tag matching profiles.VERSION_NUMBER (for example v1.033)"
         required: true
         type: string
 
@@ -70,10 +70,11 @@ jobs:
       - name: Run tests
         run: uv run python -m unittest discover -s tests
 
-      - name: Build both font families
+      - name: Build stable families and experimental Novel validation fonts
         run: |
           for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
             uv run nobigoe-build --weight "$weight" --autohint
+            uv run nobigoe-build --kana-style novel --weight "$weight" --autohint
           done
           uv run nobigoe-build --base koburi
 
@@ -84,6 +85,8 @@ jobs:
           done
           hb-shape dist/NobigoeMincho-Regular.otf "あーーー" --features=calt >/dev/null
           hb-shape dist/NobigoeKoburiMincho-Regular.ttf "待ってーーー。" --direction=ttb >/dev/null
+          hb-shape dist/NobigoeNovelMincho-Regular.otf "春の雨が静かに続く。" >/dev/null
+          hb-shape dist/NobigoeNovelMincho-Black.otf "ぬのめゔゐゑゝゞ" --direction=ttb >/dev/null
 
       - name: Package release archives
         run: |

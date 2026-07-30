@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-`Nobigoe Mincho`（のびごえ明朝）と`Nobigoe Koburi Mincho`（のびごえこぶり明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。STIX Two TextとSource Serif 4は、`--latin-family`で明示した比較ビルドだけに取り込みます。
+`Nobigoe Mincho`（のびごえ明朝）、`Nobigoe Novel Mincho`（のびごえ小説明朝）、`Nobigoe Koburi Mincho`（のびごえこぶり明朝）は、次の第三者フォントから輪郭とメトリクスを取り込んだ派生フォントです。STIX Two TextとSource Serif 4は、`--latin-family`で明示した比較ビルドだけに取り込みます。
 
 ## Noto Serif JP
 
@@ -23,8 +23,13 @@
 
 ### 使用箇所と改変
 
-各ウェイトを対応する`Nobigoe Mincho`の和文ベースとして使用しています。欧文字形とそのメトリクスは選択した欧文プロファイルへ置換するか、`--latin-family noto`ではNoto Serif JPのまま保持します。それ以外の既存字形・メトリクス・OpenTypeテーブルを保持しています。伸長記号、Manga1方式の感嘆符・疑問符合字、濁点・半濁点付き仮名、ルビ、小書きコを追加し、ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータを元フォントと区別できる名前へ変更しています。
+各ウェイトを対応する`Nobigoe Mincho`と`Nobigoe Novel Mincho`の和文ベースとして使用しています。Novel版のひらがなは源暎こぶり明朝の輪郭をコピーせず、対応する同ウェイトのNoto Serif JP輪郭を4字形群・3光学マスターの異方性縮小、位置、細ウェイト縦画補正で変形します。縦組は同じNoto由来輪郭へ独立した3光学マスターと字別の高さ・横幅・縦画黒み補正を追加し、源暎こぶり明朝は寸法と黒みの比較基準としてだけ使用します。U+3041–U+3096、U+309D–U+309F、追加するU+1B132、ひらがな`ccmp`出力、全縦組対応字形が仮名変換の対象です。さらにNovel版では、Unicode 15.1で固定したCJK Unified Ideographs全拡張とCJK Compatibility IdeographsのうちNoto cmapにある13,477 glyph、およびそのglyphから異体字・旧字体・新字体・言語形・縦組のGSUB機能をグラフ追跡して到達する未符号化492 glyphを、1000-unitセル中心(500, 500)基準で`1000 / 1024 = 0.9765625`倍へ等方縮小します。`々`・`〆`・`〇`・`〻`・`〼`、カタカナ、約物、Latin、追加記号、`dlig`・`ruby`出力は漢字縮小の対象外です。h/v advance、`VORG`、cmap、既存GSUB/GPOS/GDEFを維持します。欧文字形とそのメトリクスは選択した欧文プロファイルへ置換するか、`--latin-family noto`ではNoto Serif JPのまま保持します。伸長記号、Manga1方式の感嘆符・疑問符合字、濁点・半濁点付き仮名、ルビ、小書きコを追加し、ファミリー名、PostScript名、バージョン、著作権・Noticeメタデータを元フォントと区別できる名前へ変更しています。
 
+Novel版のカタカナも源暎こぶり明朝の輪郭をコピーせず、対応する同ウェイトのNoto Serif JP輪郭から派生します。U+30A1–U+30FA、U+30FD–U+30FF、U+31F0–U+31FFの109字、追加するU+1B155、カタカナ`ccmp`出力、全縦組対応字形を、直線主体・曲線主体・小書き・反復記号の4群と3光学マスターで変形します。結合濁点・半濁点は合成後の一体輪郭へ一度だけ適用し、源暎こぶり明朝は寸法と黒みの比較基準としてだけ使用します。
+
+現行Noto cmapではCJK Radicals Supplement／Kangxi Radicalsの293コードポイントが上記Han対象中の290 glyphを共有します。cmapを変更せず共有glyphを一度だけ変換するため、これらのradical aliasも同じ縮小輪郭を表示します。仮名・カタカナ・約物・Latin・追加記号・PUAとの共有glyphは許可せず、変換前にビルドを失敗させます。
+
+Han縮小はIdeographs用CID Font DICTの複製、複製Private DICT、共有local Subrs、元CharStringバイト列、および対象glyphの`FDSelect`再割当で実装し、複製FDの`FontMatrix`だけを追加します。対象輪郭を展開・再符号化せず、元のヒント命令とsubroutine構造を維持します。
 
 ## Libertinus Serif
 

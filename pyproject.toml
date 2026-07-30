@@ -14,6 +14,7 @@ dependencies = [
 [project.scripts]
 nobigoe-build = "nobigoe_font.cli:main"
 nobigoe-package = "nobigoe_font.release:main"
+nobigoe-measure-kana = "nobigoe_font.novel_metrics:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -19,9 +19,7 @@ def autohint_latin_glyphs(
         return
     command = executable or shutil.which("otfautohint")
     if command is None:
-        raise RuntimeError(
-            "--autohint requires the AFDKO otfautohint command on PATH"
-        )
+        raise RuntimeError("--autohint requires the AFDKO otfautohint command on PATH")
     with TemporaryDirectory(
         prefix=f".{output_path.stem}-autohint-",
         dir=output_path.parent,

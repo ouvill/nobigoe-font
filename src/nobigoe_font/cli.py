@@ -9,6 +9,7 @@ from typing import Sequence
 from .pipeline import build
 from .profiles import (
     LATIN_FAMILIES,
+    KANA_STYLES,
     NOTO_WEIGHT_CLASSES,
     default_output_path,
     font_identity,
@@ -29,6 +30,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         choices=("noto", "koburi"),
         default="noto",
         help="base typeface; Koburi is available in Regular only",
+    )
+    parser.add_argument(
+        "--kana-style",
+        choices=KANA_STYLES,
+        default="noto",
+        help="hiragana design; novel is available for the Noto base only",
     )
     parser.add_argument(
         "--weight",
@@ -94,6 +101,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.base == "koburi" and args.kana_style == "novel":
+        raise ValueError("--kana-style novel requires --base noto")
     if args.base == "koburi" and args.weight != "Regular":
         raise ValueError("GenEi Koburi Mincho is available in Regular only")
     if args.base == "koburi" and args.latin_source is not None:
@@ -109,7 +118,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     ):
         raise ValueError("--latin-source cannot be combined with --latin-family noto")
 
-    identity = font_identity(args.base, args.weight)
+    identity = font_identity(args.base, args.weight, args.kana_style)
     latin_profile = latin_build_profile(
         args.latin_family if args.base == "noto" else "noto",
         args.weight,
@@ -149,4 +158,5 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.face,
         args.base,
         args.autohint,
+        args.kana_style,
     )

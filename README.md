@@ -1,21 +1,68 @@
 # のびごえ明朝 (Nobigoe Mincho)
 
-Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号、感嘆符・疑問符合字と異体字、濁点・半濁点付き仮名を追加するフォント生成プロジェクトです。Noto版の既定の欧文はLibertinus Serifの字形とメトリクスを使用します。
+Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号、感嘆符・疑問符合字と異体字、濁点・半濁点付き仮名を追加するフォント生成プロジェクトです。Noto版の既定の欧文はLibertinus Serifの字形とメトリクスを使用します。Noto各ウェイトから小説本文向けの小ぶりなひらがなを生成する`Novel`版も、既存版とは別の明示オプションで提供します。
 
 制作: [Ouvill](https://blog.ouvill.net) · [X / @ouvill](https://twitter.com/ouvill) · [GitHub](https://github.com/ouvill) · [開発を支援](https://github.com/sponsors/ouvill)
 
-Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7ウェイト、源暎こぶり明朝版は別ファミリー`Nobigoe Koburi Mincho`（`のびごえこぶり明朝`）のRegularとして配布します。Noto版はOpenType/CFF、源暎こぶり明朝版は元フォントと同じTrueType形式です。
+Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7ウェイト、源暎こぶり明朝版は`Nobigoe Koburi Mincho`（`のびごえこぶり明朝`）のRegularとして配布します。開発中のNovel版は`Nobigoe Novel Mincho`（`のびごえ小説明朝`）の7ウェイトを明示オプションで生成できますが、通常のGitHub Releaseには含めません。Noto版とNovel版はOpenType/CFF、源暎こぶり明朝版は元フォントと同じTrueType形式です。
 
 ![のびごえ明朝とのびごえこぶり明朝の字形一覧。伸長記号、結合濁点・半濁点、感嘆符・疑問符合字、二つのファミリーを掲載](https://nobigoe.ouvill.net/assets/readme-glyphs.png)
 
-## 配布構成
+## ファミリー構成
 
 | ファミリー | ベース | ウェイト | 形式 | 出力 |
 |---|---|---|---|---|
 | Nobigoe Mincho | Noto Serif JP（和文）+ Libertinus Serif（欧文） | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Black | OpenType/CFF (`.otf`) | `dist/NobigoeMincho-<Weight>.otf` |
+| Nobigoe Novel Mincho（開発中） | Noto Serif JP各ウェイト（和文）+ Libertinus Serif（欧文）、ひらがなをNovel設計へ変換 | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Black | OpenType/CFF (`.otf`) | `dist/NobigoeNovelMincho-<Weight>.otf` |
 | Nobigoe Koburi Mincho | 源暎こぶり明朝 | Regular | TrueType (`.ttf`) | `dist/NobigoeKoburiMincho-Regular.ttf` |
 
-両ファミリーの追加機能とUnicode入力は同じです。Noto版は通常の文書用ウェイトファミリー、源暎こぶり明朝版は小ぶりな仮名を持つ独立ファミリーとして扱います。
+3ファミリーの追加機能とUnicode入力は同じです。Noto版は通常の文書用、Novel版は漢字を邪魔しない小説本文用仮名と余白を持つ漢字字面、源暎こぶり明朝版は源暎こぶり明朝由来の小ぶりな仮名を持つ独立ファミリーとして扱います。
+
+### Novel小説本文設計
+> [!WARNING]
+> Novel版はmain上で統合検証する開発中の実験的ファミリーです。ファミリー名、出力名、既存ビルドの既定値は分離されていますが、字形設計と仕様は正式リリースまで変更される可能性があります。通常の配布ZIPとタグリリースには含まれません。
+
+
+`--kana-style novel`は、現行Noto版のファミリー名・出力名・既定値を変更せず、別ファミリー`Nobigoe Novel Mincho`を生成します。輪郭は源暎こぶり明朝からコピーせず、出力と同じウェイトの固定Noto Serif JPを変形した派生設計です。「完全なゼロからのオリジナル」ではありません。Noto CJKの著作権表示とSIL Open Font License 1.1は生成フォント内と第三者通知に維持します。
+
+対象ひらがなはNotoソースが収録するU+3041–U+3096とU+309D–U+309Fの89字です。小書き、符号化済み濁点・半濁点付き、`ゔ`、`ゐ`・`ゑ`、反復記号、`ゟ`を含み、追加するU+1B132小書きこ、ひらがなを基字とする`ccmp`出力と全縦組字形も同じ設計群で変換します。結合濁点・半濁点の一体字形は合成後の輪郭全体を一度だけ変換するため、基字と記号の間隔を保ちます。
+
+対象カタカナはU+30A1–U+30FA、U+30FD–U+30FF、U+31F0–U+31FFの符号化済み109字と、ビルド時に追加するU+1B155小書きコです。標準78字、小書き29字、反復記号等3字を漏れなく扱い、カタカナを基字とする`ccmp`出力と全縦組字形も変換します。U+30FB中点、U+30FC長音記号、半角カタカナは仮名字面変換の対象外です。変換対象は横組203 glyph・縦組202 glyphで、符号化済み字形、既存一体字形、生成した濁点・半濁点付き字形を重複なく含みます。ひらがな・カタカナともcmap、既存GSUB/GPOS、1000 units/emの全角送り、各縦字形の縦原点を維持します。
+
+漢字はUnicode 15.1で固定したCJK Unified Ideographs全拡張とCJK Compatibility Ideographsを対象にします。範囲はU+3400–U+4DBF、U+4E00–U+9FFF、U+F900–U+FAFF、U+20000–U+2A6DF、U+2A700–U+2B73F、U+2B740–U+2B81F、U+2B820–U+2CEAF、U+2CEB0–U+2EBEF、U+2EBF0–U+2EE5F、U+2F800–U+2FA1F、U+30000–U+3134F、U+31350–U+323AFです。Noto cmapにある13,736コードポイントが参照する13,477 glyphをseedとし、`aalt`、`jp78`、`jp83`、`jp90`、`locl`、`nlck`、`salt`、`ss01`–`ss20`、`vert`、`vrt2`等をseedからグラフ追跡して、未符号化の異体字492 glyphを加えた重複なし13,969 glyphを変換します。現行ソースの到達出力数／新規追加数は`aalt` 769／492、`jp78` 569／0、`jp83` 380／0、`jp90` 160／0、`nlck` 210／0で、`locl`・`salt`・`ss01`–`ss07`・`vert`・`vrt2`からの追加は0です。`dlig`と`ruby`は漢字異体字ではなく表示・寸法機能なので追跡しません。
+
+漢字輪郭は全7ウェイト共通で1000-unitセル中心(500, 500)を基準に`1000 / 1024 = 0.9765625`倍する純粋な等方アフィン変換です。weight調整は行わず、h/v advance 1000と既存の縦原点・`VORG`を維持します。`々` U+3005、`〆` U+3006、`〇` U+3007、`〻` U+303B、`〼` U+303C、カタカナ、約物、Latin、追加記号は漢字変換の対象外です。対象glyphと保護対象の仮名・約物・Latin・記号・PUAに共有aliasがあれば、輪郭を変更する前にビルドを失敗させます。現行Noto cmapではCJK Radicals Supplement／Kangxi Radicalsの293コードポイントが対象中の290 glyphをaliasするため、cmap不変の条件下で同じ縮小輪郭を表示します。数値と範囲の正本は[`novel_han.py`](src/nobigoe_font/novel_han.py)です。
+
+輪郭縮小の実装はNotoのIdeographs用CID Font DICTを複製し、Private DICTを独立させつつlocal Subrsと対象CharStringバイト列を保持し、複製FDの`FontMatrix`と`FDSelect`割当だけで行います。これにより13,969 glyphを個別展開せず、全ウェイトで元のヒント命令とsubroutine構造を維持します。`glyph_path`と計測CLIはFDごとの相対`FontMatrix`を反映するため、ソース輪郭との比較も実際の描画寸法と一致します。
+
+設計は200（細）、400（標準）、900（太）の3光学マスターを`normal`、懐を持つ`counter`、`small`、`iteration`の4群に分け、300・500・600・700へ補間します。横組の字面横縮率は通常字で0.950→0.940→0.935、縦縮率は0.960→0.950→0.950です。太字のcounter群だけ横0.925としてBlackのカウンターを確保し、小書きと反復記号は通常字より縮小を抑えます。位置基準は横組の(500, 370)、縦組通常字の(500, 370)、縦組小書きの(650, 395)で、0.25 units以上の必要な縦画補正だけを加えます。
+
+カタカナは同じ200・400・900の3光学マスターを、直線主体41字、曲線主体37字、小書き29字、反復記号3字の4群へ分け、残る4ウェイトを補間します。横組マスターの字面横縮率は直線主体で0.950→0.940→0.935、曲線主体で0.950→0.940→0.930、縦縮率は0.960→0.950→0.950です。小書きと反復記号は縮小を抑え、縦組では別マスターで横幅を1.025→1.030→1.035倍へ復元し、小書きだけ(650, 395)を位置基準にします。字別の縦高さ補正は`ハ・シ・ン・チ・ワ・ネ・ケ`へ適用します。数値の正本は[`novel_katakana.py`](src/nobigoe_font/novel_katakana.py)です。
+
+縦組は横組マスターを正本として先に適用し、別の200・400・900マスターと字別補正を二段目に適用します。通常字の横幅復元は1.025→1.030→1.035、counter群のBlackは1.030、小書きは1.000です。RegularでKoburiより高かった25字だけ高さを0.880–0.995倍に抑え、狭い`ぬ・り・ひ・け`はさらに1.030倍、準狭幅5字は1.015倍、もともと広い9字は0.980倍の横幅係数を使います。低かった`あ・す・ゆ・る`と全小書きは高さを変えません。補正強度は細0.9・標準1.0・太0.9で補間し、ExtraLightの細線とBlackのカウンターを守ります。縦送り1000と`VORG`は不変です。数値の正本は[`novel.py`](src/nobigoe_font/novel.py)の`NOVEL_MASTER_PROFILES`、`NOVEL_VERTICAL_MASTER_PROFILES`、`NOVEL_VERTICAL_HEIGHT_CORRECTIONS`、`NOVEL_VERTICAL_WIDTH_CORRECTIONS`です。
+
+縦組の黒みは、Regular基本46字について各書体内平均へ正規化したNovel/Koburi比を全字走査し、1.040以上をstrong、1.025以上をmoderateとして補正します。strongは`か・き・け・せ・は・も`、moderateは`た・ち・に・み・む`です。`な`は1.085でしたが、-1.15 unitsを超える補正で小輪郭を失うためfragile群として独立させます。stem補正の200→400→900マスターはstrongが-0.75→-1.50→-0.75、fragileが-0.50→-1.00→-0.50、moderateが-0.50→-0.75→-0.50 unitsです。符号化済み濁点・半濁点字と`ccmp`出力は基字群を継承し、記号を痩せさせないため合成済み輪郭へ2/3強度で一度だけ適用します。数値の正本は`NOVEL_VERTICAL_STEM_GROUPS`と`NOVEL_VERTICAL_STEM_MASTER_PROFILES`です。
+
+実測は[`nobigoe-measure-kana`](src/nobigoe_font/novel_metrics.py)で再現できます。89字の平均を1000 units/emへ正規化すると、RegularのNotoは字面0.7531×0.7684、ink area 0.1278、代表漢字9字に対するink比0.6807、源暎こぶり明朝は0.7064×0.7200、0.1113、0.6202、Novelは0.7131×0.7337、0.1162、0.6490です。Novelの同ink比はExtraLight 0.6708、Black 0.6580で、ウェイト端でも本文濃度の比率をほぼ一定に保ちます。
+
+カタカナ109字のRegular平均は、横組でNotoの字面0.714492×0.692168・ink area 0.097757に対してNovelが0.674508×0.659149・0.088418で、比率は94.40%・95.23%・90.45%です。Koburiの0.664157×0.646458・0.086242に対してNovelは幅+1.56%、高さ+1.96%、ink +2.52%です。Notoに対するNovelの横組字面幅比／高さ比／ink比はExtraLightで95.64%／96.24%／94.93%、Blackで93.62%／95.12%／88.99%となり、細字の線を保ちながら太字のカウンターを確保します。代表漢字9字に対するカタカナink比はExtraLight 0.5002、Regular 0.4936、Black 0.5234です。縦組でもNoto比は全ウェイトで幅95.30–96.79%、高さ94.23–95.44%、ink 90.10–95.48%に収まります。
+
+代表漢字`永漢字山川雨月語本`のRegular平均は、変換前Noto／Novelの字面0.888778×0.898778・ink area 0.187824・fill 0.234243に対し、変換後Novelが0.867947×0.877713・0.179122・0.234243です。源暎こぶり明朝の0.867188×0.878255・0.179431・0.234725との差はwidth +0.09%、height -0.06%、ink -0.17%、fill -0.21%です。計測JSONの比較セクションにも代表漢字9字のmean／median比を出力します。
+
+
+基本46字のRegular縦字形では、Novelと源暎こぶり明朝の高さMAEが0.018139emから0.009811em、中央値絶対誤差が0.015500emから0.006297emへ改善しました。width/heightのaspect MAEは0.056932から0.024008、中央値絶対誤差は0.043717から0.022450です。調整後の平均はKoburiの0.7016×0.7345・aspect 0.9788に対してNovelが0.6953×0.7290・0.9738です。横組90字の輪郭と`hmtx`は調整前と同一です。
+
+同じ46字の相対黒みMAEは0.029699から0.022134、中央値絶対誤差は0.022802から0.014402へ改善しました。Regularの`か・が・は・ば・ぱ`のink areaはそれぞれ0.126261→0.121131、0.141355→0.137004、0.141028→0.135520、0.154692→0.150306、0.156831→0.152426です。Koburi比は1.008、1.002、1.011、1.002、1.003となり、bbox高さの変化は最大1 unitです。補正後の相対黒み上位は、輪郭保護を優先した`な`1.065、`せ`1.035、`よ`1.032、`を`1.030、`き`1.030です。
+
+```sh
+uv run nobigoe-measure-kana --strict --json \
+  --output dist/novel-kana-metrics.json \
+  NotoR=.cache/font-sources/NotoSerifJP-Regular.otf \
+  KoburiR=.cache/font-sources/GenEiKoburiMin6-R.ttf \
+  NovelR=dist/NobigoeNovelMincho-Regular.otf
+```
+
+縦組の`vert`/`vrt2`置換後の輪郭を測る場合は、同じコマンドへ`--vertical`を追加します。
 
 ## 機能
 
@@ -130,6 +177,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | `geometry.py` / `operations.py` | 輪郭変換、cmap、CFF／TrueType、欧文レイアウトの操作 |
 | `punctuation.py` / `features.py` | 感嘆符・疑問符合字の合成とOpenType機能の生成・結合 |
 | `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
+| `novel.py` / `novel_katakana.py` / `novel_han.py` / `novel_metrics.py` | Novelひらがな・カタカナの3マスター設計、Unicode 15.1 Han集合と等方縮小、字面・ink・カウンター計測 |
 
 ### 自動取得して生成
 
@@ -155,6 +203,11 @@ for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
   uv run nobigoe-build --weight "$weight" --autohint
 done
 
+# Novel小説仮名版の全7ウェイト
+for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+  uv run nobigoe-build --kana-style novel --weight "$weight" --autohint
+done
+
 # 源暎こぶり明朝版Regular
 uv run nobigoe-build --base koburi
 
@@ -166,13 +219,13 @@ for latin in noto libertinus stix-two-text source-serif-4; do
 done
 ```
 
-既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--output`を省略して既定以外の欧文候補を指定した場合は、既存配布フォントを上書きせず`dist/comparison/NobigoeMincho-<Weight>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
-公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。
+公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
 
 ### 配布ZIPを作成
 
-2ファミリーを混在させず、フォント、README、OFL、第三者通知、SHA-256マニフェストをそれぞれの再現可能なZIPへまとめます。先に上記の全フォントを生成してください。
+既定では安定版2ファミリーだけを、フォント、README、OFL、第三者通知、SHA-256マニフェストを含む再現可能なZIPへまとめます。先にNoto版と源暎こぶり明朝版を生成してください。
 
 ```sh
 uv run nobigoe-package
@@ -183,9 +236,19 @@ dist/NobigoeMincho-v1.033.zip
 dist/NobigoeKoburiMincho-v1.033.zip
 ```
 
+ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
+
+```sh
+uv run nobigoe-package --include-experimental
+```
+
+```text
+dist/NobigoeNovelMincho-v1.030.zip
+```
+
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.033`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.033`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 
@@ -255,6 +318,8 @@ npm run dev
 ```
 
 `website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
+
+かな比較`/compare/`は`npm run dev`でだけ有効になる開発用ページです。`npm run build`の静的成果物、公開ナビゲーション、GitHub Pagesには含めず、PagesワークフローもNovel比較用Webfontを生成しません。
 
 公開サイトは <https://nobigoe.ouvill.net/> です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
 

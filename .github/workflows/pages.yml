@@ -64,18 +64,18 @@ jobs:
           PY
             then
               echo "available=true" >> "$GITHUB_OUTPUT"
-              echo "Found both release ZIPs for $tag"
+              echo "Found both stable release ZIPs for $tag"
               exit 0
             fi
           fi
 
           echo "available=false" >> "$GITHUB_OUTPUT"
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            echo "::notice::Deferring Pages deployment until both release ZIPs for $tag are published"
+            echo "::notice::Deferring Pages deployment until both stable release ZIPs for $tag are published"
             exit 0
           fi
 
-          echo "::error::Both release ZIPs for $tag must exist before deploying Pages"
+          echo "::error::Both stable release ZIPs for $tag must exist before deploying Pages"
           exit 1
 
   build:
@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v2-${{ hashFiles('src/nobigoe_font/profiles.py', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v5-${{ hashFiles('src/nobigoe_font/profiles.py', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -148,7 +148,7 @@ jobs:
           destination.mkdir(exist_ok=True)
           archives = sorted(Path("/tmp/font-release").glob("*.zip"))
           if len(archives) != 2:
-              raise SystemExit(f"Expected two release ZIPs, found {len(archives)}")
+              raise SystemExit(f"Expected two stable release ZIPs, found {len(archives)}")
           for archive in archives:
               with ZipFile(archive) as release:
                   for member in release.infolist():
@@ -193,8 +193,18 @@ jobs:
           )
           parser = VisibleTextParser()
           parser.feed(Path("website/tools/share-images.html").read_text(encoding="utf-8"))
+          hiragana = (
+              "".join(chr(codepoint) for codepoint in range(0x3041, 0x3097))
+              + "\u3099\u309a"
+              + "".join(chr(codepoint) for codepoint in range(0x309D, 0x30A0))
+              + "\U0001B132"
+          )
           Path("/tmp/weight-showcase.txt").write_text(
               "声を、どこまでも。Voice, ever onward."
+              + "春の雨が野の道をぬらし、遠い家の灯りがゆっくり揺れていた。"
+              + "夜はまだ静かに続いている。"
+              + "永漢字山川雨月語本"
+              + hiragana
               + catalog_text
               + "".join(parser.parts),
               encoding="utf-8",
@@ -249,6 +259,8 @@ jobs:
           test -f website/site-dist/index.html
           test -f website/site-dist/tester/index.html
           test -f website/site-dist/glyphs/index.html
+          test ! -e website/site-dist/compare/index.html
+          test -z "$(find website/site-dist/_assets -name '*NobigoeNovelMincho*' -print -quit)"
           test -f website/site-dist/marks-data.json
           test -f website/site-dist/nobigoe-mincho-vertical-specimen.pdf
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"

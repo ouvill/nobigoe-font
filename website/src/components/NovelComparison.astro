@@ -1,0 +1,338 @@
+---
+import { WEIGHTS } from "../data/site";
+
+const representativeHiragana = "あのぬめょゝ";
+const representativeKatakana = "アウシネヮヽ";
+const representativeKanji = "永漢字山川雨月語本";
+const hiraganaProse =
+  "春の雨が野の道をぬらし、遠い家の灯りがゆっくり揺れていた。夜はまだ静かに続いている。";
+const katakanaProse =
+  "窓辺のラジオからクラシックが流れ、テーブルのコーヒーは静かに湯気を立てていた。";
+const verticalProse = `かがはばぱ、なけせきも。カガハバパ、ナケセキモ。${hiraganaProse}${katakanaProse}`;
+const faces = [
+  {
+    key: "noto",
+    name: "Noto",
+    label: "Noto Serif JP",
+    source: "のびごえ明朝 Regularの通常かな",
+  },
+  {
+    key: "koburi",
+    name: "Koburi",
+    label: "のびごえこぶり明朝",
+    source: "源暎こぶり明朝由来",
+  },
+  {
+    key: "novel",
+    name: "Novel",
+    label: "のびごえ小説明朝",
+    source: "同ウェイトのNoto Serif JPを本文向けに変形",
+  },
+] as const;
+const novelFontCss = WEIGHTS.map(
+  (weight) => `
+@font-face {
+  font-family: "Nobigoe Novel Mincho";
+  src: url("${import.meta.env.BASE_URL}src/assets/fonts/NobigoeNovelMincho-${weight.name}-showcase.woff2") format("woff2");
+  font-weight: ${weight.value};
+  font-style: normal;
+  font-display: swap;
+}`,
+).join("\n");
+---
+
+<style is:inline set:html={novelFontCss}></style>
+
+<section
+  class="comparison-app"
+  aria-labelledby="comparison-tool-title"
+  aria-busy="true"
+  data-novel-comparison
+>
+  <header class="comparison-app__header">
+    <p class="comparison-step">比較内容</p>
+    <div>
+      <h2 id="comparison-tool-title">字形、ウェイト、組方向</h2>
+      <p>
+        三書体の代表字、Novelの7ウェイト、横組と縦組の文章見本を順に表示します。文章見本は直接編集できます。
+      </p>
+    </div>
+    <p class="comparison-provenance">
+      Novelは各ウェイトのNoto Serif
+      JP由来のひらがなとカタカナを本文向けに変形した設計です。Koburiの輪郭は使用していません。
+    </p>
+  </header>
+
+  <p class="comparison-font-status" role="status" data-novel-font-status>
+    Novelの比較用Webフォントを読み込んでいます。
+  </p>
+
+  <div class="comparison-overview">
+    <section
+      class="representative-comparison"
+      aria-labelledby="representative-title"
+    >
+      <header class="comparison-section-heading">
+        <p>01 / THREE FACES</p>
+        <h3 id="representative-title">三書体の代表字</h3>
+      </header>
+      <div class="representative-list" role="list">
+        {
+          faces.map((face) => (
+            <article
+              class="representative-row"
+              data-comparison-family={face.key}
+              role="listitem"
+            >
+              <p class="representative-label">
+                <strong>{face.name}</strong>
+                <span>{face.label}</span>
+                <small>{face.source}</small>
+              </p>
+              <div class="representative-specimens">
+                <div class="representative-specimen">
+                  <span class="representative-script-label">
+                    HIRAGANA / ひらがな
+                  </span>
+                  <p
+                    class="representative-glyphs"
+                    lang="ja"
+                    aria-label={`${face.label}のひらがな代表字。あ、の、ぬ、め、小書きのよ、繰り返し記号`}
+                  >
+                    {representativeHiragana}
+                  </p>
+                </div>
+                <div class="representative-specimen">
+                  <span class="representative-script-label">
+                    KATAKANA / カタカナ
+                  </span>
+                  <p
+                    class="representative-glyphs"
+                    lang="ja"
+                    aria-label={`${face.label}のカタカナ代表字。ア、ウ、シ、ネ、小書きのワ、繰り返し記号`}
+                  >
+                    {representativeKatakana}
+                  </p>
+                </div>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="novel-weights" aria-labelledby="novel-weights-title">
+      <header class="comparison-section-heading">
+        <p>02 / SEVEN WEIGHTS</p>
+        <h3 id="novel-weights-title">Novelの7ウェイト</h3>
+      </header>
+      <ol class="novel-weight-list">
+        {
+          WEIGHTS.map((weight) => (
+            <li style={`--comparison-weight: ${weight.value}`}>
+              <span>
+                <strong>{weight.name}</strong>
+                <small>{weight.value}</small>
+              </span>
+              <div class="novel-weight-samples">
+                <p>
+                  <>
+                    <small>ひらがな</small>
+                    <span lang="ja">かがはばぱ</span>
+                  </>
+                </p>
+                <p>
+                  <>
+                    <small>カタカナ</small>
+                    <span lang="ja">カガハバパ</span>
+                  </>
+                </p>
+              </div>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+  </div>
+
+  <section class="comparison-prose" aria-labelledby="comparison-prose-title">
+    <header
+      class="comparison-section-heading comparison-section-heading--prose"
+    >
+      <p>03 / PROSE</p>
+      <h3 id="comparison-prose-title">Novel Regularの横組・縦組</h3>
+      <p>
+        Novelはひらがなとカタカナを本文向けに変形し、漢字の字面をセル中央基準で縮小しています。Latinと約物は土台ののびごえ明朝と共通です。
+      </p>
+    </header>
+
+    <div class="comparison-prose-grid">
+      <article class="prose-sample prose-sample--horizontal">
+        <header>
+          <h4 id="horizontal-prose-title">Novel Regular · 横組</h4>
+          <p id="horizontal-prose-hint">本文を選択して書き換えられます</p>
+        </header>
+        <div
+          class="prose-editor"
+          contenteditable="true"
+          role="textbox"
+          aria-multiline="true"
+          aria-labelledby="horizontal-prose-title"
+          aria-describedby="horizontal-prose-hint"
+          spellcheck="false"
+          lang="ja"
+        >
+          <span>{hiraganaProse}</span><br /><br /><span>{katakanaProse}</span>
+        </div>
+      </article>
+
+      <article class="prose-sample prose-sample--vertical">
+        <header>
+          <h4 id="vertical-prose-title">Novel Regular · 縦組</h4>
+          <p id="vertical-prose-hint">本文を選択して書き換えられます</p>
+        </header>
+        <div
+          class="prose-editor"
+          contenteditable="true"
+          role="textbox"
+          aria-multiline="true"
+          aria-labelledby="vertical-prose-title"
+          aria-describedby="vertical-prose-hint"
+          spellcheck="false"
+          lang="ja"
+        >
+          <span>{hiraganaProse}</span><br /><br /><span>{katakanaProse}</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section
+    class="vertical-face-comparison"
+    aria-labelledby="vertical-face-comparison-title"
+  >
+    <header class="comparison-section-heading">
+      <p>04 / VERTICAL THREE FACES</p>
+      <h3 id="vertical-face-comparison-title">三書体の縦組比較</h3>
+      <p>
+        三書体ともRegular、36px、行送り72px、縦送り1000
+        unitsです。Novelの漢字は送りを保ったまま97.65625%へ縮小しています。
+      </p>
+    </header>
+    <h4 class="vertical-face-subtitle">代表漢字9字</h4>
+    <div class="vertical-face-grid vertical-face-grid--han" role="list">
+      {
+        faces.map((face) => (
+          <article
+            class="vertical-face-sample"
+            data-comparison-family={face.key}
+            role="listitem"
+          >
+            <header>
+              <strong>{face.name} Regular</strong>
+              <span>{face.label}</span>
+            </header>
+            <p lang="ja">{representativeKanji}</p>
+          </article>
+        ))
+      }
+    </div>
+    <h4 class="vertical-face-subtitle">かな・カタカナ・漢字の混植</h4>
+    <div class="vertical-face-grid vertical-face-grid--mixed" role="list">
+      {
+        faces.map((face) => (
+          <article
+            class="vertical-face-sample"
+            data-comparison-family={face.key}
+            role="listitem"
+          >
+            <header>
+              <strong>{face.name} Regular</strong>
+              <span>{face.label}</span>
+            </header>
+            <p lang="ja">{verticalProse}</p>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <details class="comparison-overlay">
+    <summary>
+      <span>任意表示：三書体の簡易重ね表示</span>
+      <span aria-hidden="true">＋</span>
+    </summary>
+    <div class="comparison-overlay__body">
+      <div
+        class="overlay-glyph"
+        role="img"
+        aria-label="Noto、Koburi、Novelの、のとぬを同じ位置に重ねた比較"
+      >
+        <span data-overlay-family="noto" aria-hidden="true">のぬ</span>
+        <span data-overlay-family="koburi" aria-hidden="true">のぬ</span>
+        <span data-overlay-family="novel" aria-hidden="true">のぬ</span>
+      </div>
+      <div class="overlay-explanation">
+        <h3>簡易重ね表示</h3>
+        <p>
+          CSSの文字ストロークで作る簡易比較です。赤がNoto、緑がKoburi、濃色がNovel。正確なアウトライン計測図ではありません。
+        </p>
+        <ul aria-label="重ね表示の凡例">
+          <li><span data-key="noto"></span>Noto</li>
+          <li><span data-key="koburi"></span>Koburi</li>
+          <li><span data-key="novel"></span>Novel</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+</section>
+
+<script>
+  const comparison = document.querySelector<HTMLElement>(
+    "[data-novel-comparison]",
+  );
+
+  if (comparison) {
+    const status = comparison.querySelector<HTMLElement>(
+      "[data-novel-font-status]",
+    );
+    const weights = [200, 300, 400, 500, 600, 700, 900];
+    const requiredFonts = [
+      ...weights.map((weight) => ({
+        declaration: `${weight} 48px "Nobigoe Novel Mincho"`,
+        sample:
+          "かがはばぱなけせきもアウシネヮヽカガハバパナケセキモ永漢字山川雨月語本",
+      })),
+      {
+        declaration: '400 48px "Nobigoe Weight"',
+        sample: "春の雨と窓辺のラジオ",
+      },
+      {
+        declaration: '400 48px "Nobigoe Koburi"',
+        sample: "春の雨と窓辺のラジオ",
+      },
+    ];
+
+    Promise.all(
+      requiredFonts.map(({ declaration, sample }) =>
+        document.fonts.load(declaration, sample),
+      ),
+    )
+      .then((loadedFaces) => {
+        if (loadedFaces.some((faces) => faces.length === 0)) {
+          throw new Error("A required comparison webfont did not load.");
+        }
+        comparison.classList.add("novel-fonts-ready");
+        if (status)
+          status.textContent = "三書体の比較用Webフォントを読み込みました。";
+      })
+      .catch(() => {
+        comparison.classList.add("novel-fonts-failed");
+        if (status) {
+          status.textContent =
+            "比較用Webフォントを読み込めなかったため、一部見本は代替書体で表示しています。";
+        }
+      })
+      .finally(() => comparison.setAttribute("aria-busy", "false"));
+  }
+</script>

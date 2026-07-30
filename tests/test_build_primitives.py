@@ -25,6 +25,11 @@ from nobigoe_font.features import (
 )
 from nobigoe_font.pipeline import (
     COMBINING_MARK_INPUTS,
+    _apply_novel_style,
+    _novel_hiragana_mappings,
+    _novel_katakana_mappings,
+    _native_novel_ccmp_outputs,
+    build,
     import_koburi_ruby,
     SPACING_MARK_INPUTS,
     mark_ligature_rules,
@@ -42,7 +47,12 @@ from nobigoe_font.marks import (
     KOBURI_PUA_MARK_PAIRS,
     KOBURI_PUA_START,
     MANGA_MISSING_SMALL_KANA,
+    MANGA_MARK_PAIRS,
     MarkPlacement,
+)
+from nobigoe_font.novel_katakana import (
+    KATAKANA_CODEPOINTS,
+    KATAKANA_SOURCE_CODEPOINTS,
 )
 
 from nobigoe_font.operations import (
@@ -100,9 +110,7 @@ def minimal_true_type_font() -> TTFont:
     return builder.font
 
 
-def named_true_type_font(
-    glyph_order: list[str], cmap: dict[int, str]
-) -> TTFont:
+def named_true_type_font(glyph_order: list[str], cmap: dict[int, str]) -> TTFont:
     builder = FontBuilder(1000, isTTF=True)
     builder.setupGlyphOrder(glyph_order)
     glyphs = {}
@@ -267,9 +275,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(vertical_end.bounds[1], -20)
         self.assertEqual(vertical_middle.bounds[1::2], (-120, 880))
 
-        manga_isolated, manga_parts = make_manga_wave_parts(
-            rectangle_path(), 1000, 880
-        )
+        manga_isolated, manga_parts = make_manga_wave_parts(rectangle_path(), 1000, 880)
         (
             manga_start,
             manga_middle,
@@ -287,9 +293,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(manga_vertical_isolated.bounds[1::2], (-20, 780))
         self.assertEqual(manga_vertical_start.bounds[3], 780)
         self.assertEqual(manga_vertical_end.bounds[1], -20)
-        self.assertEqual(
-            manga_vertical_middle.bounds[1::2], (-120, 880)
-        )
+        self.assertEqual(manga_vertical_middle.bounds[1::2], (-120, 880))
 
     def test_exclamation_sequences_use_shippori_upright_pua_ligatures(
         self,
@@ -330,9 +334,7 @@ class TrueTypeBuildTests(unittest.TestCase):
             {0xE000: "exclamation", 0xFF1F: "question"},
         )
         exclamation = rectangle_path()
-        question = transform_path(
-            rectangle_path(), Transform(0.5, 0, 0, 1, 250, 0)
-        )
+        question = transform_path(rectangle_path(), Transform(0.5, 0, 0, 1, 250, 0))
         font["glyf"]["exclamation"] = tt_glyph(exclamation, 1000)
         font["glyf"]["question"] = tt_glyph(question, 1000)
 
@@ -352,8 +354,7 @@ class TrueTypeBuildTests(unittest.TestCase):
             for index, codepoint in enumerate(direct_codepoints)
         }
         source_marks = {
-            KOBURI_PUA_START + index: f"source.mark.{index}"
-            for index in range(14)
+            KOBURI_PUA_START + index: f"source.mark.{index}" for index in range(14)
         }
         source_small_ko = ["source.small.hira", "source.small.kata"]
         source_vertical = {
@@ -463,9 +464,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         )
         self.assertEqual(
             imported[missing_small_glyphs[MANGA_MISSING_SMALL_KANA[0]][1]],
-            output_names[
-                source_substitutions[source_vertical[source_small_ko[0]]]
-            ],
+            output_names[source_substitutions[source_vertical[source_small_ko[0]]]],
         )
         self.assertEqual(len(vertical_maps), 44)
         append.assert_called_once_with(
@@ -504,24 +503,16 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertAlmostEqual(right_edge_y, 510)
 
     def test_choon_dakuten_uses_koburi_mark_centers(self) -> None:
-        mark = transform_path(
-            rectangle_path(), Transform(0.2, 0, 0, 0.2, -300, 500)
-        )
-        for orientation, (target_x, target_y) in (
-            CHOON_DAKUTEN_MARK_CENTERS.items()
-        ):
+        mark = transform_path(rectangle_path(), Transform(0.2, 0, 0, 0.2, -300, 500))
+        for orientation, (target_x, target_y) in CHOON_DAKUTEN_MARK_CENTERS.items():
             placed = transform_path(
                 mark,
                 centered_transform(mark, 1, target_x, target_y),
             )
             x_min, y_min, x_max, y_max = placed.bounds
             with self.subTest(orientation=orientation):
-                self.assertAlmostEqual(
-                    (x_min + x_max) / 2, target_x, places=3
-                )
-                self.assertAlmostEqual(
-                    (y_min + y_max) / 2, target_y, places=3
-                )
+                self.assertAlmostEqual((x_min + x_max) / 2, target_x, places=3)
+                self.assertAlmostEqual((y_min + y_max) / 2, target_y, places=3)
 
     def test_feature_source_builds_choon_dakuten_substitutions(self) -> None:
         base_codepoint, mark_codepoint = CHOON_DAKUTEN_PAIR
@@ -534,7 +525,10 @@ class TrueTypeBuildTests(unittest.TestCase):
         wave_names = [f"wave.{index}" for index in range(10)]
         manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
         punctuation_variants = [
-            ("!", ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3")),
+            (
+                "!",
+                ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3"),
+            ),
             ("?", ("question", "question.a1", "question.a2", "question.a3")),
         ]
         glyph_order = list(
@@ -551,11 +545,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                     *wave_names,
                     "manga-wave.base",
                     *manga_wave_names,
-                    *(
-                        name
-                        for _, names in punctuation_variants
-                        for name in names
-                    ),
+                    *(name for _, names in punctuation_variants for name in names),
                 ]
             )
         )
@@ -648,7 +638,10 @@ class TrueTypeBuildTests(unittest.TestCase):
 
     def test_feature_source_builds_punctuation_mark_substitutions(self) -> None:
         punctuation_variants = [
-            ("!", ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3")),
+            (
+                "!",
+                ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3"),
+            ),
             ("?", ("question", "question.a1", "question.a2", "question.a3")),
         ]
         marks = ("dakuten", "handakuten")
@@ -680,11 +673,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                     *wave_names,
                     "manga-wave.base",
                     *manga_wave_names,
-                    *(
-                        name
-                        for _, names in punctuation_variants
-                        for name in names
-                    ),
+                    *(name for _, names in punctuation_variants for name in names),
                 ]
             )
         )
@@ -705,21 +694,14 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         ccmp = feature_ligatures(font, "ccmp")
         self.assertEqual(
-            {
-                (base, mark): ccmp[(base, mark)]
-                for base, mark, _ in punctuation_marks
-            },
-            {
-                (base, mark): output
-                for base, mark, output in punctuation_marks
-            },
+            {(base, mark): ccmp[(base, mark)] for base, mark, _ in punctuation_marks},
+            {(base, mark): output for base, mark, output in punctuation_marks},
         )
         vert = feature_single_substitutions(font, "vert")
         self.assertEqual(
             {output: vert[output] for output in outputs},
             dict(vertical_maps),
         )
-
 
     def test_horizontal_choon_calt_is_added_to_kana_script(self) -> None:
         glyph_order = [
@@ -919,19 +901,13 @@ class TrueTypeBuildTests(unittest.TestCase):
             {0x2661: "unicode.heart", 0xE064: "pua.heart"},
         )
 
-        existing = add_unicode_mapping_if_missing(
-            font, 0xE064, "unicode.heart"
-        )
-        added = add_unicode_mapping_if_missing(
-            font, 0xE065, "unicode.heart"
-        )
+        existing = add_unicode_mapping_if_missing(font, 0xE064, "unicode.heart")
+        added = add_unicode_mapping_if_missing(font, 0xE065, "unicode.heart")
 
         self.assertEqual(existing, "pua.heart")
         self.assertEqual(added, "unicode.heart")
         self.assertEqual(font.getBestCmap()[0xE064], "pua.heart")
         self.assertEqual(font.getBestCmap()[0xE065], "unicode.heart")
-
-
 
     def test_appended_glyph_has_unique_order_and_survives_round_trip(self) -> None:
         font = minimal_true_type_font()
@@ -953,8 +929,6 @@ class TrueTypeBuildTests(unittest.TestCase):
         rebuilt = TTFont(data)
         self.assertEqual(rebuilt.getGlyphOrder(), font.getGlyphOrder())
         self.assertEqual(rebuilt["maxp"].numGlyphs, 3)
-
-
 
     def test_latin_import_merges_source_layout_and_common_numeric_features(
         self,
@@ -993,9 +967,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                 hinted_path = Path(command[command.index("--output") + 1])
                 hinted_path.write_bytes(b"hinted")
 
-            with patch(
-                "nobigoe_font.hinting.subprocess.run", side_effect=fake_run
-            ):
+            with patch("nobigoe_font.hinting.subprocess.run", side_effect=fake_run):
                 autohint_latin_glyphs(
                     output_path,
                     ("latin.A", "latin.B"),
@@ -1025,6 +997,283 @@ class TrueTypeBuildTests(unittest.TestCase):
         ]
         self.assertEqual(target["hmtx"].metrics[target_fi], (550, 44))
         self.assertEqual(bounds(target, target_fi), (44, 88, 506, 660))
+
+
+class NovelKatakanaPipelineTests(unittest.TestCase):
+    def test_native_katakana_ccmp_discovery_includes_vertical_outputs(
+        self,
+    ) -> None:
+        cmap = {
+            0x3099: "dakuten",
+            0x309A: "handakuten",
+            0x30AB: "katakana-ka",
+            0x31F7: "small-katakana-pu",
+            0x30FC: "choon",
+        }
+        ligatures = {
+            ("katakana-ka", "dakuten"): "native-ga",
+            ("katakana-ka.vert", "dakuten"): "native-ga.vert",
+            ("small-katakana-pu", "handakuten"): "native-small-pu",
+            (
+                "small-katakana-pu.vert",
+                "handakuten",
+            ): "native-small-pu.vert",
+            ("choon", "dakuten"): "excluded-choon-dakuten",
+        }
+        with patch(
+            "nobigoe_font.pipeline._font_operations.vertical_glyph_or_self",
+            side_effect=lambda _font, glyph_name: f"{glyph_name}.vert",
+        ):
+            horizontal, vertical = _native_novel_ccmp_outputs(
+                Mock(),
+                cmap,
+                ligatures,
+                KATAKANA_SOURCE_CODEPOINTS,
+            )
+
+        self.assertEqual(
+            horizontal,
+            {
+                (0x30AB, 0x3099): "native-ga",
+                (0x31F7, 0x309A): "native-small-pu",
+            },
+        )
+        self.assertEqual(
+            vertical,
+            {
+                (0x30AB, 0x3099): "native-ga.vert",
+                (0x31F7, 0x309A): "native-small-pu.vert",
+            },
+        )
+        self.assertNotIn(CHOON_DAKUTEN_PAIR, horizontal)
+
+    def test_katakana_mapping_rejects_group_and_vertical_base_conflicts(
+        self,
+    ) -> None:
+        with (
+            patch(
+                "nobigoe_font.pipeline._font_operations.vertical_glyph_or_self",
+                side_effect=lambda _font, glyph_name: glyph_name,
+            ),
+            self.assertRaisesRegex(
+                ValueError,
+                "Conflicting novel katakana groups",
+            ),
+        ):
+            _novel_katakana_mappings(
+                Mock(),
+                {0x30A2: "shared", 0x30A4: "shared"},
+                {},
+                {},
+                {},
+            )
+
+        with (
+            patch(
+                "nobigoe_font.pipeline._font_operations.vertical_glyph_or_self",
+                return_value="shared.vert",
+            ),
+            self.assertRaisesRegex(
+                ValueError,
+                "Conflicting novel katakana groups",
+            ),
+        ):
+            _novel_katakana_mappings(
+                Mock(),
+                {0x30A2: "katakana-a", 0x30A4: "katakana-i"},
+                {},
+                {},
+                {},
+            )
+
+    def test_hiragana_mapping_preserves_ka_identity_for_all_derivatives(
+        self,
+    ) -> None:
+        cmap = {
+            ord("か"): "ka",
+            ord("が"): "ga",
+            ord("き"): "ki",
+        }
+        mark_outputs = {
+            (ord("か"), 0x3099): "ka.comb",
+        }
+        with patch(
+            "nobigoe_font.pipeline._font_operations.vertical_glyph_or_self",
+            side_effect=lambda _font, glyph_name: glyph_name,
+        ):
+            (
+                horizontal,
+                vertical,
+                vertical_codepoints,
+                vertical_marked,
+                horizontal_codepoints,
+            ) = _novel_hiragana_mappings(
+                Mock(),
+                cmap,
+                mark_outputs,
+                {},
+                {},
+            )
+
+        self.assertEqual(
+            {name: horizontal[name] for name in ("ka", "ga", "ka.comb", "ki")},
+            {
+                "ka": "normal",
+                "ga": "normal",
+                "ka.comb": "normal",
+                "ki": "normal",
+            },
+        )
+        self.assertEqual(
+            horizontal_codepoints,
+            {
+                "ka": ord("か"),
+                "ga": ord("が"),
+                "ka.comb": ord("か"),
+                "ki": ord("き"),
+            },
+        )
+        self.assertEqual(vertical, {})
+        self.assertEqual(vertical_codepoints, {})
+        self.assertEqual(vertical_marked, frozenset())
+
+    def test_complete_katakana_mappings_and_novel_apply_order(self) -> None:
+        self.assertEqual(len(KATAKANA_SOURCE_CODEPOINTS), 109)
+        target_pairs = tuple(
+            pair for pair in MANGA_MARK_PAIRS if pair[0] in KATAKANA_CODEPOINTS
+        )
+        self.assertEqual(len(target_pairs), 93)
+
+        cmap = {
+            codepoint: f"encoded.{codepoint:05X}"
+            for codepoint in KATAKANA_SOURCE_CODEPOINTS
+        }
+        excluded_names = {
+            0x30FB: "excluded.middle-dot",
+            0x30FC: "excluded.choon",
+            0xFF71: "excluded.halfwidth-a",
+        }
+        cmap.update(excluded_names)
+        mark_outputs = {
+            pair: (f"native.ccmp.{index}" if index < 14 else f"generated.ccmp.{index}")
+            for index, pair in enumerate(target_pairs)
+        }
+        mark_outputs[CHOON_DAKUTEN_PAIR] = "excluded.choon.ccmp"
+        vertical_mark_outputs = {
+            pair: f"{glyph_name}.vert" for pair, glyph_name in mark_outputs.items()
+        }
+        generated_small = ("generated.small-ko", "generated.small-ko.vert")
+        missing_small_glyphs = {0x1B155: generated_small}
+        no_distinct_vertical = 0x30FF
+
+        def vertical_glyph_or_self(_font, glyph_name):
+            if glyph_name == cmap[no_distinct_vertical]:
+                return glyph_name
+            return f"{glyph_name}.vert"
+
+        with patch(
+            "nobigoe_font.pipeline._font_operations.vertical_glyph_or_self",
+            side_effect=vertical_glyph_or_self,
+        ):
+            katakana_mappings = _novel_katakana_mappings(
+                Mock(),
+                cmap,
+                mark_outputs,
+                vertical_mark_outputs,
+                missing_small_glyphs,
+            )
+
+        horizontal, vertical, vertical_codepoints, vertical_marked = katakana_mappings
+        self.assertEqual(len(horizontal), 203)
+        self.assertEqual(len(vertical), 202)
+        self.assertFalse(horizontal.keys() & vertical.keys())
+        self.assertEqual(horizontal[cmap[0x30A2]], "curve")
+        self.assertEqual(horizontal[cmap[0x31F7]], "small")
+        self.assertEqual(horizontal[generated_small[0]], "small")
+        core_pair = (0x30A2, 0x3099)
+        self.assertEqual(horizontal[mark_outputs[core_pair]], "curve")
+        self.assertEqual(
+            vertical[vertical_mark_outputs[core_pair]],
+            "curve",
+        )
+        self.assertEqual(
+            vertical_codepoints[vertical_mark_outputs[core_pair]],
+            0x30A2,
+        )
+        self.assertIn(vertical_mark_outputs[core_pair], vertical_marked)
+        self.assertEqual(vertical[generated_small[1]], "small")
+        self.assertEqual(vertical_codepoints[generated_small[1]], 0x1B155)
+        for excluded_name in (*excluded_names.values(), "excluded.choon.ccmp"):
+            self.assertNotIn(excluded_name, horizontal)
+            self.assertNotIn(excluded_name, vertical)
+
+        hiragana_mappings = (
+            {"hiragana": "normal"},
+            {"hiragana.vert": "normal"},
+            {"hiragana.vert": 0x3042},
+            frozenset(),
+            {"hiragana": 0x3042},
+        )
+        font = Mock()
+        calls = Mock()
+        with (
+            patch("nobigoe_font.pipeline.apply_novel_hiragana") as hiragana,
+            patch("nobigoe_font.pipeline.apply_novel_katakana") as katakana,
+            patch("nobigoe_font.pipeline.apply_novel_han") as han,
+        ):
+            calls.attach_mock(hiragana, "hiragana")
+            calls.attach_mock(katakana, "katakana")
+            calls.attach_mock(han, "han")
+            _apply_novel_style(
+                font,
+                400,
+                "novel",
+                hiragana_mappings,
+                katakana_mappings,
+            )
+
+        hiragana.assert_called_once_with(
+            font,
+            400,
+            *hiragana_mappings[:4],
+            horizontal_codepoints=hiragana_mappings[4],
+        )
+        katakana.assert_called_once_with(font, 400, *katakana_mappings)
+        han.assert_called_once_with(font)
+        self.assertEqual(
+            [call[0] for call in calls.mock_calls],
+            ["hiragana", "katakana", "han"],
+        )
+
+    def test_default_and_koburi_styles_do_not_apply_novel_transforms(self) -> None:
+        font = Mock()
+        with (
+            patch("nobigoe_font.pipeline.apply_novel_hiragana") as hiragana,
+            patch("nobigoe_font.pipeline.apply_novel_katakana") as katakana,
+            patch("nobigoe_font.pipeline.apply_novel_han") as han,
+        ):
+            _apply_novel_style(font, 400, "noto")
+            with self.assertRaisesRegex(
+                ValueError,
+                "--kana-style novel requires --base noto",
+            ):
+                build(
+                    Path("source.otf"),
+                    None,
+                    Path("ruby.otf"),
+                    Path("punctuation.otf"),
+                    Path("sans.otf"),
+                    Path("output.otf"),
+                    Mock(),
+                    Mock(),
+                    0,
+                    "koburi",
+                    kana_style="novel",
+                )
+
+        hiragana.assert_not_called()
+        katakana.assert_not_called()
+        han.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from pathlib import Path
 from nobigoe_font.profiles import (
     DirectSource,
     KOBURI_ARCHIVE_SHA256,
+    KANA_STYLES,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
     LATIN_FAMILIES,
     LIBERTINUS_ARCHIVE_SHA256,
@@ -58,6 +59,21 @@ class FontProfileTests(unittest.TestCase):
             Path("dist/NobigoeMincho-Medium.otf"),
         )
 
+    def test_novel_identity_is_explicit_and_keeps_noto_default(self) -> None:
+        default_identity = font_identity("noto", "Regular")
+        novel = font_identity("noto", "Regular", "novel")
+        self.assertEqual(KANA_STYLES, ("noto", "novel"))
+        self.assertEqual(default_identity.family, "Nobigoe Mincho")
+        self.assertEqual(novel.family, "Nobigoe Novel Mincho")
+        self.assertEqual(novel.japanese_family, "のびごえ小説明朝")
+        self.assertEqual(novel.postscript_name, "NobigoeNovelMincho-Regular")
+        self.assertEqual(
+            default_output_path(novel, "noto"),
+            Path("dist/NobigoeNovelMincho-Regular.otf"),
+        )
+        with self.assertRaisesRegex(ValueError, "requires --base noto"):
+            font_identity("koburi", "Regular", "novel")
+
     def test_regular_and_bold_share_legacy_family(self) -> None:
         for weight in ("Regular", "Bold"):
             with self.subTest(weight=weight):
@@ -91,9 +107,7 @@ class FontProfileTests(unittest.TestCase):
 
                 shippori = shippori_source(weight)
                 self.assertIsInstance(shippori, ZipMemberSource)
-                self.assertTrue(
-                    shippori.member.startswith("ShipporiMincho-OTF-")
-                )
+                self.assertTrue(shippori.member.startswith("ShipporiMincho-OTF-"))
                 self.assertEqual(len(shippori.sha256), 64)
 
         self.assertEqual(len(SHIPPORI_ARCHIVE_SHA256), 64)
@@ -107,33 +121,20 @@ class FontProfileTests(unittest.TestCase):
             },
             {
                 "ExtraLight": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Regular.otf"
+                    "Libertinus-7.051/static/OTF/" "LibertinusSerif-Regular.otf"
                 ),
-                "Light": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Regular.otf"
-                ),
+                "Light": ("Libertinus-7.051/static/OTF/" "LibertinusSerif-Regular.otf"),
                 "Regular": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Regular.otf"
+                    "Libertinus-7.051/static/OTF/" "LibertinusSerif-Regular.otf"
                 ),
                 "Medium": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Regular.otf"
+                    "Libertinus-7.051/static/OTF/" "LibertinusSerif-Regular.otf"
                 ),
                 "SemiBold": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Semibold.otf"
+                    "Libertinus-7.051/static/OTF/" "LibertinusSerif-Semibold.otf"
                 ),
-                "Bold": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Bold.otf"
-                ),
-                "Black": (
-                    "Libertinus-7.051/static/OTF/"
-                    "LibertinusSerif-Bold.otf"
-                ),
+                "Bold": ("Libertinus-7.051/static/OTF/" "LibertinusSerif-Bold.otf"),
+                "Black": ("Libertinus-7.051/static/OTF/" "LibertinusSerif-Bold.otf"),
             },
         )
         for weight in NOTO_WEIGHT_CLASSES:
@@ -208,7 +209,6 @@ class FontProfileTests(unittest.TestCase):
             },
         )
 
-
     def test_koburi_ruby_weight_adjustments_cover_every_noto_weight(self) -> None:
         self.assertEqual(
             KOBURI_RUBY_STROKE_ADJUSTMENTS,
@@ -223,17 +223,12 @@ class FontProfileTests(unittest.TestCase):
             },
         )
 
-
     def test_release_version_tracks_feature_change(self) -> None:
         self.assertEqual(VERSION_NUMBER, "1.033")
 
     def test_missing_sans_weights_use_nearest_static_sources(self) -> None:
-        self.assertEqual(
-            noto_sans_source("ExtraLight").filename, "NotoSansJP-Thin.otf"
-        )
-        self.assertEqual(
-            noto_sans_source("SemiBold").filename, "NotoSansJP-Bold.otf"
-        )
+        self.assertEqual(noto_sans_source("ExtraLight").filename, "NotoSansJP-Thin.otf")
+        self.assertEqual(noto_sans_source("SemiBold").filename, "NotoSansJP-Bold.otf")
 
     def test_shippori_ligatures_follow_available_weights(self) -> None:
         self.assertEqual(
