@@ -167,9 +167,10 @@ def ascii_true_type_font(width: int, role: str) -> TTFont:
         features = (
             "languagesystem latn dflt;\n"
             f"feature liga {{ sub {cmap[0x66]} {cmap[0x69]} by {fi_ligature}; }} liga;\n"
-            f"feature pnum {{ sub {cmap[0x30]} by {zero_alternate}; }} pnum;"
+            f"feature pnum {{ sub {cmap[0x30]} by {zero_alternate}; }} pnum;\n"
+            f"feature kern {{ pos {cmap[0x41]} {cmap[0x56]} -40; }} kern;"
         )
-    addOpenTypeFeaturesFromString(font, features, tables={"GSUB"})
+    addOpenTypeFeaturesFromString(font, features, tables={"GSUB", "GPOS"})
     return font
 
 
@@ -1195,6 +1196,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         )
         self.assertIn(target_cmap[0x30], target_pnum)
         self.assertIn(target_pnum[target_cmap[0x30]], result.glyph_names)
+        self.assertIn("GPOS", target)
 
     def test_autohint_limits_processing_to_imported_glyphs(self) -> None:
         with TemporaryDirectory() as temporary_directory:

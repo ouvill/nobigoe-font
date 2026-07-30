@@ -17,6 +17,7 @@ from nobigoe_font.profiles import (
     SHIPPORI_STROKE_ADJUSTMENTS,
     SOURCE_SERIF_ARCHIVE_SHA256,
     STIX_TWO_OTF_SHA256,
+    STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS,
     ZipMemberSource,
     default_output_path,
     font_identity,
@@ -182,8 +183,33 @@ class FontProfileTests(unittest.TestCase):
             latin_build_profile("stix-two-text", "Regular").scale_factor,
             1.110,
         )
-        with self.assertRaisesRegex(ValueError, "no native ExtraLight"):
-            stix_two_text_source("ExtraLight")
+        self.assertEqual(
+            STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS,
+            {
+                "Regular": -10,
+                "Medium": -12,
+                "SemiBold": -14,
+                "Bold": -15,
+            },
+        )
+        self.assertEqual(
+            set(STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS),
+            set(STIX_TWO_OTF_SHA256),
+        )
+        for weight, adjustment in STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS.items():
+            with self.subTest(stix_weight=weight):
+                self.assertEqual(
+                    latin_build_profile(
+                        "stix-two-text", weight
+                    ).horizontal_stroke_adjustment,
+                    adjustment,
+                )
+        for unsupported_weight in ("ExtraLight", "Light", "Black"):
+            with self.subTest(unsupported_stix_weight=unsupported_weight):
+                with self.assertRaisesRegex(
+                    ValueError, f"no native {unsupported_weight}"
+                ):
+                    stix_two_text_source(unsupported_weight)
 
         source_serif = source_serif_source()
         self.assertIsInstance(source_serif, ZipMemberSource)

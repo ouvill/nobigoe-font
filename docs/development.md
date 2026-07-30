@@ -61,7 +61,7 @@ Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです�
 
 `--autohint`を指定すると、生成後にAFDKO `otfautohint`を実行します。処理対象は今回取り込んだ欧文字形だけに限定し、Noto Serif JP由来の和文字形の既存ヒントには触れません。`otfautohint`が見つからない場合はエラーにして、未ヒントの成果物を正常終了として扱いません。
 
-`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍で取り込みます。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。
+`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍したうえで縦画を中心に-10、-12、-14、-15 units補正します。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。STIX Two Textの補正値は、1.110倍後の`A–Z`・`a–z`・`0–9`について、各字の輪郭面積を送り幅で割り、同ウェイトのNoto Serif JP欧文との差の平均絶対誤差を-40〜0 unitsの整数候補中で最小にする値です。
 
 ```sh
 # Noto版Regular
