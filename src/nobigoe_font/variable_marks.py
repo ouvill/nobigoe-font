@@ -1,14 +1,16 @@
-"""CFF2 variable-font kana and combining-mark generation."""
+"""CFF2 variable-font kana-mark and joining-symbol generation."""
 
 from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
 
 import pathops
 from fontTools.cffLib import TopDict
+from fontTools.misc.bezierTools import solveCubic, splitCubicAtT
 from fontTools.misc.fixedTools import floatToFixedToFloat
 from fontTools.otlLib.builder import (
     buildLigatureSubstSubtable,
@@ -16,12 +18,14 @@ from fontTools.otlLib.builder import (
     buildSingleSubstSubtable,
 )
 from fontTools.pens.filterPen import DecomposingFilterPen
+from fontTools.pens.recordingPen import RecordingPen, replayRecording
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.tables import otTables
 from fontTools.varLib.cff import CFF2CharStringMergePen
 from fontTools.varLib.models import normalizeValue, piecewiseLinearMap
 
 from . import geometry
+from .features import merge_features, symbol_feature_source
 from .marks import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
@@ -40,7 +44,21 @@ from .operations import (
     allocate_cid_names,
     feature_ligatures,
     feature_single_substitutions,
+    remove_repeated_ligatures,
     vertical_glyph_or_self,
+)
+from .pipeline import (
+    MANGA_WAVE_GLYPH_COUNT,
+    NEW_GLYPH_COUNT,
+    RELAXED_WAVE_GLYPH_COUNT,
+    WAVE_GLYPH_COUNT,
+    WAVE_SELECTOR_GLYPH_COUNT,
+    flatten_horizontal_centerline,
+    make_horizontal_parts,
+    make_manga_wave_parts,
+    make_relaxed_wave_parts,
+    make_vertical_parts,
+    make_wave_parts,
 )
 from .profiles import NOTO_WEIGHT_CLASSES
 from .version import VERSION, VERSION_NUMBER
@@ -48,6 +66,7 @@ from .version import VERSION, VERSION_NUMBER
 _STYLES = tuple(NOTO_WEIGHT_CLASSES.items())
 _WEIGHTS = tuple(value for _, value in _STYLES)
 _SPACING = {0x3099: 0x309B, 0x309A: 0x309C}
+_SYMBOL_VERTICAL_ORIGIN = 880
 
 
 def _scalar(x: float, support: tuple[float, float, float]) -> float:
@@ -233,6 +252,7 @@ def _append_glyphs(
     model: _DeltaModel,
     vsindex: int,
     metric_source: str,
+    vertical_origin: int = 880,
 ) -> None:
     fd_index = top.FDSelect[font.getGlyphID(metric_source)]
     private = top.FDArray[fd_index].Private
@@ -252,7 +272,10 @@ def _append_glyphs(
         top.FDSelect.gidArray.append(fd_index)
         x_min, _, _, y_max = outlines[0].bounds
         font["hmtx"].metrics[name] = (advance, math.floor(x_min))
-        font["vmtx"].metrics[name] = (vertical_advance, math.floor(880 - y_max))
+        font["vmtx"].metrics[name] = (
+            vertical_advance,
+            math.floor(vertical_origin - y_max),
+        )
         names.append(name)
     order = [*font.getGlyphOrder(), *names]
     font.setGlyphOrder(order)
@@ -263,6 +286,482 @@ def _append_glyphs(
             if attribute.endswith("Map") and varmap is not None:
                 for name in names:
                     varmap.mapping[name] = otTables.NO_VARIATION_INDEX
+
+
+def _replace_var_glyph(
+    font: TTFont,
+    top: TopDict,
+    name: str,
+    outlines: Sequence[pathops.Path],
+    vertical_origin: int,
+    model: _DeltaModel,
+    vsindex: int,
+) -> None:
+    glyph_id = font.getGlyphID(name)
+    fd_index = top.FDSelect[glyph_id]
+    charstring = _charstring(
+        name,
+        outlines,
+        top.FDArray[fd_index].Private,
+        font["CFF2"].cff.GlobalSubrs,
+        model,
+        vsindex,
+    )
+    index = top.CharStrings.charStrings[name]
+    top.CharStrings.charStringsIndex[index] = charstring
+    x_min, _, _, y_max = outlines[0].bounds
+    advance = font["hmtx"].metrics[name][0]
+    vertical_advance = font["vmtx"].metrics[name][0]
+    font["hmtx"].metrics[name] = (advance, math.floor(x_min))
+    font["vmtx"].metrics[name] = (
+        vertical_advance,
+        math.floor(vertical_origin - y_max),
+    )
+
+
+@dataclass(frozen=True)
+class _ContourSegment:
+    start: tuple[float, float]
+    controls: tuple[tuple[float, float], ...]
+    end: tuple[float, float]
+
+    def split(self, t: float) -> tuple[_ContourSegment, _ContourSegment]:
+        if not self.controls:
+            point = (
+                self.start[0] + (self.end[0] - self.start[0]) * t,
+                self.start[1] + (self.end[1] - self.start[1]) * t,
+            )
+            return (
+                _ContourSegment(self.start, (), point),
+                _ContourSegment(point, (), self.end),
+            )
+        left, right = splitCubicAtT(self.start, *self.controls, self.end, t)
+        return (
+            _ContourSegment(left[0], tuple(left[1:3]), left[3]),
+            _ContourSegment(right[0], tuple(right[1:3]), right[3]),
+        )
+
+    def draw(self, pen) -> None:
+        if self.controls:
+            pen.curveTo(*self.controls, self.end)
+        else:
+            pen.lineTo(self.end)
+
+
+def _contour_segments(source: pathops.Path) -> list[_ContourSegment]:
+    recording = RecordingPen()
+    source.draw(recording)
+    segments = []
+    contour_start = None
+    current = None
+    closed = False
+    for operation, points in recording.value:
+        if operation == "moveTo":
+            if contour_start is not None:
+                raise ValueError("The variable choon source must have one contour")
+            contour_start = current = points[0]
+        elif operation == "lineTo":
+            if current is None:
+                raise ValueError("The variable choon source has no contour start")
+            segments.append(_ContourSegment(current, (), points[0]))
+            current = points[0]
+        elif operation == "curveTo":
+            if current is None or len(points) != 3:
+                raise ValueError("The variable choon source must use cubic curves")
+            segments.append(_ContourSegment(current, tuple(points[:2]), points[2]))
+            current = points[2]
+        elif operation == "closePath":
+            if current is None or contour_start is None:
+                raise ValueError("The variable choon source has no contour start")
+            if current != contour_start:
+                segments.append(_ContourSegment(current, (), contour_start))
+            closed = True
+        else:
+            raise ValueError(
+                f"Unsupported variable choon contour operation: {operation}"
+            )
+    if not closed or not segments:
+        raise ValueError("The variable choon source must be a closed contour")
+    return segments
+
+
+def _segment_crossings(
+    segment: _ContourSegment, coordinate: int, seam: float
+) -> list[float]:
+    if not segment.controls:
+        distance = segment.end[coordinate] - segment.start[coordinate]
+        roots = [] if distance == 0 else [(seam - segment.start[coordinate]) / distance]
+    else:
+        p0 = segment.start[coordinate]
+        p1 = segment.controls[0][coordinate]
+        p2 = segment.controls[1][coordinate]
+        p3 = segment.end[coordinate]
+        roots = solveCubic(
+            -p0 + 3 * p1 - 3 * p2 + p3,
+            3 * p0 - 6 * p1 + 3 * p2,
+            -3 * p0 + 3 * p1,
+            p0 - seam,
+        )
+    result = []
+    for root in roots:
+        try:
+            t = float(root)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(t) and 1e-9 < t < 1 - 1e-9:
+            result.append(t)
+    return result
+
+
+def _cap_between(
+    segments: Sequence[_ContourSegment],
+    start_crossing: tuple[int, float],
+    end_crossing: tuple[int, float],
+    coordinate: int,
+    seam: float,
+) -> pathops.Path:
+    start_index, start_t = start_crossing
+    end_index, end_t = end_crossing
+    if start_index == end_index:
+        raise ValueError("The variable choon crossings must use separate segments")
+    _, first = segments[start_index].split(start_t)
+    last, _ = segments[end_index].split(end_t)
+
+    def snap(point: tuple[float, float]) -> tuple[float, float]:
+        values = list(point)
+        values[coordinate] = seam
+        return values[0], values[1]
+
+    first = _ContourSegment(snap(first.start), first.controls, first.end)
+    last = _ContourSegment(last.start, last.controls, snap(last.end))
+    result = pathops.Path()
+    pen = result.getPen()
+    pen.moveTo(first.start)
+    first.draw(pen)
+    index = (start_index + 1) % len(segments)
+    while index != end_index:
+        segments[index].draw(pen)
+        index = (index + 1) % len(segments)
+    last.draw(pen)
+    pen.closePath()
+    return result
+
+
+def _split_caps(
+    source: pathops.Path, axis: str, seam: float
+) -> tuple[pathops.Path, pathops.Path]:
+    coordinate = 0 if axis == "horizontal" else 1
+    segments = _contour_segments(source)
+    crossings = sorted(
+        (index, t)
+        for index, segment in enumerate(segments)
+        for t in _segment_crossings(segment, coordinate, seam)
+    )
+    if len(crossings) != 2:
+        raise ValueError(f"The variable choon must cross its {axis} seam exactly twice")
+    first = _cap_between(segments, crossings[0], crossings[1], coordinate, seam)
+    second = _cap_between(segments, crossings[1], crossings[0], coordinate, seam)
+
+    def side(outline: pathops.Path) -> str | None:
+        low, high = (
+            (outline.bounds[0], outline.bounds[2])
+            if coordinate == 0
+            else (outline.bounds[1], outline.bounds[3])
+        )
+        if high <= seam + 0.01:
+            return "low"
+        if low >= seam - 0.01:
+            return "high"
+        return None
+
+    first_side, second_side = side(first), side(second)
+    if (first_side, second_side) == ("low", "high"):
+        return first, second
+    if (first_side, second_side) == ("high", "low"):
+        return second, first
+    raise ValueError(f"The variable choon {axis} caps overlap their seam")
+
+
+def _overlaid_path(*outlines: pathops.Path) -> pathops.Path:
+    result = pathops.Path()
+    pen = result.getPen()
+    for outline in outlines:
+        outline.draw(pen)
+    return result
+
+
+def _cap_cut_span(outline: pathops.Path, axis: str) -> tuple[float, float]:
+    recording = RecordingPen()
+    outline.draw(recording)
+    start = next(
+        points[0] for operation, points in recording.value if operation == "moveTo"
+    )
+    end = next(
+        points[-1]
+        for operation, points in reversed(recording.value)
+        if operation in {"lineTo", "curveTo"}
+    )
+    coordinate = 1 if axis == "horizontal" else 0
+    return tuple(sorted((start[coordinate], end[coordinate])))
+
+
+def _split_horizontal_parts(
+    outline: pathops.Path, advance: int
+) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
+    seam = advance / 2
+    start_cap, end_cap = _split_caps(outline, "horizontal", seam)
+    y_min, y_max = _cap_cut_span(start_cap, "horizontal")
+    start_bar = geometry.rectangle(seam, y_min, advance, y_max)
+    middle = geometry.rectangle(0, y_min, advance, y_max)
+    end_bar = geometry.rectangle(0, y_min, seam, y_max)
+    return (
+        _overlaid_path(start_cap, start_bar),
+        middle,
+        _overlaid_path(end_bar, end_cap),
+    )
+
+
+def _split_vertical_parts(
+    outline: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
+    seam = advance * 0.4
+    bottom_cap, top_cap = _split_caps(outline, "vertical", seam)
+    x_min, x_max = _cap_cut_span(bottom_cap, "vertical")
+    cell_top = vertical_origin
+    cell_bottom = vertical_origin - advance
+    start_bar = geometry.rectangle(x_min, cell_bottom, x_max, seam)
+    middle = geometry.rectangle(x_min, cell_bottom, x_max, cell_top)
+    end_bar = geometry.rectangle(x_min, seam, x_max, cell_top)
+    return (
+        _overlaid_path(top_cap, start_bar),
+        middle,
+        _overlaid_path(end_bar, bottom_cap),
+    )
+
+
+def _pad_degenerate_curves(
+    outline: pathops.Path, count: int, *, at_start: bool
+) -> pathops.Path:
+    if count == 0:
+        return outline
+    recording = RecordingPen()
+    outline.draw(recording)
+    commands = list(recording.value)
+    if at_start:
+        index = next(
+            i for i, (operation, _) in enumerate(commands) if operation == "moveTo"
+        )
+        point = commands[index][1][0]
+        insert_at = index + 1
+    else:
+        insert_at = max(
+            i for i, (operation, _) in enumerate(commands) if operation == "closePath"
+        )
+        point = commands[insert_at - 1][1][-1]
+    commands[insert_at:insert_at] = [
+        ("curveTo", (point, point, point)) for _ in range(count)
+    ]
+    result = pathops.Path()
+    replayRecording(commands, result.getPen())
+    return result
+
+
+def _normalize_vertical_parts(
+    masters: Sequence[tuple[pathops.Path, pathops.Path, pathops.Path]],
+) -> list[tuple[pathops.Path, pathops.Path, pathops.Path]]:
+    # At y=400 the Black master crosses the next source curve. Degenerate
+    # cubics preserve each exact cap while equalizing the CFF2 command topology.
+    start_count = max(len(parts[0].verbs) for parts in masters)
+    end_count = max(len(parts[2].verbs) for parts in masters)
+    return [
+        (
+            _pad_degenerate_curves(
+                start,
+                start_count - len(start.verbs),
+                at_start=True,
+            ),
+            middle,
+            _pad_degenerate_curves(
+                end,
+                end_count - len(end.verbs),
+                at_start=False,
+            ),
+        )
+        for start, middle, end in masters
+    ]
+
+
+def _named_master_outlines(names: Sequence[str], masters):
+    return [
+        (
+            name,
+            [master[index] for master in masters],
+        )
+        for index, name in enumerate(names)
+    ]
+
+
+def _append_symbols(
+    font: TTFont,
+    top: TopDict,
+    cmap: Mapping[int, str],
+    paths: Mapping[int, Mapping[str, pathops.Path]],
+    vertical_sources: Mapping[str, str],
+    model: _DeltaModel,
+    vsindex: int,
+) -> None:
+    allocated = allocate_cid_names(
+        font,
+        2 * NEW_GLYPH_COUNT
+        + WAVE_GLYPH_COUNT
+        + RELAXED_WAVE_GLYPH_COUNT
+        + WAVE_SELECTOR_GLYPH_COUNT
+        + MANGA_WAVE_GLYPH_COUNT,
+    )
+    extensions = []
+    offset = 0
+    for prefix, codepoint in (("choon", 0x30FC), ("dash", 0x2015)):
+        base = cmap[codepoint]
+        vertical = vertical_sources[base]
+        names = allocated[offset : offset + NEW_GLYPH_COUNT]
+        offset += NEW_GLYPH_COUNT
+        masters = []
+        if codepoint == 0x30FC:
+            horizontal_masters = []
+            vertical_masters = []
+            for weight in _WEIGHTS:
+                horizontal_outline = flatten_horizontal_centerline(
+                    paths[weight][base], 1000
+                )
+                horizontal_masters.append(
+                    _split_horizontal_parts(horizontal_outline, 1000)
+                )
+                vertical_masters.append(
+                    _split_vertical_parts(
+                        paths[weight][vertical],
+                        1000,
+                        _SYMBOL_VERTICAL_ORIGIN,
+                    )
+                )
+            vertical_masters = _normalize_vertical_parts(vertical_masters)
+            masters = [
+                horizontal + vertical_parts
+                for horizontal, vertical_parts in zip(
+                    horizontal_masters, vertical_masters, strict=True
+                )
+            ]
+        else:
+            for weight in _WEIGHTS:
+                horizontal = make_horizontal_parts(paths[weight][base], 1000)
+                vertical_parts = make_vertical_parts(
+                    paths[weight][vertical], 1000, _SYMBOL_VERTICAL_ORIGIN
+                )
+                masters.append(horizontal + vertical_parts)
+        _append_glyphs(
+            font,
+            top,
+            _named_master_outlines(names, masters),
+            model,
+            vsindex,
+            base,
+            _SYMBOL_VERTICAL_ORIGIN,
+        )
+        extensions.append((prefix, base, vertical, names))
+
+    wave_base = cmap[0x301C]
+    wave_vertical = vertical_sources[wave_base]
+    wave_names = allocated[offset : offset + WAVE_GLYPH_COUNT]
+    offset += WAVE_GLYPH_COUNT
+    wave_masters = []
+    for weight in _WEIGHTS:
+        wave_masters.append(
+            make_wave_parts(paths[weight][wave_base], 1000, _SYMBOL_VERTICAL_ORIGIN)
+        )
+    _append_glyphs(
+        font,
+        top,
+        _named_master_outlines(wave_names, wave_masters),
+        model,
+        vsindex,
+        wave_base,
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+    wave = ("wave", wave_base, wave_vertical, wave_names)
+
+    relaxed_names = allocated[offset : offset + RELAXED_WAVE_GLYPH_COUNT]
+    offset += RELAXED_WAVE_GLYPH_COUNT
+    relaxed_masters = []
+    for weight in _WEIGHTS:
+        relaxed_masters.append(
+            make_relaxed_wave_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        _named_master_outlines(relaxed_names, relaxed_masters),
+        model,
+        vsindex,
+        wave_base,
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+
+    selector_seed = allocated[offset]
+    offset += WAVE_SELECTOR_GLYPH_COUNT
+    _append_glyphs(
+        font,
+        top,
+        [(selector_seed, [paths[weight][wave_base] for weight in _WEIGHTS])],
+        model,
+        vsindex,
+        wave_base,
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+    relaxed_wave = (
+        "relaxed_wave",
+        wave_base,
+        wave_vertical,
+        cmap[0x7E],
+        selector_seed,
+        relaxed_names,
+    )
+
+    manga_base = cmap[0x3030]
+    manga_names = allocated[offset : offset + MANGA_WAVE_GLYPH_COUNT]
+    manga_isolated = []
+    manga_masters = []
+    for weight in _WEIGHTS:
+        isolated, parts = make_manga_wave_parts(
+            paths[weight][wave_base], 1000, _SYMBOL_VERTICAL_ORIGIN
+        )
+        manga_isolated.append(isolated)
+        manga_masters.append(parts)
+    _replace_var_glyph(
+        font,
+        top,
+        manga_base,
+        manga_isolated,
+        _SYMBOL_VERTICAL_ORIGIN,
+        model,
+        vsindex,
+    )
+    _append_glyphs(
+        font,
+        top,
+        _named_master_outlines(manga_names, manga_masters),
+        model,
+        vsindex,
+        manga_base,
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+    manga_wave = ("manga_wave", manga_base, manga_names)
+    merge_features(
+        font,
+        symbol_feature_source(extensions, wave, relaxed_wave, manga_wave),
+    )
 
 
 def _append_lookup(font: TTFont, tags: set[str], subtable) -> None:
@@ -350,7 +849,7 @@ def _rename_font(font: TTFont) -> None:
 
 
 def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) -> None:
-    """Write a Noto Serif JP CFF2 VF with reviewed kana mark outputs."""
+    """Write a Noto Serif JP CFF2 VF with reviewed marks and joining symbols."""
     font = TTFont(source_path, fontNumber=face)
     top, locations = _validate(font)
     original_order = list(font.getGlyphOrder())
@@ -371,6 +870,11 @@ def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) ->
         0x3042,
         0x3053,
         0x30B3,
+        0x7E,
+        0x2015,
+        0x301C,
+        0x3030,
+        0xFF5E,
         0x3099,
         0x309A,
         0x309B,
@@ -383,6 +887,8 @@ def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) ->
         raise ValueError(
             "The variable source lacks " + ", ".join(f"U+{cp:04X}" for cp in missing)
         )
+    if cmap[0x301C] != cmap[0xFF5E]:
+        raise ValueError("U+301C and U+FF5E must share a source glyph")
     pairs = (*MANGA_MARK_PAIRS, CHOON_DAKUTEN_PAIR)
     source_ccmp = feature_ligatures(font, "ccmp")
     native = {}
@@ -404,6 +910,9 @@ def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) ->
         cmap[0x309A],
         *(cmap[base] for base, _ in generated if base in cmap),
     }
+    names.update(
+        cmap[codepoint] for codepoint in (0x7E, 0x2015, 0x301C, 0x3030, 0x30FC)
+    )
     vertical_sources = {name: vertical_glyph_or_self(font, name) for name in names}
     names.update(vertical_sources.values())
     paths = _paths(font, sorted(names))
@@ -493,6 +1002,8 @@ def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) ->
     }
     if any(output not in source_vertical for output in native.values()):
         raise ValueError("Native ccmp mark outputs lack source vertical forms")
+    remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
+    _append_symbols(font, top, cmap, paths, vertical_sources, model, vsindex)
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
     _rename_font(font)

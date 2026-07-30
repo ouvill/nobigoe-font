@@ -42,7 +42,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | モジュール | 責務 |
 |---|---|
 | `cli.py` | `nobigoe-build`の引数検証と入出力の解決 |
-| `variable_cli.py` / `variable_marks.py` | `nobigoe-build-variable`とNoto CFF2可変フォントへの濁点・半濁点字形追加 |
+| `variable_cli.py` / `variable_marks.py` | `nobigoe-build-variable`とNoto CFF2可変フォントへの濁点・半濁点字形、連結記号追加 |
 | `pipeline.py` | フォント生成手順のオーケストレーション |
 | `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
 | `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
@@ -83,7 +83,7 @@ done
 # 源暎こぶり明朝版Regular
 uv run nobigoe-build --base koburi
 
-# Noto CFF2可変フォントへ濁点・半濁点字形を追加
+# Noto CFF2可変フォントへ濁点・半濁点字形と連結記号を追加
 uv run nobigoe-build-variable
 
 # Regularの欧文候補を比較用ディレクトリへ生成
@@ -96,7 +96,7 @@ done
 
 既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
-`nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`を取得し、Notoに既存一体字形がない濁点・半濁点列について横組・縦組のCFF2 CharStringを追加します。配置は200、300、400、500、600、700、900のレビュー済み値を`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力は濁点・半濁点生成だけを対象とし、`nobigoe-build`の長音伸長、約物、欧文・ルビ置換は含みません。
+`nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`を取得し、Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharStringに加えて、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。濁点・半濁点の配置と記号の輪郭は200、300、400、500、600、700、900のレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`の約物、欧文・ルビ置換は含みません。
 
 公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
 

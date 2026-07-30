@@ -1,4 +1,4 @@
-"""Command-line interface for building the CFF2 variable marks font."""
+"""Command-line interface for building the experimental CFF2 variable font."""
 
 from __future__ import annotations
 
@@ -16,8 +16,8 @@ DEFAULT_OUTPUT_PATH = Path("dist") / "NobigoeVariableMarks-VF.otf"
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build the CFF2 Nobigoe variable font with kana dakuten and "
-            "handakuten forms."
+            "Build the CFF2 Nobigoe variable font with kana marks and "
+            "automatically joining ー, ―, 〜, and 〰."
         )
     )
     parser.add_argument(
