@@ -319,6 +319,8 @@ npm run dev
 
 `website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
 
+かな比較`/compare/`は`npm run dev`でだけ有効になる開発用ページです。`npm run build`の静的成果物、公開ナビゲーション、GitHub Pagesには含めず、PagesワークフローもNovel比較用Webfontを生成しません。
+
 公開サイトは <https://nobigoe.ouvill.net/> です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
 
 配信用Webfont（`website/src/assets/fonts/*.woff2`）は生成物のためGit管理に含めません。リポジトリ直下から標準版Regularを更新する場合は、次のコマンドを使用します。

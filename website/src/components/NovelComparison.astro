@@ -29,7 +29,19 @@ const faces = [
     source: "同ウェイトのNoto Serif JPを本文向けに変形",
   },
 ] as const;
+const novelFontCss = WEIGHTS.map(
+  (weight) => `
+@font-face {
+  font-family: "Nobigoe Novel Mincho";
+  src: url("${import.meta.env.BASE_URL}src/assets/fonts/NobigoeNovelMincho-${weight.name}-showcase.woff2") format("woff2");
+  font-weight: ${weight.value};
+  font-style: normal;
+  font-display: swap;
+}`,
+).join("\n");
 ---
+
+<style is:inline set:html={novelFontCss}></style>
 
 <section
   class="comparison-app"

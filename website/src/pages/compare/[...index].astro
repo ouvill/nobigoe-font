@@ -1,7 +1,11 @@
 ---
-import NovelComparison from "../components/NovelComparison.astro";
-import BaseLayout from "../layouts/BaseLayout.astro";
-import { SITE } from "../data/site";
+import NovelComparison from "../../components/NovelComparison.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { SITE } from "../../data/site";
+
+export function getStaticPaths() {
+  return import.meta.env.DEV ? [{ params: { index: undefined } }] : [];
+}
 ---
 
 <BaseLayout

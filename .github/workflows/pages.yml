@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v4-${{ hashFiles('src/nobigoe_font/*.py', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v5-${{ hashFiles('src/nobigoe_font/profiles.py', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -157,16 +157,6 @@ jobs:
                           continue
                       (destination / path.name).write_bytes(release.read(member))
           PY
-
-      - name: Build experimental Novel preview fonts
-        if: steps.webfont-cache.outputs.cache-hit != 'true'
-        run: |
-          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            uv run nobigoe-build \
-              --kana-style novel \
-              --weight "$weight" \
-              --output "/tmp/font-release/fonts/NobigoeNovelMincho-${weight}.otf"
-          done
 
       - name: Build webfonts
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -252,28 +242,6 @@ jobs:
               --notdef-outline \
               --recommended-glyphs
           done
-          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            uv run pyftsubset "/tmp/font-release/fonts/NobigoeNovelMincho-${weight}.otf" \
-              --output-file="website/src/assets/fonts/NobigoeNovelMincho-${weight}-showcase.woff2" \
-              --flavor=woff2 \
-              --text-file=/tmp/weight-showcase.txt \
-              --layout-features='*' \
-              --name-IDs='*' \
-              --name-languages='*' \
-              --notdef-glyph \
-              --notdef-outline \
-              --recommended-glyphs
-          done
-
-      - name: Verify Novel showcase webfonts
-        run: |
-          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            webfont="website/src/assets/fonts/NobigoeNovelMincho-${weight}-showcase.woff2"
-            if [[ ! -s "$webfont" ]]; then
-              echo "::error::Missing Novel showcase webfont: $webfont"
-              exit 1
-            fi
-          done
 
       - name: Build vertical specimen PDF
         working-directory: website
@@ -291,7 +259,8 @@ jobs:
           test -f website/site-dist/index.html
           test -f website/site-dist/tester/index.html
           test -f website/site-dist/glyphs/index.html
-          test -f website/site-dist/compare/index.html
+          test ! -e website/site-dist/compare/index.html
+          test -z "$(find website/site-dist/_assets -name '*NobigoeNovelMincho*' -print -quit)"
           test -f website/site-dist/marks-data.json
           test -f website/site-dist/nobigoe-mincho-vertical-specimen.pdf
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"

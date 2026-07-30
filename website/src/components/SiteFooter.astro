@@ -16,7 +16,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   <nav class="footer-nav" aria-label="フッターナビゲーション">
     <a href={`${base}/`}>紹介</a>
     <a href={`${base}/tester/`}>文字を試す</a>
-    <a href={`${base}/compare/`}>かな比較</a>
+    {import.meta.env.DEV && <a href={`${base}/compare/`}>かな比較</a>}
     <a href={`${base}/glyphs/`}>字形一覧</a>
     <a href={SITE.author.url}>作者 Ouvill ↗</a>
     <a href={SITE.author.socialUrl}>X / @ouvill ↗</a>
