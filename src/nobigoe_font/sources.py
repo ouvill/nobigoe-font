@@ -22,6 +22,7 @@ from .profiles import (
     latin_font_source,
     noto_sans_source,
     noto_serif_source,
+    noto_serif_variable_source,
     shippori_source,
 )
 
@@ -38,17 +39,19 @@ class SourceOverrides:
     ruby_source: Path | None = None
     punctuation_source: Path | None = None
     sans_source: Path | None = None
+    variable_kana_source: Path | None = None
 
 
 @dataclass(frozen=True)
 class ResolvedSources:
-    """The five inputs consumed by ``build_font.build``."""
+    """Inputs consumed by the static build pipeline."""
 
     source: Path
     latin_source: Path | None
     ruby_source: Path
     punctuation_source: Path
     sans_source: Path
+    variable_kana_source: Path | None = None
 
 
 def verify_sha256(path: Path, expected: str) -> None:
@@ -78,13 +81,13 @@ class SourceCache:
         weight: str,
         overrides: SourceOverrides = SourceOverrides(),
         latin_family: LatinFamily = "libertinus",
+        variable_kana: bool = False,
     ) -> ResolvedSources:
         """Resolve all build inputs, downloading only missing or invalid cache data."""
+        resolved_variable_kana_source: Path | None = None
 
         if base == "noto":
-            source = overrides.source or self._fetch_direct(
-                noto_serif_source(weight)
-            )
+            source = overrides.source or self._fetch_direct(noto_serif_source(weight))
             if overrides.latin_source is not None:
                 latin_source = overrides.latin_source
             else:
@@ -96,9 +99,16 @@ class SourceCache:
             ruby_source = overrides.ruby_source or self._fetch_zip_member(
                 koburi_source()
             )
+            resolved_variable_kana_source = (
+                self.resolve_variable_kana(overrides.variable_kana_source)
+                if variable_kana
+                else None
+            )
         elif base == "koburi":
             if overrides.latin_source is not None:
                 raise ValueError("--latin-source is available for the Noto base only")
+            if variable_kana:
+                raise ValueError("Variable kana is available for the Noto base only")
             source = overrides.source or self._fetch_zip_member(koburi_source())
             latin_source = None
             secondary_weight = "Regular"
@@ -106,9 +116,8 @@ class SourceCache:
         else:
             raise ValueError(f"Unknown base type {base!r}")
 
-        punctuation_source = (
-            overrides.punctuation_source
-            or self._fetch_zip_member(shippori_source(secondary_weight))
+        punctuation_source = overrides.punctuation_source or self._fetch_zip_member(
+            shippori_source(secondary_weight)
         )
         sans_source = overrides.sans_source or self._fetch_direct(
             noto_sans_source(secondary_weight)
@@ -119,7 +128,13 @@ class SourceCache:
             ruby_source=ruby_source,
             punctuation_source=punctuation_source,
             sans_source=sans_source,
+            variable_kana_source=resolved_variable_kana_source,
         )
+
+    def resolve_variable_kana(self, override: Path | None = None) -> Path:
+        """Resolve the pinned development VF, unless a local source is explicit."""
+
+        return override or self._fetch_direct(noto_serif_variable_source())
 
     def _fetch(self, source: FontSource) -> Path:
         if isinstance(source, DirectSource):

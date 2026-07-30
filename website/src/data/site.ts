@@ -30,8 +30,5 @@ export const NAVIGATION = [
   { href: "/", label: "紹介" },
   { href: "/tester/", label: "文字を試す" },
   { href: "/glyphs/", label: "字形一覧" },
-] as const;
-
-export const DEV_NAVIGATION = [
   { href: "/compare/", label: "かな比較" },
 ] as const;

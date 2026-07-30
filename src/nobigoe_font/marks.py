@@ -21,6 +21,7 @@ Orientation: TypeAlias = Literal["horizontal", "vertical"]
 KanaScript: TypeAlias = Literal["hiragana", "katakana"]
 MarkPair: TypeAlias = tuple[int, int]
 
+
 class MarkPlacement(NamedTuple):
     scale: float
     x: float
@@ -31,6 +32,7 @@ class MarkPlacement(NamedTuple):
 class MarkPosition(TypedDict):
     horizontal: MarkPlacement
     vertical: MarkPlacement
+
 
 MarkPositionMap: TypeAlias = dict[MarkPair, MarkPosition]
 JsonObject: TypeAlias = dict[str, object]
@@ -204,12 +206,10 @@ PUNCTUATION_MARK_POSITION_STYLES: dict[BaseType, tuple[str, ...]] = {
     ),
     "koburi": ("Regular",),
 }
-KOBURI_NATIVE_MARK_PAIRS: frozenset[MarkPair] = frozenset(
-    KOBURI_PUA_MARK_PAIRS
+KOBURI_NATIVE_MARK_PAIRS: frozenset[MarkPair] = frozenset(KOBURI_PUA_MARK_PAIRS)
+KOBURI_GENERATED_MARK_PAIRS: frozenset[MarkPair] = (
+    frozenset(MANGA_MARK_PAIRS) - KOBURI_NATIVE_MARK_PAIRS
 )
-KOBURI_GENERATED_MARK_PAIRS: frozenset[MarkPair] = frozenset(
-    MANGA_MARK_PAIRS
-) - KOBURI_NATIVE_MARK_PAIRS
 KOBURI_MARK_POSITION_SOURCE: JsonObject = {
     "file": Path(KOBURI_TTF_MEMBER).name,
     "sha256": KOBURI_TTF_SHA256,
@@ -235,9 +235,7 @@ def small_kana_script(codepoint: int) -> KanaScript:
 
 
 def _require_json_object(path: Path, label: str, value: object) -> JsonObject:
-    if not isinstance(value, dict) or any(
-        not isinstance(key, str) for key in value
-    ):
+    if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
         raise ValueError(f"{path}: {label} must be an object")
     return cast(JsonObject, value)
 
@@ -281,9 +279,7 @@ def _parse_mark_position_codepoint(
     try:
         codepoint = int(value, 16)
     except ValueError as error:
-        raise ValueError(
-            f"{path}: {label} must be uppercase hexadecimal"
-        ) from error
+        raise ValueError(f"{path}: {label} must be uppercase hexadecimal") from error
     if not 0 <= codepoint <= 0x10FFFF:
         raise ValueError(f"{path}: {label} is outside the Unicode range")
     if value != f"{codepoint:04X}":
@@ -319,9 +315,7 @@ def _finite_mark_position_values(
         or not math.isfinite(item)
         for item in value
     ):
-        raise ValueError(
-            f"{path}: {label} must contain finite numeric values"
-        )
+        raise ValueError(f"{path}: {label} must contain finite numeric values")
     return cast(list[float | int], value)
 
 
@@ -343,9 +337,7 @@ def _parse_mark_position(
     label: str,
     value: object,
 ) -> MarkPosition:
-    orientations = _require_object_keys(
-        path, label, value, set(ORIENTATIONS)
-    )
+    orientations = _require_object_keys(path, label, value, set(ORIENTATIONS))
     return MarkPosition(
         horizontal=_parse_mark_placement(
             path, f"{label} horizontal", orientations["horizontal"]
@@ -370,8 +362,7 @@ def _load_common_mark_position_overrides(directory: Path) -> MarkPositionMap:
         mark = _parse_mark_position_codepoint(path, "mark", data["mark"])
         if mark != expected_mark:
             raise ValueError(
-                f"{path}: expected mark U+{expected_mark:04X}, "
-                f"got U+{mark:04X}"
+                f"{path}: expected mark U+{expected_mark:04X}, " f"got U+{mark:04X}"
             )
         positions = _require_json_object(path, "positions", data["positions"])
         parsed_positions: dict[int, object] = {
@@ -474,8 +465,7 @@ def _load_koburi_mark_position_overrides(directory: Path) -> MarkPositionMap:
     )
     if source != KOBURI_MARK_POSITION_SOURCE:
         raise ValueError(
-            f"{path}: source metadata does not match GenEi Koburi Mincho "
-            "v6.1"
+            f"{path}: source metadata does not match GenEi Koburi Mincho " "v6.1"
         )
     _validate_koburi_measurement(path, data["measurement"])
     positions = _require_json_object(path, "positions", data["positions"])
@@ -493,10 +483,7 @@ def _load_koburi_mark_position_overrides(directory: Path) -> MarkPositionMap:
                 f"native ccmp pair U+{base:04X}+U+{mark:04X}"
                 for base, mark in sorted(native)
             ),
-            *(
-                f"missing U+{base:04X}+U+{mark:04X}"
-                for base, mark in sorted(missing)
-            ),
+            *(f"missing U+{base:04X}+U+{mark:04X}" for base, mark in sorted(missing)),
             *(
                 f"extra U+{base:04X}+U+{mark:04X}"
                 for base, mark in sorted(extra - native)
@@ -624,16 +611,11 @@ def load_punctuation_mark_positions(
                         for pair_base, pair_mark in sorted(extra)
                     ),
                 ]
-                raise ValueError(
-                    f"{path}: {family}.{style} {', '.join(details)}"
-                )
+                raise ValueError(f"{path}: {family}.{style} {', '.join(details)}")
             family_positions[style] = {
                 pair: _parse_mark_position(
                     path,
-                    (
-                        f"{family}.{style}."
-                        f"U+{pair[0]:04X}+U+{pair[1]:04X}"
-                    ),
+                    (f"{family}.{style}." f"U+{pair[0]:04X}+U+{pair[1]:04X}"),
                     raw_orientations,
                 )
                 for pair, raw_orientations in parsed_positions.items()
@@ -645,10 +627,7 @@ def load_punctuation_mark_positions(
     if weight not in PUNCTUATION_MARK_POSITION_STYLES[base]:
         if base == "koburi":
             raise ValueError(
-                "GenEi Koburi Mincho punctuation mark positions are "
-                "Regular only"
+                "GenEi Koburi Mincho punctuation mark positions are " "Regular only"
             )
-        raise ValueError(
-            f"Unknown Noto punctuation mark position weight {weight!r}"
-        )
+        raise ValueError(f"Unknown Noto punctuation mark position weight {weight!r}")
     return loaded[base][weight]

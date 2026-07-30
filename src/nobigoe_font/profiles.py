@@ -123,6 +123,9 @@ NOTO_WEIGHT_CLASSES = {
     "Bold": 700,
     "Black": 900,
 }
+NOTO_SERIF_VARIABLE_SHA256 = (
+    "99999f906b3793c7c97661a05ef9d53488d488604683b308c756d084b71df7d1"
+)
 NOTO_SERIF_SHA256 = {
     "ExtraLight": "a5056bf9b22a624b62115e9ad242879492179fe6f0b45ce5932967eb20295d5e",
     "Light": "54e6b0fa70430987a6c12001f128812f37fc315d899cb1d964395ab6450bb977",
@@ -358,6 +361,17 @@ def noto_serif_source(weight: str) -> DirectSource:
         f"{NOTO_COMMIT}/Serif/SubsetOTF/JP/{filename}"
     )
     return DirectSource(filename, url, NOTO_SERIF_SHA256[weight])
+
+
+def noto_serif_variable_source() -> DirectSource:
+    """Return the pinned development source for the Novel kana design VF."""
+
+    filename = "NotoSerifJP-VF.ttf"
+    url = (
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/"
+        f"{NOTO_COMMIT}/Serif/Variable/TTF/Subset/{filename}"
+    )
+    return DirectSource(filename, url, NOTO_SERIF_VARIABLE_SHA256)
 
 
 def noto_sans_source(weight: str) -> DirectSource:

@@ -2,10 +2,6 @@
 import NovelComparison from "../../components/NovelComparison.astro";
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { SITE } from "../../data/site";
-
-export function getStaticPaths() {
-  return import.meta.env.DEV ? [{ params: { index: undefined } }] : [];
-}
 ---
 
 <BaseLayout
@@ -17,7 +13,7 @@ export function getStaticPaths() {
     <p class="page-index">かな比較</p>
     <h1>かなと本文の比較</h1>
     <p>
-      Noto、Koburi、Novelの代表字をRegularで並べ、Novelは7ウェイトを表示します。横組・縦組の文章見本と簡易重ね表示も確認できます。
+      Noto、Koburi、Novelの代表字をRegularで並べ、Novelは7ウェイトを表示します。横組・縦組の文章見本と簡易重ね表示に加え、利用可能なときだけ開発用の可変かなソースも確認できます。
       <span class="comparison-preview-notice">
         <strong>Novelは開発中のプレビューです。</strong>
         通常のGitHub Releaseには含まれず、字形設計と仕様は正式リリースまで変更される可能性があります。

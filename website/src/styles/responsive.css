@@ -110,6 +110,14 @@
     grid-column: 2;
   }
 
+  .variable-kana-introduction {
+    grid-template-columns: minmax(120px, 0.25fr) minmax(0, 1fr);
+  }
+
+  .variable-kana-status {
+    grid-column: 2;
+  }
+
   .comparison-prose-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
   }
@@ -528,6 +536,102 @@
 
   .overlay-explanation ul {
     flex-wrap: wrap;
+  }
+
+  .variable-kana-inspector {
+    margin-top: 28px;
+  }
+
+  .variable-kana-inspector > summary {
+    min-height: 64px;
+    padding: 14px 18px;
+  }
+
+  .variable-kana-introduction {
+    display: block;
+    padding: 20px 18px;
+  }
+
+  .variable-kana-introduction > div {
+    margin-top: 8px;
+  }
+
+  .variable-kana-status {
+    margin-top: 16px;
+  }
+
+  .variable-kana-control {
+    padding: 20px 18px;
+  }
+
+  .variable-kana-ticks {
+    display: grid;
+    height: auto;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-left: 1px solid var(--line);
+  }
+
+  .variable-kana-ticks button,
+  .variable-kana-ticks button:first-child,
+  .variable-kana-ticks button:last-child {
+    position: relative;
+    left: auto;
+    min-height: 52px;
+    justify-items: center;
+    padding: 8px 4px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    transform: none;
+  }
+
+  .variable-kana-ticks button::before {
+    display: none;
+  }
+
+  .variable-kana-specimens {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .variable-kana-prose + .variable-kana-prose {
+    border-top: 1px solid
+      color-mix(in srgb, var(--paper-bright) 22%, transparent);
+    border-left: 0;
+  }
+
+  .variable-kana-prose--horizontal > p {
+    min-height: 280px;
+    padding: 28px 22px;
+  }
+
+  .variable-kana-prose--vertical > p {
+    height: 360px;
+    padding: 28px 22px;
+  }
+
+  .variable-kana-sheet {
+    grid-column: auto;
+  }
+
+  .variable-kana-sheet > header {
+    flex-wrap: wrap;
+  }
+
+  .variable-kana-sheet > header > p:first-child {
+    width: 100%;
+  }
+
+  .variable-kana-sheet__scripts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .variable-kana-sheet__scripts > section + section {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .variable-kana-sheet__scripts [data-variable-specimen] {
+    padding: 20px 18px;
+    font-size: 24px;
   }
 
   .next-page {

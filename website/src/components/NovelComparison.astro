@@ -1,5 +1,13 @@
 ---
 import { WEIGHTS } from "../data/site";
+import novelExtraLightUrl from "../assets/fonts/NobigoeNovelMincho-ExtraLight-showcase.woff2?url";
+import novelLightUrl from "../assets/fonts/NobigoeNovelMincho-Light-showcase.woff2?url";
+import novelRegularUrl from "../assets/fonts/NobigoeNovelMincho-Regular-showcase.woff2?url";
+import novelMediumUrl from "../assets/fonts/NobigoeNovelMincho-Medium-showcase.woff2?url";
+import novelSemiBoldUrl from "../assets/fonts/NobigoeNovelMincho-SemiBold-showcase.woff2?url";
+import novelBoldUrl from "../assets/fonts/NobigoeNovelMincho-Bold-showcase.woff2?url";
+import novelBlackUrl from "../assets/fonts/NobigoeNovelMincho-Black-showcase.woff2?url";
+import VariableKanaInspector from "./VariableKanaInspector.astro";
 
 const representativeHiragana = "あのぬめょゝ";
 const representativeKatakana = "アウシネヮヽ";
@@ -29,11 +37,20 @@ const faces = [
     source: "同ウェイトのNoto Serif JPを本文向けに変形",
   },
 ] as const;
+const novelFontUrls: Record<string, string> = {
+  ExtraLight: novelExtraLightUrl,
+  Light: novelLightUrl,
+  Regular: novelRegularUrl,
+  Medium: novelMediumUrl,
+  SemiBold: novelSemiBoldUrl,
+  Bold: novelBoldUrl,
+  Black: novelBlackUrl,
+};
 const novelFontCss = WEIGHTS.map(
   (weight) => `
 @font-face {
   font-family: "Nobigoe Novel Mincho";
-  src: url("${import.meta.env.BASE_URL}src/assets/fonts/NobigoeNovelMincho-${weight.name}-showcase.woff2") format("woff2");
+  src: url("${novelFontUrls[weight.name]}") format("woff2");
   font-weight: ${weight.value};
   font-style: normal;
   font-display: swap;
@@ -256,6 +273,8 @@ const novelFontCss = WEIGHTS.map(
       }
     </div>
   </section>
+
+  <VariableKanaInspector />
 
   <details class="comparison-overlay">
     <summary>
