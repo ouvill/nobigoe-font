@@ -96,17 +96,17 @@ class NovelDesignTests(unittest.TestCase):
     ) -> None:
         self.assertEqual(
             NOVEL_KA_TERMINAL_MASTER_RAISES,
-            {200: 16, 400: 18, 900: 22},
+            {200: 32, 400: 36, 900: 44},
         )
         self.assertEqual(NOVEL_KA_CODEPOINT, ord("か"))
         expected = {
-            200: 16,
-            300: 17,
-            400: 18,
-            500: 18.8,
-            600: 19.6,
-            700: 20.4,
-            900: 22,
+            200: 32,
+            300: 34,
+            400: 36,
+            500: 37.6,
+            600: 39.2,
+            700: 40.8,
+            900: 44,
         }
         for weight, amount in expected.items():
             self.assertAlmostEqual(novel_ka_terminal_raise(weight), amount)
@@ -121,14 +121,14 @@ class NovelDesignTests(unittest.TestCase):
         pen.lineTo((390, 17))
         pen.closePath()
 
-        shortened = shorten_novel_ka_terminal(outline, 18)
+        shortened = shorten_novel_ka_terminal(outline, 36)
         before = list(outline.points)
         after = list(shortened.points)
         self.assertEqual([point[0] for point in after], [point[0] for point in before])
-        self.assertEqual(after[0][1] - before[0][1], 18)
-        self.assertEqual(after[1][1] - before[1][1], 18)
+        self.assertEqual(after[0][1] - before[0][1], 36)
+        self.assertEqual(after[1][1] - before[1][1], 36)
         self.assertGreater(after[2][1] - before[2][1], 0)
-        self.assertLess(after[2][1] - before[2][1], 18)
+        self.assertLess(after[2][1] - before[2][1], 36)
         self.assertEqual(after[3], before[3])
         self.assertEqual(after[4], before[4])
         with self.assertRaisesRegex(ValueError, "must not be negative"):
@@ -336,7 +336,7 @@ class NovelDesignTests(unittest.TestCase):
         def lower_left(path: pathops.Path) -> float:
             return min(y for x, y in path.points if x < 200)
 
-        self.assertEqual(lower_left(ka_path) - lower_left(reference_path), 18)
+        self.assertEqual(lower_left(ka_path) - lower_left(reference_path), 36)
 
     def test_conflicting_alias_groups_fail_before_mutation(self) -> None:
         font = _novel_test_font()

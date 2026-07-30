@@ -44,9 +44,9 @@ _GROUPS: tuple[NovelGlyphGroup, ...] = (
 _WEIGHT_CLASSES = frozenset((200, 300, 400, 500, 600, 700, 900))
 NOVEL_KA_CODEPOINT = ord("か")
 NOVEL_KA_TERMINAL_MASTER_RAISES: Mapping[int, float] = {
-    200: 16,
-    400: 18,
-    900: 22,
+    200: 32,
+    400: 36,
+    900: 44,
 }
 _KA_TERMINAL_FULL_X = 330
 _KA_TERMINAL_FADE_X = 370
