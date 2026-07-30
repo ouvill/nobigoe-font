@@ -93,7 +93,7 @@ class SourceCache:
             else:
                 latin_spec = latin_font_source(latin_family, weight)
                 latin_source = (
-                    self._fetch(latin_spec) if latin_spec is not None else None
+                    self.fetch(latin_spec) if latin_spec is not None else None
                 )
             secondary_weight = weight
             ruby_source = overrides.ruby_source or self._fetch_zip_member(
@@ -136,7 +136,8 @@ class SourceCache:
 
         return override or self._fetch_direct(noto_serif_variable_source())
 
-    def _fetch(self, source: FontSource) -> Path:
+    def fetch(self, source: FontSource) -> Path:
+        """Return a pinned source from the verified persistent cache."""
         if isinstance(source, DirectSource):
             return self._fetch_direct(source)
         return self._fetch_zip_member(source)

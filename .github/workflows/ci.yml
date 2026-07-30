@@ -38,6 +38,7 @@ jobs:
           uv run python -m compileall -q src tests
           uv run python -m unittest discover -s tests
           uv run nobigoe-build --help >/dev/null
+          uv run nobigoe-build-variable --help >/dev/null
           uv run nobigoe-package --help >/dev/null
 
       - name: Build distribution
@@ -101,6 +102,8 @@ jobs:
             --weight Regular \
             --autohint \
             --output /tmp/NobigoeMincho-Regular.otf
+          uv run nobigoe-build-variable \
+            --output /tmp/NobigoeVariableMarks-VF.otf
           uv run nobigoe-build \
             --base koburi \
             --output /tmp/NobigoeKoburiMincho-Regular.ttf
@@ -113,10 +116,22 @@ jobs:
           ots-sanitize \
             /tmp/NobigoeKoburiMincho-Regular.ttf \
             /tmp/NobigoeKoburiMincho-Regular-sanitized.ttf
+          ots-sanitize \
+            /tmp/NobigoeVariableMarks-VF.otf \
+            /tmp/NobigoeVariableMarks-VF-sanitized.otf
           hb-shape \
             /tmp/NobigoeMincho-Regular.otf \
             "AVATAR あーーー！？" \
             --features=kern,liga,calt,ccmp >/dev/null
+          hb-shape \
+            /tmp/NobigoeVariableMarks-VF.otf \
+            "ーーーー　――――　〜〜〜〜　〰〰〰〰" \
+            --variations=wght=550 >/dev/null
+          hb-shape \
+            /tmp/NobigoeVariableMarks-VF.otf \
+            "ーーーー　――――　〜〜〜〜　〰〰〰〰" \
+            --variations=wght=550 \
+            --direction=ttb >/dev/null
           hb-shape \
             /tmp/NobigoeKoburiMincho-Regular.ttf \
             "待ってーーー。" \

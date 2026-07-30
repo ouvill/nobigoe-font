@@ -102,18 +102,12 @@ def selected_run_rules(prefix: str, source: str, seed: str, selected: str) -> st
 """
 
 
-def feature_source(
+def _symbol_feature_rules(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
     relaxed_wave: tuple[str, str, str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
-    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
-    kana_marks: list[tuple[str, str, str]],
-    spacing_marks: Sequence[tuple[str, str, str]],
-    kana_vertical_maps: list[tuple[str, str]],
-    ruby_substitutions: list[tuple[str, str]],
-    punctuation_marks: Sequence[tuple[str, str, str]] = (),
-) -> str:
+) -> tuple[str, str, str, str, str]:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
     vrt2_rules: list[str] = []
@@ -227,7 +221,7 @@ def feature_source(
         )
         + relaxed_vertical_maps
     )
-    relaxed_wave_rules = repeated_glyph_rules(
+    ss04_rules = repeated_glyph_rules(
         f"{relaxed_wave_prefix}_h_style",
         relaxed_wave_source,
         relaxed_horizontal_base,
@@ -236,9 +230,8 @@ def feature_source(
         relaxed_wave_vertical_source,
         relaxed_vertical_base,
     )
-    relaxed_wave_composition = (
-        f"  sub {relaxed_wave_selector} {relaxed_wave_source} "
-        f"by {relaxed_wave_seed};\n"
+    ccmp_rules = (
+        f"  sub {relaxed_wave_selector} {relaxed_wave_source} by {relaxed_wave_seed};\n"
     )
 
     manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
@@ -286,13 +279,60 @@ def feature_source(
         )
         + manga_wave_vertical_maps
     )
+    return (
+        ccmp_rules,
+        ss04_rules,
+        "".join(calt_rules),
+        "".join(vert_rules),
+        "".join(vrt2_rules),
+    )
+
+
+def symbol_feature_source(
+    extensions: list[tuple[str, str, str, list[str]]],
+    wave: tuple[str, str, str, list[str]],
+    relaxed_wave: tuple[str, str, str, str, str, list[str]],
+    manga_wave: tuple[str, str, list[str]],
+) -> str:
+    ccmp, ss04, calt, vert, vrt2 = _symbol_feature_rules(
+        extensions, wave, relaxed_wave, manga_wave
+    )
+    return (
+        "languagesystem DFLT dflt;\n\n"
+        f"feature ccmp {{\n{ccmp}}} ccmp;\n\n"
+        f"feature ss04 {{\n{ss04}}} ss04;\n\n"
+        f"feature calt {{\n{calt}}} calt;\n\n"
+        f"feature vert {{\n{vert}}} vert;\n\n"
+        f"feature vrt2 {{\n{vrt2}}} vrt2;\n"
+    )
+
+
+def feature_source(
+    extensions: list[tuple[str, str, str, list[str]]],
+    wave: tuple[str, str, str, list[str]],
+    relaxed_wave: tuple[str, str, str, str, str, list[str]],
+    manga_wave: tuple[str, str, list[str]],
+    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
+    kana_marks: list[tuple[str, str, str]],
+    spacing_marks: Sequence[tuple[str, str, str]],
+    kana_vertical_maps: list[tuple[str, str]],
+    ruby_substitutions: list[tuple[str, str]],
+    punctuation_marks: Sequence[tuple[str, str, str]] = (),
+) -> str:
+    (
+        symbol_ccmp_rules,
+        ss04_rules,
+        calt_rules,
+        vert_rules,
+        vrt2_rules,
+    ) = _symbol_feature_rules(extensions, wave, relaxed_wave, manga_wave)
 
     kana_vertical_rules = "".join(
         f"  sub {horizontal} by {vertical};\n"
         for horizontal, vertical in kana_vertical_maps
     )
-    vert_rules.append(kana_vertical_rules)
-    vrt2_rules.append(kana_vertical_rules)
+    vert_rules += kana_vertical_rules
+    vrt2_rules += kana_vertical_rules
 
     punctuation_names = dict(punctuation_variants)
     ccmp_rules = punctuation_ligature_rules(
@@ -308,9 +348,8 @@ def feature_source(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in (*kana_marks, *punctuation_marks)
     )
-    liga_rules = relaxed_wave_composition + "".join(
-        f"  sub {base} {mark} by {output};\n"
-        for base, mark, output in spacing_marks
+    liga_rules = symbol_ccmp_rules + "".join(
+        f"  sub {base} {mark} by {output};\n" for base, mark, output in spacing_marks
     )
     alternate_rules = "".join(
         f"  sub {names[0]} from [{' '.join(names[1:])}];\n"
@@ -331,15 +370,15 @@ def feature_source(
         "languagesystem DFLT dflt;\n\n"
         f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature liga {{\n{liga_rules}}} liga;\n\n"
-        f"feature ss04 {{\n{relaxed_wave_rules}}} ss04;\n\n"
-        f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
+        f"feature ss04 {{\n{ss04_rules}}} ss04;\n\n"
+        f"feature calt {{\n{calt_rules}}} calt;\n\n"
         f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
         f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"
         f"feature ss02 {{\n{stylistic_set_rules[1]}}} ss02;\n\n"
         f"feature ss03 {{\n{stylistic_set_rules[2]}}} ss03;\n\n"
         f"feature ruby {{\n{ruby_rules}}} ruby;\n\n"
-        f"feature vert {{\n{''.join(vert_rules)}}} vert;\n\n"
-        f"feature vrt2 {{\n{''.join(vrt2_rules)}}} vrt2;\n"
+        f"feature vert {{\n{vert_rules}}} vert;\n\n"
+        f"feature vrt2 {{\n{vrt2_rules}}} vrt2;\n"
     )
 
 
