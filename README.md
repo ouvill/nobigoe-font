@@ -4,21 +4,24 @@ Noto Serif JPまたは源暎こぶり明朝を和文ベースに、伸長記号�
 
 制作: [Ouvill](https://blog.ouvill.net) · [X / @ouvill](https://twitter.com/ouvill) · [GitHub](https://github.com/ouvill) · [開発を支援](https://github.com/sponsors/ouvill)
 
-Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7ウェイト、Novel版は`Nobigoe Novel Mincho`（`のびごえ小説明朝`）の7ウェイト、源暎こぶり明朝版は`Nobigoe Koburi Mincho`（`のびごえこぶり明朝`）のRegularとして別々に配布します。Noto版とNovel版はOpenType/CFF、源暎こぶり明朝版は元フォントと同じTrueType形式です。
+Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7ウェイト、源暎こぶり明朝版は`Nobigoe Koburi Mincho`（`のびごえこぶり明朝`）のRegularとして配布します。開発中のNovel版は`Nobigoe Novel Mincho`（`のびごえ小説明朝`）の7ウェイトを明示オプションで生成できますが、通常のGitHub Releaseには含めません。Noto版とNovel版はOpenType/CFF、源暎こぶり明朝版は元フォントと同じTrueType形式です。
 
 ![のびごえ明朝とのびごえこぶり明朝の字形一覧。伸長記号、結合濁点・半濁点、感嘆符・疑問符合字、二つのファミリーを掲載](https://nobigoe.ouvill.net/assets/readme-glyphs.png)
 
-## 配布構成
+## ファミリー構成
 
 | ファミリー | ベース | ウェイト | 形式 | 出力 |
 |---|---|---|---|---|
 | Nobigoe Mincho | Noto Serif JP（和文）+ Libertinus Serif（欧文） | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Black | OpenType/CFF (`.otf`) | `dist/NobigoeMincho-<Weight>.otf` |
-| Nobigoe Novel Mincho | Noto Serif JP各ウェイト（和文）+ Libertinus Serif（欧文）、ひらがなをNovel設計へ変換 | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Black | OpenType/CFF (`.otf`) | `dist/NobigoeNovelMincho-<Weight>.otf` |
+| Nobigoe Novel Mincho（開発中） | Noto Serif JP各ウェイト（和文）+ Libertinus Serif（欧文）、ひらがなをNovel設計へ変換 | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Black | OpenType/CFF (`.otf`) | `dist/NobigoeNovelMincho-<Weight>.otf` |
 | Nobigoe Koburi Mincho | 源暎こぶり明朝 | Regular | TrueType (`.ttf`) | `dist/NobigoeKoburiMincho-Regular.ttf` |
 
 3ファミリーの追加機能とUnicode入力は同じです。Noto版は通常の文書用、Novel版は漢字を邪魔しない小説本文用仮名と余白を持つ漢字字面、源暎こぶり明朝版は源暎こぶり明朝由来の小ぶりな仮名を持つ独立ファミリーとして扱います。
 
 ### Novel小説本文設計
+> [!WARNING]
+> Novel版はmain上で統合検証する開発中の実験的ファミリーです。ファミリー名、出力名、既存ビルドの既定値は分離されていますが、字形設計と仕様は正式リリースまで変更される可能性があります。通常の配布ZIPとタグリリースには含まれません。
+
 
 `--kana-style novel`は、現行Noto版のファミリー名・出力名・既定値を変更せず、別ファミリー`Nobigoe Novel Mincho`を生成します。輪郭は源暎こぶり明朝からコピーせず、出力と同じウェイトの固定Noto Serif JPを変形した派生設計です。「完全なゼロからのオリジナル」ではありません。Noto CJKの著作権表示とSIL Open Font License 1.1は生成フォント内と第三者通知に維持します。
 
@@ -218,11 +221,11 @@ done
 
 既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
-公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版、Novel版、源暎こぶり明朝版を別々のZIPで配布します。
+公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
 
 ### 配布ZIPを作成
 
-3ファミリーを混在させず、フォント、README、OFL、第三者通知、SHA-256マニフェストをそれぞれの再現可能なZIPへまとめます。先に上記の全フォントを生成してください。
+既定では安定版2ファミリーだけを、フォント、README、OFL、第三者通知、SHA-256マニフェストを含む再現可能なZIPへまとめます。先にNoto版と源暎こぶり明朝版を生成してください。
 
 ```sh
 uv run nobigoe-package
@@ -230,13 +233,22 @@ uv run nobigoe-package
 
 ```text
 dist/NobigoeMincho-v1.030.zip
-
 dist/NobigoeKoburiMincho-v1.030.zip
+```
+
+ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
+
+```sh
+uv run nobigoe-package --include-experimental
+```
+
+```text
+dist/NobigoeNovelMincho-v1.030.zip
 ```
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.030`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.030`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 

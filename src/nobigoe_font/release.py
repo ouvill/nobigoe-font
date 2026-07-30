@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import zipfile
+from typing import Sequence
 
 from .profiles import NOTO_WEIGHT_CLASSES, VERSION_NUMBER
 
@@ -29,25 +30,35 @@ NOTO_RELEASE = ReleaseSpec(
 NOVEL_RELEASE = ReleaseSpec(
     directory=f"NobigoeNovelMincho-v{VERSION_NUMBER}",
     archive=f"NobigoeNovelMincho-v{VERSION_NUMBER}.zip",
-    fonts=tuple(
-        f"NobigoeNovelMincho-{weight}.otf"
-        for weight in NOTO_WEIGHT_CLASSES
-    ),
+    fonts=tuple(f"NobigoeNovelMincho-{weight}.otf" for weight in NOTO_WEIGHT_CLASSES),
 )
 KOBURI_RELEASE = ReleaseSpec(
     directory=f"NobigoeKoburiMincho-v{VERSION_NUMBER}",
     archive=f"NobigoeKoburiMincho-v{VERSION_NUMBER}.zip",
     fonts=("NobigoeKoburiMincho-Regular.ttf",),
 )
-RELEASES = (NOTO_RELEASE, KOBURI_RELEASE, NOVEL_RELEASE)
+RELEASES = (NOTO_RELEASE, KOBURI_RELEASE)
+EXPERIMENTAL_RELEASES = (NOVEL_RELEASE,)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Package Nobigoe Mincho families into separate ZIP archives."
     )
     parser.add_argument("--dist", type=Path, default=Path("dist"))
-    return parser.parse_args()
+    parser.add_argument(
+        "--include-experimental",
+        action="store_true",
+        help="also package the experimental Novel family",
+    )
+    return parser.parse_args(argv)
+
+
+def release_specs(include_experimental: bool = False) -> tuple[ReleaseSpec, ...]:
+    """Return stable releases plus explicitly requested experimental families."""
+    if include_experimental:
+        return RELEASES + EXPERIMENTAL_RELEASES
+    return RELEASES
 
 
 def sha256(path: Path) -> str:
@@ -80,16 +91,12 @@ def package_release(spec: ReleaseSpec, dist: Path) -> Path:
     archive_path = dist / spec.archive
     manifest_lines: list[str] = []
     for source in sources:
-        destination = (
-            f"Fonts/{source.name}" if source.parent == dist else source.name
-        )
+        destination = f"Fonts/{source.name}" if source.parent == dist else source.name
         manifest_lines.append(f"{sha256(source)}  {destination}")
 
     with zipfile.ZipFile(archive_path, "w") as archive:
         for source in sources:
-            relative = (
-                f"Fonts/{source.name}" if source.parent == dist else source.name
-            )
+            relative = f"Fonts/{source.name}" if source.parent == dist else source.name
             write_file(archive, source, f"{spec.directory}/{relative}")
         archive.writestr(
             archive_info(f"{spec.directory}/MANIFEST.sha256"),
@@ -100,7 +107,7 @@ def package_release(spec: ReleaseSpec, dist: Path) -> Path:
 
 def main() -> None:
     args = parse_args()
-    for release in RELEASES:
+    for release in release_specs(args.include_experimental):
         output = package_release(release, args.dist)
         print(output)
 

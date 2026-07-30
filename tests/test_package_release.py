@@ -10,8 +10,11 @@ import zipfile
 from nobigoe_font.release import (
     ARCHIVE_TIMESTAMP,
     NOVEL_RELEASE,
+    RELEASES,
     ReleaseSpec,
     package_release,
+    parse_args,
+    release_specs,
 )
 
 
@@ -23,7 +26,9 @@ class ReleasePackagingTests(unittest.TestCase):
             dist.mkdir()
             font = dist / "Family-Regular.otf"
             font.write_bytes(b"font-data")
-            documents = tuple(root / name for name in ("README.md", "OFL.txt", "NOTICES.md"))
+            documents = tuple(
+                root / name for name in ("README.md", "OFL.txt", "NOTICES.md")
+            )
             for document in documents:
                 document.write_text(document.name)
             spec = ReleaseSpec("Family-v1", "Family-v1.zip", (font.name,))
@@ -46,13 +51,24 @@ class ReleasePackagingTests(unittest.TestCase):
                     ],
                 )
                 self.assertTrue(
-                    all(info.date_time == ARCHIVE_TIMESTAMP for info in archive.infolist())
+                    all(
+                        info.date_time == ARCHIVE_TIMESTAMP
+                        for info in archive.infolist()
+                    )
                 )
                 manifest = archive.read("Family-v1/MANIFEST.sha256").decode()
                 self.assertIn(
                     f"{hashlib.sha256(b'font-data').hexdigest()}  Fonts/{font.name}",
                     manifest,
                 )
+
+    def test_experimental_release_requires_explicit_opt_in(self) -> None:
+        self.assertNotIn(NOVEL_RELEASE, RELEASES)
+        self.assertEqual(release_specs(), RELEASES)
+        self.assertEqual(release_specs(False), RELEASES)
+        self.assertEqual(release_specs(True), (*RELEASES, NOVEL_RELEASE))
+        self.assertFalse(parse_args([]).include_experimental)
+        self.assertTrue(parse_args(["--include-experimental"]).include_experimental)
 
     def test_novel_release_is_a_separate_seven_weight_archive(self) -> None:
         self.assertEqual(NOVEL_RELEASE.archive, "NobigoeNovelMincho-v1.030.zip")
@@ -65,7 +81,6 @@ class ReleasePackagingTests(unittest.TestCase):
             NOVEL_RELEASE.fonts[-1],
             "NobigoeNovelMincho-Black.otf",
         )
-
 
     def test_missing_font_stops_packaging(self) -> None:
         with TemporaryDirectory() as directory:

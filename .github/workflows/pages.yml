@@ -48,7 +48,6 @@ jobs:
           expected = {
               f"NobigoeMincho-v{version}.zip",
               f"NobigoeKoburiMincho-v{version}.zip",
-              f"NobigoeNovelMincho-v{version}.zip",
           }
           release = json.loads(os.environ["RELEASE_JSON"])
           actual = {
@@ -65,18 +64,18 @@ jobs:
           PY
             then
               echo "available=true" >> "$GITHUB_OUTPUT"
-              echo "Found all three release ZIPs for $tag"
+              echo "Found both stable release ZIPs for $tag"
               exit 0
             fi
           fi
 
           echo "available=false" >> "$GITHUB_OUTPUT"
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            echo "::notice::Deferring Pages deployment until all three release ZIPs for $tag are published"
+            echo "::notice::Deferring Pages deployment until both stable release ZIPs for $tag are published"
             exit 0
           fi
 
-          echo "::error::All three release ZIPs for $tag must exist before deploying Pages"
+          echo "::error::Both stable release ZIPs for $tag must exist before deploying Pages"
           exit 1
 
   build:
@@ -116,7 +115,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v3-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/novel.py', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v4-${{ hashFiles('src/nobigoe_font/*.py', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -148,8 +147,8 @@ jobs:
           destination = Path("/tmp/font-release/fonts")
           destination.mkdir(exist_ok=True)
           archives = sorted(Path("/tmp/font-release").glob("*.zip"))
-          if len(archives) != 3:
-              raise SystemExit(f"Expected three release ZIPs, found {len(archives)}")
+          if len(archives) != 2:
+              raise SystemExit(f"Expected two stable release ZIPs, found {len(archives)}")
           for archive in archives:
               with ZipFile(archive) as release:
                   for member in release.infolist():
@@ -158,6 +157,16 @@ jobs:
                           continue
                       (destination / path.name).write_bytes(release.read(member))
           PY
+
+      - name: Build experimental Novel preview fonts
+        if: steps.webfont-cache.outputs.cache-hit != 'true'
+        run: |
+          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+            uv run nobigoe-build \
+              --kana-style novel \
+              --weight "$weight" \
+              --output "/tmp/font-release/fonts/NobigoeNovelMincho-${weight}.otf"
+          done
 
       - name: Build webfonts
         if: steps.webfont-cache.outputs.cache-hit != 'true'

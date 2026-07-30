@@ -70,7 +70,7 @@ jobs:
       - name: Run tests
         run: uv run python -m unittest discover -s tests
 
-      - name: Build all font families
+      - name: Build stable families and experimental Novel validation fonts
         run: |
           for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
             uv run nobigoe-build --weight "$weight" --autohint
@@ -92,7 +92,7 @@ jobs:
         run: |
           uv run nobigoe-package
           cd dist
-          sha256sum NobigoeMincho-v*.zip NobigoeNovelMincho-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
+          sha256sum NobigoeMincho-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
 
       - name: Create GitHub Release
         env:
@@ -105,5 +105,4 @@ jobs:
             --generate-notes \
             dist/NobigoeMincho-v*.zip \
             dist/NobigoeKoburiMincho-v*.zip \
-            dist/NobigoeNovelMincho-v*.zip \
             dist/SHA256SUMS
