@@ -1,0 +1,210 @@
+# ビルドと開発
+
+[READMEへ戻る](../README.md)
+
+特記がない限り、コマンドはリポジトリのルートで実行します。
+
+## 使用フォント
+
+| 用途 | フォント | バージョン |
+|---|---|---:|
+| Noto版の本文、長音、ダッシュ、波線 | [Noto Serif JP](https://github.com/notofonts/noto-cjk) | 2.003 |
+| Noto版の既定欧文 | [Libertinus Serif](https://github.com/alerque/libertinus) | 7.051 |
+| 比較用欧文候補 | [STIX Two Text](https://github.com/stipub/stixfonts) | 2.13 b171 |
+| 比較用欧文候補 | [Source Serif 4](https://github.com/adobe-fonts/source-serif) | 4.005 |
+| 源暎こぶり明朝版の本文、長音、ダッシュ、波線、および両版のルビ専用字形 | [源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html) | 6.1 |
+| Manga1感嘆符・疑問符合字の記号輪郭 | [Shippori Mincho OTF 5ウェイト（しっぽり明朝）](https://fontdasu.com/shippori-mincho/) | 3.300 |
+| Manga1感嘆符・疑問符合字のゴシック異体字 | [Noto Sans JP](https://github.com/notofonts/noto-cjk) | 2.004 |
+
+取得元、バージョン、SHA-256、著作権表示は[`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md)に記載しています。
+
+## 必要環境
+
+- Python 3.13
+- `uv`
+- `fonttools`
+- `skia-pathops`
+- OpenType SanitizerとHarfBuzz（検証する場合）
+- AFDKOの`otfautohint`（`--autohint`を使用する場合）
+
+Python依存関係をuvで同期します。
+
+```sh
+uv sync
+```
+
+`--autohint`を使用する場合もAFDKOは通常依存に含まれるため、`uv run`から`otfautohint`を実行できます。通常のビルドには不要です。
+
+## コード構成
+
+Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライン、フォント操作、設定データをインストール可能な1パッケージとして管理しています。
+
+| モジュール | 責務 |
+|---|---|
+| `cli.py` | `nobigoe-build`の引数検証と入出力の解決 |
+| `pipeline.py` | フォント生成手順のオーケストレーション |
+| `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
+| `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
+| `geometry.py` / `operations.py` | 輪郭変換、cmap、CFF／TrueType、欧文レイアウトの操作 |
+| `punctuation.py` / `features.py` | 感嘆符・疑問符合字の合成とOpenType機能の生成・結合 |
+| `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
+| `novel.py` / `novel_katakana.py` / `novel_han.py` / `novel_metrics.py` | Novelひらがな・カタカナの3マスター設計、Unicode 15.1 Han集合と等方縮小、字面・ink・カウンター計測 |
+
+## 自動取得して生成
+
+引数を省略すると、欧文にLibertinus Serifを使用するRegularのNoto版を生成します。`--weight`には`ExtraLight`、`Light`、`Regular`、`Medium`、`SemiBold`、`Bold`、`Black`を指定できます。Noto Serif JP、Noto Sans JP、STIX Two Textは固定コミットまたはタグ、Libertinus Serif、Source Serif 4、源暎こぶり明朝、対応するしっぽり明朝ウェイトは公式配布アーカイブから取得し、すべてSHA-256を検証します。初回に取得したファイルと展開済みフォントは`.cache/font-sources/`へ保存し、2回目以降はSHA-256が一致するローカルファイルを再利用します。取得先、ウェイト対応、ハッシュは`src/nobigoe_font/profiles.py`へ集約しています。
+
+Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです。和文と欧文の高さを厳密に追従させて横幅まで変形するのではなく、Noto Serif JPの和文とおおむね高さが揃う等方拡大を実マスターごとに固定しています。Regular由来のExtraLight・Light・Regular・Mediumは1.119倍、Semiboldは1.129倍、Bold由来のBold・Blackは1.138倍です。同じマスターから作るウェイトでは輪郭と送り幅に同じ倍率を使い、個々の欧文字形の送り幅を共通化することで、拡大率に由来する文字列幅の逆転をなくしています。そのうえで細い横画をほぼ保ち、太い縦画を中心に-13〜+6 unitsのウェイト別輪郭補正を行います。同じ変換を通常字形、`ccmp`・`locl`異体字、標準合字へ適用します。
+
+欧文ソースからはBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Combining Diacritical Marks、Latin Extended Additionalと、欧文組版で使うダッシュ、引用符、分数スラッシュ、マイナス記号などを取り込みます。Unicodeに直接割り当てられた字形だけでなく、`ccmp`、`locl`、`liga`、`dlig`、`frac`、`lnum`、`onum`、`pnum`、`tnum`、`subs`、`sups`、`zero`などのGSUB出力字形、`kern`、`mark`、`mkmk`のGPOS、GDEFの字形クラスとMarkAttachClassも同じ倍率・ベースライン補正で移植します。和文ソース側の縦組・仮名・約物機能は維持します。
+
+`--autohint`を指定すると、生成後にAFDKO `otfautohint`を実行します。処理対象は今回取り込んだ欧文字形だけに限定し、Noto Serif JP由来の和文字形の既存ヒントには触れません。`otfautohint`が見つからない場合はエラーにして、未ヒントの成果物を正常終了として扱いません。
+
+`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍で取り込みます。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。
+
+```sh
+# Noto版Regular
+uv run nobigoe-build
+
+# 取り込んだ欧文字形だけをAFDKOで再ヒント
+uv run nobigoe-build --autohint
+
+# Noto版の全7ウェイト
+for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+  uv run nobigoe-build --weight "$weight" --autohint
+done
+
+# Novel小説仮名版の全7ウェイト
+for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+  uv run nobigoe-build --kana-style novel --weight "$weight" --autohint
+done
+
+# 源暎こぶり明朝版Regular
+uv run nobigoe-build --base koburi
+
+# Regularの欧文候補を比較用ディレクトリへ生成
+for latin in noto libertinus stix-two-text source-serif-4; do
+  uv run nobigoe-build \
+    --latin-family "$latin" \
+    --output "dist/comparison/NobigoeMincho-Regular-$latin.otf"
+done
+```
+
+既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+
+公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
+
+## 配布ZIPを作成
+
+既定では安定版2ファミリーだけを、フォント、README、OFL、第三者通知、SHA-256マニフェストを含む再現可能なZIPへまとめます。先にNoto版と源暎こぶり明朝版を生成してください。
+
+```sh
+uv run nobigoe-package
+```
+
+```text
+dist/NobigoeMincho-v1.033.zip
+dist/NobigoeKoburiMincho-v1.033.zip
+```
+
+ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
+
+```sh
+uv run nobigoe-package --include-experimental
+```
+
+```text
+dist/NobigoeNovelMincho-v1.030.zip
+```
+
+## GitHub Releaseを公開
+
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.033`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+
+## ローカルの元フォントを使用
+
+```sh
+uv run nobigoe-build \
+  --source /path/to/NotoSerifJP-Regular.otf \
+  --latin-source /path/to/LibertinusSerif-Regular.otf \
+  --punctuation-source /path/to/ShipporiMincho-OTF-Regular.otf \
+  --sans-source /path/to/NotoSansJP-Regular.otf \
+  --output dist/NobigoeMincho-Regular.otf
+```
+
+`--source`、`--latin-source`、`--punctuation-source`、`--sans-source`の一部だけを指定した場合、指定しなかったフォントだけを自動取得します。`--latin-source`はNoto版だけに適用され、`--latin-family`で選択したプロファイルの倍率・補正・可変軸設定を使用します。`source-serif-4`へローカルファイルを指定する場合は`wght`と`opsz`を持つ可変フォントが必要です。`--latin-family noto`と`--latin-source`は併用できません。Noto Serif CJKのTTCを入力する場合は`--face`でフェイス番号を指定できます。源暎こぶり明朝版へローカルファイルを渡す場合は`--base koburi --source /path/to/GenEiKoburiMin6-R.ttf`とします。
+
+明示したローカルファイルはキャッシュより優先します。指定しなかった取得元だけキャッシュを検索し、正しいSHA-256のファイルがなければダウンロードします。キャッシュ内の不完全または不正なファイルは一時ファイルへ再取得し、検証成功後に置換します。
+
+しっぽり明朝はOTF版とTTF版のどちらも`--punctuation-source`に指定できます。明示したファイルはすべての明朝合字に使用されます。既定の自動取得ではNobigoeのウェイトに対応するOTF版を選び、Noto版ではCFF、源暎こぶり明朝版ではTrueTypeの輪郭形式へ追加字形を変換します。
+
+## テスト
+
+生成設定、命名、固定取得元とTrueType字形追加処理の単体テストを実行します。
+
+```sh
+uv run python -m unittest discover -s tests -v
+```
+
+## 濁点・半濁点の位置を調整
+
+共通の基準配置191列は、字種と記号ごとの4ファイルへ分割しています。源暎こぶり明朝版の専用レイヤーと、感嘆符・疑問符4列のファミリー・ウェイト別配置も同じディレクトリで管理します。
+
+```text
+src/nobigoe_font/mark_positions/hiragana_dakuten.json
+src/nobigoe_font/mark_positions/hiragana_handakuten.json
+src/nobigoe_font/mark_positions/katakana_dakuten.json
+src/nobigoe_font/mark_positions/katakana_handakuten.json
+src/nobigoe_font/mark_positions/koburi.json
+src/nobigoe_font/mark_positions/punctuation.json
+```
+
+各字の`horizontal`と`vertical`は`[scale, x, y, rotation]`です。`scale`は結合記号の等方倍率、`x`と`y`は拡大後の平行移動量で、正の値は右・上へ移動します。`rotation`は度数法の回転角で、正の値は反時計回りです。回転の中心には`scale`、`x`、`y`適用後の記号輪郭のバウンディングボックス中心を使うため、角度を変えても記号の中心位置は動きません。`nobigoe-build`は共通4ファイルの記号種、キー集合、配列長、有限値、正の倍率を検証し、191列の不足や重複があれば生成を停止します。収録値では濁点だけを文字ごと・横縦別に光学調整し、半濁点は回転させていません。Noto版で生成する167列は、実際のウェイトの輪郭で基字との交差も検査します。交差時は記号の大きさを変えず、基字と記号の中心関係から求めた上・横・斜めの外向き候補を比較し、縦メトリクス内で輪郭が離れる最短距離の移動を採用します。
+
+```json
+"30A1": {
+  "horizontal": [0.8, 955, -57, 3],
+  "vertical": [0.8, 1036, 171, 3]
+}
+```
+
+Version 1.015の配置値は、[源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html)の一体型濁点・半濁点字形を比較基準にしています。同フォントの1024 units/emの輪郭寸法と基字からの相対位置を1000 units/emへ正規化し、Nobigoe Minchoの各基字へ移植しました。源暎こぶり明朝のフォントデータや輪郭自体は取り込んでいません。
+
+長音濁点はManga1の191列には含まれないため、`src/nobigoe_font/marks.py`の`CHOON_DAKUTEN_MARK_CENTERS`で横組・縦組の記号中心を管理します。この値も源暎こぶり明朝のU+E0DBを1000 units/emへ正規化したものです。
+
+`src/nobigoe_font/mark_positions/punctuation.json`は、感嘆符・疑問符と結合濁点・半濁点の4列について、Noto版7ウェイトと源暎こぶり明朝版Regularの横組・縦組配置をすべて明示します。実輪郭の候補比較と視覚調整に基づき、感嘆符・疑問符の濁点は両ファミリー・全ウェイト・横縦とも時計回り3度（`rotation: -3`）、半濁点は0度に設定しています。ビルド時にファミリー、ウェイト、4つのキー集合と各変換値を検証し、不足や未定義ウェイトがあれば生成を停止します。
+
+`src/nobigoe_font/mark_positions/koburi.json`は、源暎こぶり明朝に一体字形がない103列だけを上書きします。源暎こぶり明朝v6.1の既存88列から、基字に対する記号の相対位置と寸法を通常仮名・小書き仮名、濁点・半濁点、横組・縦組ごとに測定して配置へ反映しています。元フォントの88列は専用レイヤーで上書きせず、元の一体字形をそのまま使用します。設定ファイルには測定元のSHA-256、units/em、GPOS機能、対象数も記録し、ビルド時に検証します。
+
+Noto Serif JPに既存一体字形がある24列は元の輪郭と縦組字形を優先します。該当列にも完全な191キー集合を検証するための設定値がありますが、生成輪郭には適用されません。U+31F7`ㇷ` + U+309Aもこの24列に含まれます。
+
+## 紹介サイト
+
+紹介サイトのコードと開発設定は`website/`にまとめています。リポジトリ直下のフォント生成処理とは独立しています。
+
+```sh
+cd website
+npm ci
+npm run dev
+```
+
+`website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
+
+かな比較`/compare/`は`npm run dev`でだけ有効になる開発用ページです。`npm run build`の静的成果物、公開ナビゲーション、GitHub Pagesには含めず、PagesワークフローもNovel比較用Webfontを生成しません。
+
+公開サイトは<https://nobigoe.ouvill.net/>です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
+
+配信用Webfont（`website/src/assets/fonts/*.woff2`）は生成物のためGit管理に含めません。リポジトリ直下から標準版Regularを更新する場合は、次のコマンドを使用します。
+
+```sh
+uv run pyftsubset dist/NobigoeMincho-Regular.otf \
+  --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
+  --flavor=woff2 \
+  --glyphs='*' \
+  --layout-features='*' \
+  --name-IDs='*' \
+  --name-languages='*' \
+  --notdef-glyph \
+  --notdef-outline \
+  --recommended-glyphs
+```
