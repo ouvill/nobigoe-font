@@ -1,6 +1,7 @@
 """Build Nobigoe font families with extensible punctuation."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 
 from collections.abc import Mapping, Sequence
 import math
@@ -9,6 +10,7 @@ import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Literal
 
 from .profiles import (
     BaseType,
@@ -25,6 +27,11 @@ from . import marks as _mark_positioning
 from .features import feature_source, merge_features
 from .hinting import autohint_latin_glyphs
 from .metadata import rename_font
+from .variable_kana import (
+    build_variable_kana_source,
+    export_variable_kana_instance,
+    is_variable_kana_design_source,
+)
 from .novel import (
     HIRAGANA_CODEPOINTS,
     NOVEL_SMALL_KO_CODEPOINT,
@@ -71,6 +78,18 @@ OVERLAP = 0
 KOBURI_RUBY_RULE_COUNT = 289
 KOBURI_RUBY_OUTPUT_COUNT = 288
 KOBURI_RUBY_VERTICAL_ORIGIN = 880
+_KanaOrientation = Literal["horizontal", "vertical"]
+_KANA_ORIENTATIONS: tuple[_KanaOrientation, ...] = ("horizontal", "vertical")
+
+
+@dataclass(frozen=True)
+class _KanaSourceKey:
+    """Semantic identity for a kana outline imported from the design VF."""
+
+    codepoint: int
+    orientation: _KanaOrientation
+    mark_codepoint: int | None = None
+
 
 COMBINING_MARK_INPUTS = {
     0x3099: 0x3099,
@@ -455,9 +474,7 @@ def make_sine_wave_tile(
     taper_end: bool = False,
     half_waves: float = 3,
     phase_offset_half_waves: float = 0,
-    terminal_phase_extension_half_waves: float = (
-        WAVE_TERMINAL_EXTENSION_HALF_WAVES
-    ),
+    terminal_phase_extension_half_waves: float = (WAVE_TERMINAL_EXTENSION_HALF_WAVES),
     taper_fraction: float = 1 / 4,
     start_margin: float = 0,
     end_margin: float = 0,
@@ -507,10 +524,7 @@ def make_sine_wave_tile(
         return 30 * progress**2 * (progress - 1) ** 2
 
     def phase_at(position: float) -> tuple[float, float]:
-        phase = (
-            phase_offset_half_waves * math.pi
-            + normal_phase_velocity * position
-        )
+        phase = phase_offset_half_waves * math.pi + normal_phase_velocity * position
         phase_velocity = normal_phase_velocity
         correction_start = taper_length
         correction_end = advance - taper_length
@@ -1002,6 +1016,138 @@ def mark_ligature_rules(
     ]
 
 
+def _variable_kana_mappings(
+    font: TTFont,
+    source_font: TTFont,
+) -> dict[_KanaSourceKey, tuple[str, str]]:
+    """Map design-VF kana to the static font without relying on CID names."""
+
+    cmap = font.getBestCmap() or {}
+    source_cmap = source_font.getBestCmap() or {}
+    mappings: dict[_KanaSourceKey, tuple[str, str]] = {}
+    source_for_target: dict[str, tuple[str, _KanaSourceKey]] = {}
+
+    def add(key: _KanaSourceKey, target_name: str, source_name: str) -> None:
+        previous = source_for_target.get(target_name)
+        if previous is not None and previous[0] != source_name:
+            previous_source, previous_key = previous
+            raise ValueError(
+                "Variable kana semantic mappings conflict for target "
+                f"{target_name!r}: {previous_key!r} maps to "
+                f"{previous_source!r}, but {key!r} maps to {source_name!r}"
+            )
+        mappings[key] = (target_name, source_name)
+        source_for_target[target_name] = (source_name, key)
+
+    kana_codepoints = HIRAGANA_CODEPOINTS | KATAKANA_SOURCE_CODEPOINTS
+    for codepoint in sorted(kana_codepoints):
+        target_name = cmap.get(codepoint)
+        if target_name is None:
+            continue
+        source_name = source_cmap.get(codepoint)
+        if source_name is None:
+            raise ValueError(
+                "The variable kana source cannot provide "
+                f"horizontal U+{codepoint:04X}"
+            )
+        add(_KanaSourceKey(codepoint, "horizontal"), target_name, source_name)
+
+        target_vertical = _font_operations.vertical_glyph_or_self(font, target_name)
+        if target_vertical == target_name:
+            continue
+        source_vertical = _font_operations.vertical_glyph_or_self(
+            source_font, source_name
+        )
+        if source_vertical == source_name:
+            raise ValueError(
+                "The variable kana source cannot provide " f"vertical U+{codepoint:04X}"
+            )
+        add(
+            _KanaSourceKey(codepoint, "vertical"),
+            target_vertical,
+            source_vertical,
+        )
+
+    target_ligatures = _font_operations.feature_ligatures(font, "ccmp")
+    source_ligatures = _font_operations.feature_ligatures(source_font, "ccmp")
+    for codepoint in sorted(kana_codepoints):
+        target_name = cmap.get(codepoint)
+        source_name = source_cmap.get(codepoint)
+        if target_name is None or source_name is None:
+            continue
+        for mark_codepoint in (0x3099, 0x309A):
+            target_mark = cmap.get(mark_codepoint)
+            source_mark = source_cmap.get(mark_codepoint)
+            if target_mark is None:
+                continue
+            if source_mark is None:
+                raise ValueError(
+                    "The variable kana source cannot provide "
+                    f"U+{codepoint:04X}+U+{mark_codepoint:04X}"
+                )
+            for orientation in _KANA_ORIENTATIONS:
+                target_base = (
+                    target_name
+                    if orientation == "horizontal"
+                    else _font_operations.vertical_glyph_or_self(font, target_name)
+                )
+                target_output = target_ligatures.get((target_base, target_mark))
+                if target_output is None:
+                    continue
+                source_base = (
+                    source_name
+                    if orientation == "horizontal"
+                    else _font_operations.vertical_glyph_or_self(
+                        source_font, source_name
+                    )
+                )
+                source_output = source_ligatures.get((source_base, source_mark))
+                if source_output is None:
+                    raise ValueError(
+                        "The variable kana source cannot provide "
+                        f"{orientation} ccmp output for "
+                        f"U+{codepoint:04X}+U+{mark_codepoint:04X}"
+                    )
+                add(
+                    _KanaSourceKey(
+                        codepoint,
+                        orientation,
+                        mark_codepoint,
+                    ),
+                    target_output,
+                    source_output,
+                )
+    return mappings
+
+
+def _import_variable_kana(
+    font: TTFont,
+    variable_kana_source_path: Path,
+    weight_class: int,
+) -> None:
+    """Build, export, and semantically import one matching design-VF instance."""
+
+    with TemporaryDirectory(prefix=".nobigoe-variable-kana-") as directory:
+        temporary_directory = Path(directory)
+        instance_path = temporary_directory / f"NobigoeNovelKana-{weight_class}.ttf"
+        design_path = variable_kana_source_path
+        if not is_variable_kana_design_source(design_path):
+            design_path = temporary_directory / "NobigoeNovelKana-DesignVF.ttf"
+            build_variable_kana_source(variable_kana_source_path, design_path)
+        export_variable_kana_instance(design_path, weight_class, instance_path)
+        source_font = TTFont(instance_path)
+        if source_font["head"].unitsPerEm != font["head"].unitsPerEm:
+            scale_upem(source_font, font["head"].unitsPerEm)
+        mappings = _variable_kana_mappings(font, source_font)
+        for target_name, source_name in dict.fromkeys(mappings.values()):
+            _font_operations.replace_glyph_from_source(
+                font,
+                target_name,
+                source_font,
+                source_name,
+            )
+
+
 def autohint_latin_glyphs(
     output_path: Path,
     glyph_names: tuple[str, ...],
@@ -1049,11 +1195,16 @@ def build(
     base_type: BaseType,
     autohint: bool = False,
     kana_style: KanaStyle = "noto",
+    variable_kana_source_path: Path | None = None,
 ) -> None:
     if kana_style not in {"noto", "novel"}:
         raise ValueError(f"Unknown kana style {kana_style!r}")
     if kana_style == "novel" and base_type != "noto":
         raise ValueError("--kana-style novel requires --base noto")
+    if variable_kana_source_path is not None and kana_style != "novel":
+        raise ValueError(
+            "A variable kana source requires --kana-style novel with --base noto"
+        )
     if autohint and latin_source_path is None:
         raise ValueError("--autohint requires an imported Latin source")
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
@@ -1158,6 +1309,13 @@ def build(
         raise AssertionError("Expected two Koburi Mincho heart mappings")
     if len(_mark_positioning.PUNCTUATION_MARK_PAIRS) != 4:
         raise AssertionError("Expected four fullwidth punctuation mark sequences")
+    if variable_kana_source_path is not None:
+        _import_variable_kana(
+            font,
+            variable_kana_source_path,
+            identity.weight_class,
+        )
+
     latin_import = (
         _font_operations.import_latin_font(font, latin_font, latin_profile)
         if latin_font is not None
@@ -1829,7 +1987,7 @@ def build(
     ]
     hiragana_mappings = None
     katakana_mappings = None
-    if kana_style == "novel":
+    if kana_style == "novel" and variable_kana_source_path is None:
         hiragana_mappings = _novel_hiragana_mappings(
             font,
             cmap,
@@ -1844,13 +2002,16 @@ def build(
             native_katakana_vertical_ccmp_outputs | generated_vertical_mark_outputs,
             missing_small_glyphs,
         )
-    _apply_novel_style(
-        font,
-        identity.weight_class,
-        kana_style,
-        hiragana_mappings,
-        katakana_mappings,
-    )
+    if variable_kana_source_path is None:
+        _apply_novel_style(
+            font,
+            identity.weight_class,
+            kana_style,
+            hiragana_mappings,
+            katakana_mappings,
+        )
+    else:
+        apply_novel_han(font)
 
     if base_type == "noto":
         _font_operations.remove_repeated_ligatures(font, "ccmp", cmap[0x2015])

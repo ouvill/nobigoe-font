@@ -9,7 +9,8 @@ from pathlib import Path
 import zipfile
 from typing import Sequence
 
-from .profiles import NOTO_WEIGHT_CLASSES, VERSION_NUMBER
+from .profiles import NOTO_WEIGHT_CLASSES
+from .version import VERSION_NUMBER
 
 ARCHIVE_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 DOCUMENTS = (Path("README.md"), Path("OFL.txt"), Path("THIRD_PARTY_NOTICES.md"))

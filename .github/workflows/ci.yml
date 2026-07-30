@@ -17,14 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: uv.lock
+          prune-cache: true
 
       - name: Verify lockfile
         run: uv lock --check
@@ -49,10 +50,11 @@ jobs:
           from zipfile import ZipFile
 
           wheel, = Path("dist").glob("*.whl")
-          expected = {
+          expected = {"nobigoe_font/version.json"}
+          expected.update(
               path.relative_to("src").as_posix()
               for path in Path("src/nobigoe_font/mark_positions").rglob("*.json")
-          }
+          )
           with ZipFile(wheel) as archive:
               packaged = set(archive.namelist())
           missing = sorted(expected - packaged)
@@ -66,17 +68,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: uv.lock
+          prune-cache: true
+          save-cache: false
 
       - name: Cache pinned font sources
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: .cache/font-sources
           key: font-sources-${{ runner.os }}-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/sources.py') }}
@@ -127,10 +131,10 @@ jobs:
         working-directory: website
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: "22"
           cache: npm

@@ -21,9 +21,12 @@ from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.ttLib import TTFont
 
 from . import geometry, operations
+from .kana_terminals import soften_kana_terminals
 
 NovelGlyphGroup: TypeAlias = Literal["normal", "counter", "small", "iteration"]
 NovelVerticalStemGroup: TypeAlias = Literal["strong", "fragile", "moderate"]
+
+_MAX_CFF_STORAGE_CORRECTIONS = 4
 
 NOVEL_SMALL_KO_CODEPOINT = 0x1B132
 HIRAGANA_CODEPOINTS = frozenset((*range(0x3041, 0x3097), *range(0x309D, 0x30A0)))
@@ -846,16 +849,15 @@ def transform_novel_glyph(
                     f"{vertical_profile.stem_adjustment:g} units"
                 ) from error
 
-    terminal_left_side_bearing = (
-        math.floor(transformed.bounds[0])
-        if terminal_raise and transformed.verbs
-        else None
-    )
-    terminal_top_side_bearing = (
-        math.floor(vertical_origin - transformed.bounds[3])
-        if terminal_raise and transformed.verbs and "vmtx" in font
-        else None
-    )
+    terminal_left_side_bearing = None
+    terminal_top_side_bearing = None
+    if terminal_raise and transformed.verbs:
+        metric_outline, _ = soften_kana_terminals(transformed)
+        terminal_left_side_bearing = math.floor(metric_outline.bounds[0])
+        if "vmtx" in font:
+            terminal_top_side_bearing = math.floor(
+                vertical_origin - metric_outline.bounds[3]
+            )
 
     if terminal_raise:
         if "CFF " in font:
@@ -866,6 +868,7 @@ def transform_novel_glyph(
             raise ValueError(
                 f"Could not correct novel ka terminal glyph {glyph_name!r}"
             ) from error
+    transformed, _ = soften_kana_terminals(transformed)
 
     if transformed.verbs:
         operations.replace_glyph(
@@ -876,6 +879,25 @@ def transform_novel_glyph(
             advance_override=1000,
             left_side_bearing_override=terminal_left_side_bearing,
         )
+        if "CFF " in font:
+            for storage_pass in range(_MAX_CFF_STORAGE_CORRECTIONS + 1):
+                stored = geometry.glyph_path(font, glyph_name)
+                stored, stored_count = soften_kana_terminals(stored)
+                if stored_count == 0:
+                    break
+                if storage_pass == _MAX_CFF_STORAGE_CORRECTIONS:
+                    raise ValueError(
+                        f"Could not preserve softened {error_label} terminal "
+                        f"for glyph {glyph_name!r}"
+                    )
+                operations.replace_glyph(
+                    font,
+                    glyph_name,
+                    stored,
+                    vertical_origin,
+                    advance_override=1000,
+                    left_side_bearing_override=terminal_left_side_bearing,
+                )
     else:
         _, left_side_bearing = font["hmtx"].metrics[glyph_name]
         font["hmtx"].metrics[glyph_name] = (1000, left_side_bearing)

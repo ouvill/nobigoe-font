@@ -1,0 +1,44 @@
+---
+import NovelComparison from "../../components/NovelComparison.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { SITE } from "../../data/site";
+---
+
+<BaseLayout
+  title={`小説仮名 制作プレビュー — ${SITE.name}`}
+  description="小説本文のための、漢字を邪魔しない小ぶりで静かなかなを公開制作しています。Noto、Koburiとの比較、7ウェイト、横組・縦組、開発用VFを確認できます。"
+  pageClass="comparison-page"
+>
+  <section class="comparison-hero">
+    <p class="comparison-preview-kicker">
+      <span aria-hidden="true"></span>
+      <strong>PUBLIC MAKING PREVIEW</strong>
+      <small>Novel Kana / Work in progress</small>
+    </p>
+    <div class="comparison-hero__title">
+      <p class="page-index">小説仮名・公開制作プレビュー</p>
+      <h1>
+        <span>小説本文のための</span>
+        <span>かなを、</span>
+        <span>公開制作しています。</span>
+      </h1>
+      <p>
+        漢字の流れを遮らない、小ぶりで静かなひらがなとカタカナ。Noto Serif
+        JPを制作母体に、源暎こぶり明朝を寸法と黒みの比較対象として、細部の設計と検証過程を公開します。
+      </p>
+    </div>
+    <aside class="comparison-preview-status" aria-label="制作プレビューの状態">
+      <p><span aria-hidden="true"></span>設計・検証中</p>
+      <dl>
+        <div><dt>対象</dt><dd>ひらがな89字＋カタカナ109字</dd></div>
+        <div><dt>ウェイト</dt><dd>200–900 / 固定7ウェイト</dd></div>
+        <div><dt>公開範囲</dt><dd>比較画面・制作VF</dd></div>
+        <div><dt>配布状況</dt><dd>通常Releaseには未収録</dd></div>
+      </dl>
+      <small>
+        これは完成版の告知ではなく、制作途中の字形を実際の本文で確認するための公開プレビューです。字形と仕様は更新されます。
+      </small>
+    </aside>
+  </section>
+  <NovelComparison />
+</BaseLayout>

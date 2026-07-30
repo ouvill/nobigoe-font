@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag matching profiles.VERSION_NUMBER (for example v1.034)"
+        description: "Release tag matching version.json (vN.NNN)"
         required: true
         type: string
 
@@ -25,19 +25,20 @@ jobs:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           python-version: "3.13"
           enable-cache: true
           cache-dependency-glob: uv.lock
+          prune-cache: true
 
       - name: Cache pinned font sources
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: .cache/font-sources
           key: font-sources-${{ runner.os }}-${{ hashFiles('src/nobigoe_font/profiles.py', 'src/nobigoe_font/sources.py') }}
@@ -56,7 +57,7 @@ jobs:
         run: |
           uv run python - <<'PY'
           import os
-          from nobigoe_font.profiles import VERSION_NUMBER
+          from nobigoe_font.version import VERSION_NUMBER
 
           expected = f"v{VERSION_NUMBER}"
           actual = os.environ["RELEASE_TAG"]
@@ -72,9 +73,13 @@ jobs:
 
       - name: Build stable families and experimental Novel validation fonts
         run: |
+          uv run nobigoe-build \
+            --build-variable-kana /tmp/NobigoeNovelKanaDesign-VF.ttf
           for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
             uv run nobigoe-build --weight "$weight" --autohint
-            uv run nobigoe-build --kana-style novel --weight "$weight" --autohint
+            uv run nobigoe-build --kana-style novel --variable-kana \
+              --variable-kana-source /tmp/NobigoeNovelKanaDesign-VF.ttf \
+              --weight "$weight" --autohint
           done
           uv run nobigoe-build --base koburi
 

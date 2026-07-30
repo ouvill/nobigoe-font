@@ -49,6 +49,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | `punctuation.py` / `features.py` | 感嘆符・疑問符合字の合成とOpenType機能の生成・結合 |
 | `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
 | `novel.py` / `novel_katakana.py` / `novel_han.py` / `novel_metrics.py` | Novelひらがな・カタカナの3マスター設計、Unicode 15.1 Han集合と等方縮小、字面・ink・カウンター計測 |
+| `kana_terminals.py` / `terminal_plans/` / `variable_kana.py` | 互換トポロジーの筆端変形、字別・横縦・3マスター台帳、可変制作正本の生成と固定ウェイト実体化 |
 
 ## 自動取得して生成
 
@@ -74,9 +75,13 @@ for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
   uv run nobigoe-build --weight "$weight" --autohint
 done
 
-# Novel小説仮名版の全7ウェイト
+# Novel可変かな制作正本を一度生成し、そこから固定7ウェイトを作る
+uv run nobigoe-build \
+  --build-variable-kana dist/NobigoeNovelKanaDesign-VF.ttf
 for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-  uv run nobigoe-build --kana-style novel --weight "$weight" --autohint
+  uv run nobigoe-build --kana-style novel --variable-kana \
+    --variable-kana-source dist/NobigoeNovelKanaDesign-VF.ttf \
+    --weight "$weight" --autohint
 done
 
 # 源暎こぶり明朝版Regular
@@ -90,9 +95,17 @@ for latin in noto libertinus stix-two-text source-serif-4; do
 done
 ```
 
-既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`は制作VFを明示した場所へ生成し、`--variable-kana`はそのVFから対象ウェイトのかなを取り込みます。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
 公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
+
+リリース版番号の唯一の正本は`src/nobigoe_font/version.json`です。新しい版ではこのファイルの`version`だけを`N.NNN`形式で更新し、`uv lock`を実行してください。Pythonパッケージのメタデータ、生成フォント、配布ZIP、公開サイト、GitHub Actionsは同じ値を読み取るため、`pyproject.toml`、Webサイト、テスト、説明文へ版番号を転記する必要はありません。
+
+```sh
+uv lock
+uv lock --check
+uv run python -m unittest discover -s tests
+```
 
 ## 配布ZIPを作成
 
@@ -103,8 +116,8 @@ uv run nobigoe-package
 ```
 
 ```text
-dist/NobigoeMincho-v1.034.zip
-dist/NobigoeKoburiMincho-v1.034.zip
+dist/NobigoeMincho-v<version>.zip
+dist/NobigoeKoburiMincho-v<version>.zip
 ```
 
 ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
@@ -114,12 +127,18 @@ uv run nobigoe-package --include-experimental
 ```
 
 ```text
-dist/NobigoeNovelMincho-v1.034.zip
+dist/NobigoeNovelMincho-v<version>.zip
 ```
 
 ## GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.034`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/version.json`と同じ`vN.NNN`タグで起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。次のように正本からタグ名を取得して注釈付きタグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+
+```sh
+version=$(PYTHONPATH=src python3 -m nobigoe_font.version)
+git tag -a "v${version}" -m "v${version}"
+git push origin main "v${version}"
+```
 
 ## ローカルの元フォントを使用
 
@@ -190,7 +209,7 @@ npm run dev
 
 `website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
 
-かな比較`/compare/`は`npm run dev`でだけ有効になる開発用ページです。`npm run build`の静的成果物、公開ナビゲーション、GitHub Pagesには含めず、PagesワークフローもNovel比較用Webfontを生成しません。
+かな比較`/compare/`は、小説本文用のNovel仮名を制作途中から確認できる公開制作プレビューです。Noto／Koburi／Novelの比較、固定7ウェイト、横組・縦組本文、開発用可変かなソースを掲載し、Pagesワークフローで必要な比較用Webfontを生成します。Novel版は通常の配布ZIPとタグリリースには含めません。
 
 公開サイトは<https://nobigoe.ouvill.net/>です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
 

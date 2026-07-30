@@ -91,9 +91,7 @@ def repeated_glyph_rules(prefix: str, base: str, replacement: str) -> str:
 """
 
 
-def selected_run_rules(
-    prefix: str, source: str, seed: str, selected: str
-) -> str:
+def selected_run_rules(prefix: str, source: str, seed: str, selected: str) -> str:
     return f"""
   lookup {prefix}_activate {{
     sub {seed} by {selected} {selected};
@@ -122,9 +120,7 @@ def feature_source(
     for prefix, base, vertical, names in extensions:
         h_start, h_middle, h_end, v_start, v_middle, v_end = names
         calt_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_h", base, h_start, h_middle, h_end
-            )
+            contextual_extension_rules(f"{prefix}_h", base, h_start, h_middle, h_end)
         )
         calt_rules.append(
             contextual_extension_rules(
@@ -137,15 +133,11 @@ def feature_source(
             f"  sub {h_end} by {v_end};\n"
         )
         vert_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_vert", base, v_start, v_middle, v_end
-            )
+            contextual_extension_rules(f"{prefix}_vert", base, v_start, v_middle, v_end)
             + vertical_maps
         )
         vrt2_rules.append(
-            contextual_extension_rules(
-                f"{prefix}_vrt2", base, v_start, v_middle, v_end
-            )
+            contextual_extension_rules(f"{prefix}_vrt2", base, v_start, v_middle, v_end)
             + vertical_maps
         )
 
@@ -194,7 +186,7 @@ def feature_source(
             relaxed_wave_source,
             relaxed_wave_seed,
             relaxed_horizontal_base,
-        )
+        ),
     )
     calt_rules.append(
         phased_wave_rules(
@@ -427,8 +419,7 @@ def merge_features(font: TTFont, source: str) -> None:
             if langsys.ReqFeatureIndex != 0xFFFF:
                 referenced_indices.append(langsys.ReqFeatureIndex)
             if not any(
-                feature_records[index].FeatureTag == tag
-                for index in referenced_indices
+                feature_records[index].FeatureTag == tag for index in referenced_indices
             ):
                 missing_langsys.append(langsys)
         if not missing_langsys:

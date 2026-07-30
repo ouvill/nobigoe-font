@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from fontTools.ttLib import TTFont
 
-from .profiles import FontIdentity, VERSION, VERSION_NUMBER
+from .profiles import FontIdentity
+from .version import VERSION, VERSION_NUMBER
 
 
 def set_name(font: TTFont, name_id: int, value: str) -> None:
