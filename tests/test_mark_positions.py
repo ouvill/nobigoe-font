@@ -132,6 +132,30 @@ class NotoWeightMarkPositionOverrideTests(unittest.TestCase):
                 )
 
 
+    def test_six_reviewed_dakuten_positions_are_preserved(self) -> None:
+        regular = load_mark_position_overrides()
+        expected = {
+            0x3041: ((0.806, 869, -46, 0), (0.806, 1010, 85, 0)),
+            0x304A: ((0.957, 1031, 39, 3), (0.957, 1002, 25, 3)),
+            0x3049: ((0.787, 909, -55, 6), (0.787, 1014, 129, 6)),
+            0x30A5: ((0.8, 912, -96, 0), (0.8, 1041, 105, 2)),
+            0x30A1: ((0.8, 963, -49, 3), (0.8, 1044, 179, 3)),
+            0x30A2: ((0.956, 1049, 72, 3), (0.956, 1027, 65, 3)),
+        }
+
+        for base, (horizontal, vertical) in expected.items():
+            with self.subTest(base=f"U+{base:04X}"):
+                positions = regular[(base, 0x3099)]
+                self.assertEqual(
+                    placement_values(positions["horizontal"]),
+                    horizontal,
+                )
+                self.assertEqual(
+                    placement_values(positions["vertical"]),
+                    vertical,
+                )
+
+
     def test_unknown_noto_weight_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unknown Noto mark position weight"):
             load_mark_position_overrides(weight="Unknown")

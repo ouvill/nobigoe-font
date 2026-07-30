@@ -1,6 +1,6 @@
 [project]
 name = "nobigoe-font"
-version = "1.031"
+version = "1.032"
 description = "Build Nobigoe Mincho font families"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
