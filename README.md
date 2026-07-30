@@ -39,7 +39,7 @@ Noto版は共通ファミリー名`Nobigoe Mincho`（`のびごえ明朝`）の7
 
 ### Manga1方式の濁点・半濁点付き仮名
 
-Adobe-Manga1-0が規定する濁点77列と半濁点114列の計191列を、OpenTypeの `ccmp` で1グリフへ置換します。入力には結合濁点（U+3099）または結合半濁点（U+309A）を使用します。
+Adobe-Manga1-0が規定する濁点77列と半濁点114列の計191列を、OpenTypeの `ccmp` で1グリフへ置換します。正式な入力には結合濁点（U+3099）または結合半濁点（U+309A）を使用します。入力互換のため、全角幅濁点（U+309B）または全角幅半濁点（U+309C）を基字に続けた場合も、既定で有効な `liga` により同じ一体字形へ置換します。`liga` を無効にすると全角幅記号だけが基字と分離し、単独のU+309B・U+309Cは設定にかかわらず変更しません。
 
 ```text
 あ゙ ぁ゙ な゙ ん゙ ア゙ ン゙
@@ -179,13 +179,13 @@ uv run nobigoe-package
 ```
 
 ```text
-dist/NobigoeMincho-v1.032.zip
-dist/NobigoeKoburiMincho-v1.032.zip
+dist/NobigoeMincho-v1.033.zip
+dist/NobigoeKoburiMincho-v1.033.zip
 ```
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.032`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.033`）で起動します。全8フォントの生成、テスト、OpenType SanitizerとHarfBuzzによる検証、再現可能な2つのZIPと`SHA256SUMS`の作成、GitHub Releaseへの添付を自動で行います。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 
@@ -278,6 +278,7 @@ uv run pyftsubset dist/NobigoeMincho-Regular.otf \
 | feature | 用途 |
 |---|---|
 | `ccmp` | 全角感嘆符・疑問符合字と濁点・半濁点付き仮名 |
+| `liga` | 全角幅濁点・半濁点を既存の一体字形へ置換 |
 | `aalt` | 全角感嘆符・疑問符および合字の3異体字を列挙 |
 | `ss01` | 全角感嘆符・疑問符および合字を斜体明朝へ置換 |
 | `ss02` | 全角感嘆符・疑問符および合字をゴシックへ置換 |
@@ -286,9 +287,9 @@ uv run pyftsubset dist/NobigoeMincho-Regular.otf \
 | `calt` | 連続する長音・ダッシュ・波線の始端／中間／終端置換 |
 | `vert` / `vrt2` | 縦組用の伸長記号、濁点・半濁点付き仮名、`ㇷ゚`ルビ字形 |
 
-一般的なシェーピングエンジンでは `ccmp` と `calt` は既定で有効です。アプリケーション側で `calt` を無効にすると、伸長記号の自動連結は行われません。
+一般的なシェーピングエンジンでは `ccmp`、`liga`、`calt` は既定で有効です。アプリケーション側で `liga` を無効にするとU+309B・U+309Cは全角幅の独立字形になり、結合文字U+3099・U+309Aの `ccmp` は維持されます。ただし、欧文の `fi`・`fl` などの標準合字も同時に無効になります。`calt` を無効にすると、伸長記号の自動連結は行われません。
 
-CSSでは、たとえば `font-feature-settings: "ss03" 1;` で全角感嘆符・疑問符を斜体ゴシックへ、`font-feature-settings: "ruby" 1;` で対象の半濁点付き仮名をルビ字形へ切り替えられます。
+CSSでは、たとえば `font-feature-settings: "liga" 0;` で全角幅濁点・半濁点を分離し、`font-feature-settings: "ss03" 1;` で全角感嘆符・疑問符を斜体ゴシックへ、`font-feature-settings: "ruby" 1;` で対象の半濁点付き仮名をルビ字形へ切り替えられます。
 
 ## ライセンス
 

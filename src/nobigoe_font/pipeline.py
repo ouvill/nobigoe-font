@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import math
 import shutil
 import subprocess
@@ -50,6 +51,15 @@ OVERLAP = 0
 KOBURI_RUBY_RULE_COUNT = 289
 KOBURI_RUBY_OUTPUT_COUNT = 288
 KOBURI_RUBY_VERTICAL_ORIGIN = 880
+
+COMBINING_MARK_INPUTS = {
+    0x3099: 0x3099,
+    0x309A: 0x309A,
+}
+SPACING_MARK_INPUTS = {
+    0x3099: 0x309B,
+    0x309A: 0x309C,
+}
 
 
 
@@ -639,6 +649,18 @@ def import_koburi_ruby(
 
 
 
+def mark_ligature_rules(
+    cmap: Mapping[int, str],
+    pairs: Sequence[_mark_positioning.MarkPair],
+    outputs: Mapping[_mark_positioning.MarkPair, str],
+    mark_inputs: Mapping[int, int],
+) -> list[tuple[str, str, str]]:
+    return [
+        (cmap[base], cmap[mark_inputs[mark]], outputs[(base, mark)])
+        for base, mark in pairs
+    ]
+
+
 def autohint_latin_glyphs(
     output_path: Path,
     glyph_names: tuple[str, ...],
@@ -762,6 +784,8 @@ def build(
             0x3030,
             0x3099,
             0x309A,
+            0x309B,
+            0x309C,
             0xFF01,
             0xFF1F,
             0xFF5E,
@@ -1373,18 +1397,48 @@ def build(
         _mark_positioning.CHOON_DAKUTEN_PUA,
         mark_outputs[_mark_positioning.CHOON_DAKUTEN_PAIR],
     )
-    kana_marks = [
-        (cmap[base], cmap[mark], mark_outputs[(base, mark)])
-        for base, mark in supported_mark_pairs
-    ]
-    kana_marks.extend(
-        (cmap[base], cmap[mark], heart_outputs[(base, mark)])
-        for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
+    kana_marks = mark_ligature_rules(
+        cmap,
+        supported_mark_pairs,
+        mark_outputs,
+        COMBINING_MARK_INPUTS,
     )
-    punctuation_marks = [
-        (cmap[base], cmap[mark], punctuation_mark_outputs[(base, mark)])
-        for base, mark in _mark_positioning.PUNCTUATION_MARK_PAIRS
-    ]
+    spacing_marks = mark_ligature_rules(
+        cmap,
+        supported_mark_pairs,
+        mark_outputs,
+        SPACING_MARK_INPUTS,
+    )
+    kana_marks.extend(
+        mark_ligature_rules(
+            cmap,
+            _mark_positioning.KOBURI_HEART_MARK_PAIRS,
+            heart_outputs,
+            COMBINING_MARK_INPUTS,
+        )
+    )
+    spacing_marks.extend(
+        mark_ligature_rules(
+            cmap,
+            _mark_positioning.KOBURI_HEART_MARK_PAIRS,
+            heart_outputs,
+            SPACING_MARK_INPUTS,
+        )
+    )
+    punctuation_marks = mark_ligature_rules(
+        cmap,
+        _mark_positioning.PUNCTUATION_MARK_PAIRS,
+        punctuation_mark_outputs,
+        COMBINING_MARK_INPUTS,
+    )
+    spacing_marks.extend(
+        mark_ligature_rules(
+            cmap,
+            _mark_positioning.PUNCTUATION_MARK_PAIRS,
+            punctuation_mark_outputs,
+            SPACING_MARK_INPUTS,
+        )
+    )
 
     if base_type == "noto":
         _font_operations.remove_repeated_ligatures(
@@ -1441,6 +1495,7 @@ def build(
             manga_wave,
             punctuation_variants,
             kana_marks,
+            spacing_marks,
             kana_vertical_maps,
             ruby_substitutions,
             punctuation_marks,
