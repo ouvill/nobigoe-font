@@ -1113,7 +1113,6 @@ def build(
         [
             0x21,
             0x3F,
-            0x7E,
             0x301C,
             0x3030,
             0x3099,
@@ -1354,7 +1353,7 @@ def build(
         "relaxed_wave",
         wave_base,
         wave_vertical,
-        font.getBestCmap()[0x7E],
+        font.getBestCmap()[0x3030],
         wave_selector_seed,
         relaxed_wave_names,
     )

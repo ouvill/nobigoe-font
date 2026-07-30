@@ -95,12 +95,12 @@ def selected_run_rules(
     prefix: str, source: str, seed: str, selected: str
 ) -> str:
     return f"""
-  lookup {prefix}_propagate {{
-    sub [{seed} {selected}] {source}' by {selected};
-  }} {prefix}_propagate;
   lookup {prefix}_activate {{
-    sub {seed}' {selected} by {selected};
+    sub {seed} by {selected} {selected};
   }} {prefix}_activate;
+  lookup {prefix}_propagate {{
+    sub {selected} {source}' by {selected};
+  }} {prefix}_propagate;
 """
 
 
@@ -316,8 +316,7 @@ def feature_source(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in (*kana_marks, *punctuation_marks)
     )
-    ccmp_rules += relaxed_wave_composition
-    liga_rules = "".join(
+    liga_rules = relaxed_wave_composition + "".join(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in spacing_marks
     )
