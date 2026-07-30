@@ -103,8 +103,8 @@ uv run nobigoe-package
 ```
 
 ```text
-dist/NobigoeMincho-v1.033.zip
-dist/NobigoeKoburiMincho-v1.033.zip
+dist/NobigoeMincho-v1.034.zip
+dist/NobigoeKoburiMincho-v1.034.zip
 ```
 
 ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
@@ -114,12 +114,12 @@ uv run nobigoe-package --include-experimental
 ```
 
 ```text
-dist/NobigoeNovelMincho-v1.030.zip
+dist/NobigoeNovelMincho-v1.034.zip
 ```
 
 ## GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.033`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.034`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ## ローカルの元フォントを使用
 

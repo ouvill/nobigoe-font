@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag matching profiles.VERSION_NUMBER (for example v1.033)"
+        description: "Release tag matching profiles.VERSION_NUMBER (for example v1.034)"
         required: true
         type: string
 
