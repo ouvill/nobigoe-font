@@ -49,6 +49,7 @@ def feature_source(
     manga_wave: tuple[str, str, list[str]],
     punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
     kana_marks: list[tuple[str, str, str]],
+    spacing_marks: Sequence[tuple[str, str, str]],
     kana_vertical_maps: list[tuple[str, str]],
     ruby_substitutions: list[tuple[str, str]],
     punctuation_marks: Sequence[tuple[str, str, str]] = (),
@@ -177,6 +178,10 @@ def feature_source(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in (*kana_marks, *punctuation_marks)
     )
+    liga_rules = "".join(
+        f"  sub {base} {mark} by {output};\n"
+        for base, mark, output in spacing_marks
+    )
     alternate_rules = "".join(
         f"  sub {names[0]} from [{' '.join(names[1:])}];\n"
         for _, names in punctuation_variants
@@ -195,6 +200,7 @@ def feature_source(
     return (
         "languagesystem DFLT dflt;\n\n"
         f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
+        f"feature liga {{\n{liga_rules}}} liga;\n\n"
         f"feature calt {{\n{''.join(calt_rules)}}} calt;\n\n"
         f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
         f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"

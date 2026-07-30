@@ -24,7 +24,10 @@ from nobigoe_font.features import (
     merge_features,
 )
 from nobigoe_font.pipeline import (
+    COMBINING_MARK_INPUTS,
     import_koburi_ruby,
+    SPACING_MARK_INPUTS,
+    mark_ligature_rules,
     make_manga_wave_parts,
     make_wave_parts,
 )
@@ -524,6 +527,8 @@ class TrueTypeBuildTests(unittest.TestCase):
         base_codepoint, mark_codepoint = CHOON_DAKUTEN_PAIR
         base = f"uni{base_codepoint:04X}"
         mark = f"uni{mark_codepoint:04X}"
+        spacing_mark_codepoint = 0x309B
+        spacing_mark = f"uni{spacing_mark_codepoint:04X}"
         output = "choon.dakuten"
         vertical_output = f"{output}.vert"
         wave_names = [f"wave.{index}" for index in range(10)]
@@ -538,6 +543,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                     ".notdef",
                     base,
                     mark,
+                    spacing_mark,
                     output,
                     vertical_output,
                     "wave.base",
@@ -555,24 +561,89 @@ class TrueTypeBuildTests(unittest.TestCase):
         )
         font = named_true_type_font(
             glyph_order,
-            {base_codepoint: base, mark_codepoint: mark},
+            {
+                base_codepoint: base,
+                mark_codepoint: mark,
+                spacing_mark_codepoint: spacing_mark,
+            },
         )
         source = feature_source(
             [],
             ("wave", "wave.base", "wave.vert", wave_names),
             ("manga-wave", "manga-wave.base", manga_wave_names),
             punctuation_variants,
-            [(base, mark, output)],
+            mark_ligature_rules(
+                font.getBestCmap(),
+                [CHOON_DAKUTEN_PAIR],
+                {CHOON_DAKUTEN_PAIR: output},
+                COMBINING_MARK_INPUTS,
+            ),
+            mark_ligature_rules(
+                font.getBestCmap(),
+                [CHOON_DAKUTEN_PAIR],
+                {CHOON_DAKUTEN_PAIR: output},
+                SPACING_MARK_INPUTS,
+            ),
             [(output, vertical_output)],
             [],
         )
 
         addOpenTypeFeaturesFromString(font, source, tables={"GSUB"})
 
-        self.assertEqual(feature_ligatures(font, "ccmp")[(base, mark)], output)
+        ccmp = feature_ligatures(font, "ccmp")
+        liga = feature_ligatures(font, "liga")
+        self.assertEqual(ccmp[(base, mark)], output)
+        self.assertNotIn((base, spacing_mark), ccmp)
+        self.assertEqual(liga[(base, spacing_mark)], output)
         self.assertEqual(
             feature_single_substitutions(font, "vert")[output],
             vertical_output,
+        )
+
+    def test_mark_ligature_rules_alias_spacing_marks(self) -> None:
+        pairs = ((0x3042, 0x3099), (0x304B, 0x309A))
+        outputs = {
+            pairs[0]: "hiragana-a.dakuten",
+            pairs[1]: "hiragana-ka.handakuten",
+        }
+        cmap = {
+            0x3042: "hiragana-a",
+            0x304B: "hiragana-ka",
+            0x3099: "dakuten",
+            0x309A: "handakuten",
+            0x309B: "spacing-dakuten",
+            0x309C: "spacing-handakuten",
+        }
+
+        combining_rules = {
+            (base, mark): output
+            for base, mark, output in mark_ligature_rules(
+                cmap, pairs, outputs, COMBINING_MARK_INPUTS
+            )
+        }
+        spacing_rules = {
+            (base, mark): output
+            for base, mark, output in mark_ligature_rules(
+                cmap, pairs, outputs, SPACING_MARK_INPUTS
+            )
+        }
+
+        self.assertEqual(
+            combining_rules,
+            {
+                ("hiragana-a", "dakuten"): "hiragana-a.dakuten",
+                ("hiragana-ka", "handakuten"): "hiragana-ka.handakuten",
+            },
+        )
+        self.assertEqual(
+            spacing_rules,
+            {
+                ("hiragana-a", "spacing-dakuten"): "hiragana-a.dakuten",
+                (
+                    "hiragana-ka",
+                    "spacing-handakuten",
+                ): "hiragana-ka.handakuten",
+            },
         )
 
     def test_feature_source_builds_punctuation_mark_substitutions(self) -> None:
@@ -623,6 +694,7 @@ class TrueTypeBuildTests(unittest.TestCase):
             ("wave", "wave.base", "wave.vert", wave_names),
             ("manga-wave", "manga-wave.base", manga_wave_names),
             punctuation_variants,
+            [],
             [],
             vertical_maps,
             [],
