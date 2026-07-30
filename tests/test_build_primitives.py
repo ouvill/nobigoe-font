@@ -25,6 +25,7 @@ from nobigoe_font.features import (
 )
 from nobigoe_font.pipeline import (
     _apply_novel_style,
+    _novel_hiragana_mappings,
     _novel_katakana_mappings,
     _native_novel_ccmp_outputs,
     build,
@@ -920,6 +921,57 @@ class NovelKatakanaPipelineTests(unittest.TestCase):
                 {},
             )
 
+    def test_hiragana_mapping_preserves_ka_identity_for_all_derivatives(
+        self,
+    ) -> None:
+        cmap = {
+            ord("か"): "ka",
+            ord("が"): "ga",
+            ord("き"): "ki",
+        }
+        mark_outputs = {
+            (ord("か"), 0x3099): "ka.comb",
+        }
+        with patch(
+            "nobigoe_font.pipeline._font_operations.vertical_glyph_or_self",
+            side_effect=lambda _font, glyph_name: glyph_name,
+        ):
+            (
+                horizontal,
+                vertical,
+                vertical_codepoints,
+                vertical_marked,
+                horizontal_codepoints,
+            ) = _novel_hiragana_mappings(
+                Mock(),
+                cmap,
+                mark_outputs,
+                {},
+                {},
+            )
+
+        self.assertEqual(
+            {name: horizontal[name] for name in ("ka", "ga", "ka.comb", "ki")},
+            {
+                "ka": "normal",
+                "ga": "normal",
+                "ka.comb": "normal",
+                "ki": "normal",
+            },
+        )
+        self.assertEqual(
+            horizontal_codepoints,
+            {
+                "ka": ord("か"),
+                "ga": ord("が"),
+                "ka.comb": ord("か"),
+                "ki": ord("き"),
+            },
+        )
+        self.assertEqual(vertical, {})
+        self.assertEqual(vertical_codepoints, {})
+        self.assertEqual(vertical_marked, frozenset())
+
     def test_complete_katakana_mappings_and_novel_apply_order(self) -> None:
         self.assertEqual(len(KATAKANA_SOURCE_CODEPOINTS), 109)
         target_pairs = tuple(
@@ -995,6 +1047,7 @@ class NovelKatakanaPipelineTests(unittest.TestCase):
             {"hiragana.vert": "normal"},
             {"hiragana.vert": 0x3042},
             frozenset(),
+            {"hiragana": 0x3042},
         )
         font = Mock()
         calls = Mock()
@@ -1014,7 +1067,12 @@ class NovelKatakanaPipelineTests(unittest.TestCase):
                 katakana_mappings,
             )
 
-        hiragana.assert_called_once_with(font, 400, *hiragana_mappings)
+        hiragana.assert_called_once_with(
+            font,
+            400,
+            *hiragana_mappings[:4],
+            horizontal_codepoints=hiragana_mappings[4],
+        )
         katakana.assert_called_once_with(font, 400, *katakana_mappings)
         han.assert_called_once_with(font)
         self.assertEqual(

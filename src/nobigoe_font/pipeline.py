@@ -126,8 +126,15 @@ def _novel_hiragana_mappings(
     mark_outputs: dict[tuple[int, int], str],
     vertical_mark_outputs: dict[tuple[int, int], str],
     missing_small_glyphs: dict[int, tuple[str, str]],
-) -> tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]]:
+) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, int],
+    frozenset[str],
+    dict[str, int],
+]:
     horizontal: dict[str, str] = {}
+    horizontal_codepoints: dict[str, int] = {}
     vertical: dict[str, str] = {}
     vertical_codepoints: dict[str, int] = {}
     vertical_marked_glyphs: set[str] = set()
@@ -138,7 +145,13 @@ def _novel_hiragana_mappings(
         if glyph_name is None:
             continue
         group = novel_group_for_codepoint(codepoint)
-        _add_novel_glyph_group(horizontal, glyph_name, group)
+        _add_novel_glyph_group(
+            horizontal,
+            glyph_name,
+            group,
+            codepoint=codepoint,
+            codepoints=horizontal_codepoints,
+        )
         vertical_name = _font_operations.vertical_glyph_or_self(font, glyph_name)
         if vertical_name != glyph_name:
             _add_novel_glyph_group(
@@ -154,7 +167,13 @@ def _novel_hiragana_mappings(
     generated_small = missing_small_glyphs.get(NOVEL_SMALL_KO_CODEPOINT)
     if generated_small is not None:
         horizontal_name, vertical_name = generated_small
-        _add_novel_glyph_group(horizontal, horizontal_name, "small")
+        _add_novel_glyph_group(
+            horizontal,
+            horizontal_name,
+            "small",
+            codepoint=NOVEL_SMALL_KO_CODEPOINT,
+            codepoints=horizontal_codepoints,
+        )
         _add_novel_glyph_group(
             vertical,
             vertical_name,
@@ -168,7 +187,13 @@ def _novel_hiragana_mappings(
         if base not in hiragana_bases:
             continue
         group = novel_group_for_codepoint(base)
-        _add_novel_glyph_group(horizontal, horizontal_name, group)
+        _add_novel_glyph_group(
+            horizontal,
+            horizontal_name,
+            group,
+            codepoint=base,
+            codepoints=horizontal_codepoints,
+        )
         vertical_name = vertical_mark_outputs.get(pair)
         if vertical_name is None:
             vertical_name = _font_operations.vertical_glyph_or_self(
@@ -189,6 +214,7 @@ def _novel_hiragana_mappings(
         vertical,
         vertical_codepoints,
         frozenset(vertical_marked_glyphs),
+        horizontal_codepoints,
     )
 
 
@@ -296,7 +322,14 @@ def _apply_novel_style(
     weight_class: int,
     kana_style: KanaStyle,
     hiragana_mappings: (
-        tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]] | None
+        tuple[
+            dict[str, str],
+            dict[str, str],
+            dict[str, int],
+            frozenset[str],
+            dict[str, int],
+        ]
+        | None
     ) = None,
     katakana_mappings: (
         tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]] | None
@@ -306,7 +339,22 @@ def _apply_novel_style(
         return
     if hiragana_mappings is None or katakana_mappings is None:
         raise ValueError("Novel kana mappings are required for the novel style")
-    apply_novel_hiragana(font, weight_class, *hiragana_mappings)
+    (
+        horizontal,
+        vertical,
+        vertical_codepoints,
+        vertical_marked_glyphs,
+        horizontal_codepoints,
+    ) = hiragana_mappings
+    apply_novel_hiragana(
+        font,
+        weight_class,
+        horizontal,
+        vertical,
+        vertical_codepoints,
+        vertical_marked_glyphs,
+        horizontal_codepoints=horizontal_codepoints,
+    )
     apply_novel_katakana(font, weight_class, *katakana_mappings)
     apply_novel_han(font)
 

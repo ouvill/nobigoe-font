@@ -14,6 +14,7 @@ from typing import AbstractSet, Literal, TypeAlias
 
 import pathops
 from fontTools.misc.transform import Transform
+from fontTools.pens.recordingPen import RecordingPen
 from fontTools.ttLib import TTFont
 
 from . import geometry, operations
@@ -41,6 +42,16 @@ _GROUPS: tuple[NovelGlyphGroup, ...] = (
     "iteration",
 )
 _WEIGHT_CLASSES = frozenset((200, 300, 400, 500, 600, 700, 900))
+NOVEL_KA_CODEPOINT = ord("か")
+NOVEL_KA_TERMINAL_MASTER_RAISES: Mapping[int, float] = {
+    200: 16,
+    400: 18,
+    900: 22,
+}
+_KA_TERMINAL_FULL_X = 330
+_KA_TERMINAL_FADE_X = 370
+_KA_TERMINAL_FULL_Y = 160
+_KA_TERMINAL_FADE_Y = 320
 _HORIZONTAL_ANCHORS: Mapping[NovelGlyphGroup, tuple[float, float]] = {
     group: (500, 370) for group in _GROUPS
 }
@@ -309,6 +320,60 @@ def novel_group_for_codepoint(codepoint: int) -> NovelGlyphGroup:
     return "normal"
 
 
+def novel_ka_terminal_raise(weight_class: int) -> float:
+    """Return the interpolated upward correction for the second-stroke terminal."""
+    if weight_class not in _WEIGHT_CLASSES:
+        raise ValueError(f"Unsupported novel hiragana weight class {weight_class!r}")
+    if weight_class in NOVEL_KA_TERMINAL_MASTER_RAISES:
+        return NOVEL_KA_TERMINAL_MASTER_RAISES[weight_class]
+
+    lower_weight = max(
+        master for master in NOVEL_KA_TERMINAL_MASTER_RAISES if master < weight_class
+    )
+    upper_weight = min(
+        master for master in NOVEL_KA_TERMINAL_MASTER_RAISES if master > weight_class
+    )
+    position = (weight_class - lower_weight) / (upper_weight - lower_weight)
+    lower = NOVEL_KA_TERMINAL_MASTER_RAISES[lower_weight]
+    upper = NOVEL_KA_TERMINAL_MASTER_RAISES[upper_weight]
+    return lower + position * (upper - lower)
+
+
+def _smootherstep(value: float) -> float:
+    value = min(1.0, max(0.0, value))
+    return value * value * value * (value * (value * 6 - 15) + 10)
+
+
+def shorten_novel_ka_terminal(
+    outline: pathops.Path,
+    amount: float,
+) -> pathops.Path:
+    """Raise the lower-left terminal while smoothly retaining its source shape."""
+    if amount < 0:
+        raise ValueError("Novel ka terminal correction must not be negative")
+    if not outline.verbs or amount == 0:
+        return outline
+
+    def transform_point(point: tuple[float, float]) -> tuple[float, float]:
+        x, y = point
+        x_strength = _smootherstep(
+            (_KA_TERMINAL_FADE_X - x) / (_KA_TERMINAL_FADE_X - _KA_TERMINAL_FULL_X)
+        )
+        y_strength = _smootherstep(
+            (_KA_TERMINAL_FADE_Y - y) / (_KA_TERMINAL_FADE_Y - _KA_TERMINAL_FULL_Y)
+        )
+        return x, y + amount * x_strength * y_strength
+
+    recording = RecordingPen()
+    outline.draw(recording)
+    shortened = pathops.Path()
+    pen = shortened.getPen()
+    for operator, operands in recording.value:
+        transformed = tuple(transform_point(point) for point in operands)
+        getattr(pen, operator)(*transformed)
+    return shortened
+
+
 def novel_vertical_stem_group(
     codepoint: int | None,
 ) -> NovelVerticalStemGroup | None:
@@ -465,6 +530,7 @@ def transform_novel_glyph(
     anchor: tuple[float, float],
     vertical_profile: NovelTransform | None = None,
     *,
+    terminal_raise: float = 0,
     error_label: str = "novel hiragana",
 ) -> None:
     """Transform one outline while preserving full-width metrics and vertical origin."""
@@ -505,6 +571,9 @@ def transform_novel_glyph(
                     f"{vertical_profile.stem_adjustment:g} units"
                 ) from error
 
+    if terminal_raise:
+        transformed = shorten_novel_ka_terminal(transformed, terminal_raise)
+
     if transformed.verbs:
         operations.replace_glyph(
             font,
@@ -529,13 +598,18 @@ def apply_novel_hiragana(
     vertical_glyphs: Mapping[str, str],
     vertical_codepoints: Mapping[str, int] | None = None,
     vertical_marked_glyphs: AbstractSet[str] = frozenset(),
+    horizontal_codepoints: Mapping[str, int] | None = None,
 ) -> NovelGlyphResult:
     """Apply canonical transforms plus the vertical-only optical correction."""
     if weight_class not in _WEIGHT_CLASSES:
         raise ValueError(f"Unsupported novel hiragana weight class {weight_class!r}")
 
     collected = _NovelGlyphCollection()
-    collected.add(horizontal_glyphs, vertical=False)
+    collected.add(
+        horizontal_glyphs,
+        vertical=False,
+        codepoints=horizontal_codepoints,
+    )
     collected.add(
         vertical_glyphs,
         vertical=True,
@@ -562,6 +636,11 @@ def apply_novel_hiragana(
             if mapped.vertical
             else None
         )
+        base_codepoint = (
+            novel_base_codepoint(mapped.codepoint)
+            if mapped.codepoint is not None
+            else None
+        )
         anchors = _VERTICAL_ANCHORS if mapped.vertical else _HORIZONTAL_ANCHORS
         transform_novel_glyph(
             font,
@@ -569,6 +648,11 @@ def apply_novel_hiragana(
             novel_transform(weight_class, mapped.group),
             anchors[mapped.group],
             vertical_profile,
+            terminal_raise=(
+                novel_ka_terminal_raise(weight_class)
+                if base_codepoint == NOVEL_KA_CODEPOINT
+                else 0
+            ),
         )
 
     return NovelGlyphResult(
@@ -582,6 +666,8 @@ __all__ = (
     "HIRAGANA_CODEPOINTS",
     "ITERATION_HIRAGANA_CODEPOINTS",
     "NORMAL_HIRAGANA_CODEPOINTS",
+    "NOVEL_KA_CODEPOINT",
+    "NOVEL_KA_TERMINAL_MASTER_RAISES",
     "NOVEL_VERTICAL_MARK_STEM_FACTOR",
     "NOVEL_VERTICAL_STEM_GROUPS",
     "NOVEL_VERTICAL_STEM_MASTER_PROFILES",
@@ -598,10 +684,12 @@ __all__ = (
     "SMALL_HIRAGANA_CODEPOINTS",
     "apply_novel_hiragana",
     "novel_base_codepoint",
+    "novel_ka_terminal_raise",
     "novel_vertical_stem_adjustment",
     "novel_vertical_stem_group",
     "novel_vertical_transform",
     "novel_transform",
     "novel_group_for_codepoint",
+    "shorten_novel_ka_terminal",
     "transform_novel_glyph",
 )

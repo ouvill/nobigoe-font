@@ -12,6 +12,8 @@ from nobigoe_font.novel import (
     COUNTER_HIRAGANA_CODEPOINTS,
     HIRAGANA_CODEPOINTS,
     ITERATION_HIRAGANA_CODEPOINTS,
+    NOVEL_KA_CODEPOINT,
+    NOVEL_KA_TERMINAL_MASTER_RAISES,
     NOVEL_MASTER_PROFILES,
     NOVEL_VERTICAL_MASTER_PROFILES,
     NOVEL_VERTICAL_STEM_GROUPS,
@@ -20,10 +22,12 @@ from nobigoe_font.novel import (
     SMALL_HIRAGANA_CODEPOINTS,
     apply_novel_hiragana,
     novel_group_for_codepoint,
+    novel_ka_terminal_raise,
     novel_vertical_transform,
     novel_vertical_stem_adjustment,
     novel_vertical_stem_group,
     novel_transform,
+    shorten_novel_ka_terminal,
 )
 from nobigoe_font.novel_metrics import _glyph_metrics
 
@@ -86,6 +90,49 @@ class NovelDesignTests(unittest.TestCase):
                 transform = novel_transform(weight, group)
                 self.assertGreater(transform.sx, 0)
                 self.assertGreater(transform.sy, 0)
+
+    def test_ka_terminal_correction_interpolates_three_optical_masters(
+        self,
+    ) -> None:
+        self.assertEqual(
+            NOVEL_KA_TERMINAL_MASTER_RAISES,
+            {200: 16, 400: 18, 900: 22},
+        )
+        self.assertEqual(NOVEL_KA_CODEPOINT, ord("か"))
+        expected = {
+            200: 16,
+            300: 17,
+            400: 18,
+            500: 18.8,
+            600: 19.6,
+            700: 20.4,
+            900: 22,
+        }
+        for weight, amount in expected.items():
+            self.assertAlmostEqual(novel_ka_terminal_raise(weight), amount)
+
+    def test_ka_terminal_correction_is_smooth_and_local(self) -> None:
+        outline = pathops.Path()
+        pen = outline.getPen()
+        pen.moveTo((140, 7))
+        pen.lineTo((250, 120))
+        pen.lineTo((350, 250))
+        pen.lineTo((300, 450))
+        pen.lineTo((390, 17))
+        pen.closePath()
+
+        shortened = shorten_novel_ka_terminal(outline, 18)
+        before = list(outline.points)
+        after = list(shortened.points)
+        self.assertEqual([point[0] for point in after], [point[0] for point in before])
+        self.assertEqual(after[0][1] - before[0][1], 18)
+        self.assertEqual(after[1][1] - before[1][1], 18)
+        self.assertGreater(after[2][1] - before[2][1], 0)
+        self.assertLess(after[2][1] - before[2][1], 18)
+        self.assertEqual(after[3], before[3])
+        self.assertEqual(after[4], before[4])
+        with self.assertRaisesRegex(ValueError, "must not be negative"):
+            shorten_novel_ka_terminal(outline, -1)
 
     def test_vertical_masters_and_glyph_corrections_are_independent(self) -> None:
         self.assertEqual(tuple(NOVEL_VERTICAL_MASTER_PROFILES), (200, 400, 900))
@@ -241,6 +288,55 @@ class NovelDesignTests(unittest.TestCase):
             vertical_bounds[3] - vertical_bounds[1],
             horizontal_bounds[3] - horizontal_bounds[1],
         )
+
+    def test_ka_correction_is_codepoint_specific_and_alias_safe(self) -> None:
+        ka_font = _novel_test_font()
+        alias_font = _novel_test_font()
+        ki_font = _novel_test_font()
+        reference_font = _novel_test_font()
+
+        apply_novel_hiragana(
+            ka_font,
+            400,
+            {"horizontal": "normal"},
+            {},
+            horizontal_codepoints={"horizontal": ord("か")},
+        )
+        apply_novel_hiragana(
+            alias_font,
+            400,
+            {"horizontal": "normal"},
+            {"horizontal": "normal"},
+            {"horizontal": ord("か")},
+            horizontal_codepoints={"horizontal": ord("か")},
+        )
+        apply_novel_hiragana(
+            ki_font,
+            400,
+            {"horizontal": "normal"},
+            {},
+            horizontal_codepoints={"horizontal": ord("き")},
+        )
+        apply_novel_hiragana(
+            reference_font,
+            400,
+            {"horizontal": "normal"},
+            {},
+        )
+
+        ka_path = glyph_path(ka_font, "horizontal")
+        alias_path = glyph_path(alias_font, "horizontal")
+        ki_path = glyph_path(ki_font, "horizontal")
+        reference_path = glyph_path(reference_font, "horizontal")
+        self.assertEqual(alias_path.verbs, ka_path.verbs)
+        self.assertEqual(alias_path.points, ka_path.points)
+        self.assertEqual(ki_path.verbs, reference_path.verbs)
+        self.assertEqual(ki_path.points, reference_path.points)
+
+        def lower_left(path: pathops.Path) -> float:
+            return min(y for x, y in path.points if x < 200)
+
+        self.assertEqual(lower_left(ka_path) - lower_left(reference_path), 18)
 
     def test_conflicting_alias_groups_fail_before_mutation(self) -> None:
         font = _novel_test_font()
