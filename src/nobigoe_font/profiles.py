@@ -114,7 +114,7 @@ class LatinBuildProfile:
 
 
 NOTO_COMMIT = "9b0f1436e455d902de067a2501422e5dc71ad16b"
-NOTO_SERIF_VARIABLE_SHA256 = (
+NOTO_SERIF_CFF2_VARIABLE_SHA256 = (
     "39701fd096bc51204a8444c6c2659f007b29674a13eb62ddfa470638fe8179cd"
 )
 NOTO_WEIGHT_CLASSES = {
@@ -126,6 +126,9 @@ NOTO_WEIGHT_CLASSES = {
     "Bold": 700,
     "Black": 900,
 }
+NOTO_SERIF_VARIABLE_SHA256 = (
+    "99999f906b3793c7c97661a05ef9d53488d488604683b308c756d084b71df7d1"
+)
 NOTO_SERIF_SHA256 = {
     "ExtraLight": "a5056bf9b22a624b62115e9ad242879492179fe6f0b45ce5932967eb20295d5e",
     "Light": "54e6b0fa70430987a6c12001f128812f37fc315d899cb1d964395ab6450bb977",
@@ -219,6 +222,14 @@ STIX_TWO_OTF_SHA256 = {
     "Bold": "7ef76c666a6704f76ed3fa27bcdda55b36e558b5c2c93b49b03d854db96bdeb5",
 }
 STIX_TWO_SCALE_FACTOR = 1.110
+# Minimize the mean absolute per-glyph area/advance error against Noto Serif JP
+# over A-Z, a-z, and 0-9 after applying the shared STIX Two scale factor.
+STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS = {
+    "Regular": -10,
+    "Medium": -12,
+    "SemiBold": -14,
+    "Bold": -15,
+}
 STIX_TWO_COPYRIGHT = (
     "Copyright 2001-2021 The STIX Fonts Project Authors "
     "(https://github.com/stipub/stixfonts)"
@@ -364,12 +375,25 @@ def noto_serif_source(weight: str) -> DirectSource:
 
 
 def noto_serif_variable_source() -> DirectSource:
+    """Return the pinned development source for the Novel kana design VF."""
+
+    filename = "NotoSerifJP-VF.ttf"
+    url = (
+        "https://raw.githubusercontent.com/notofonts/noto-cjk/"
+        f"{NOTO_COMMIT}/Serif/Variable/TTF/Subset/{filename}"
+    )
+    return DirectSource(filename, url, NOTO_SERIF_VARIABLE_SHA256)
+
+
+def noto_serif_cff2_variable_source() -> DirectSource:
+    """Return the pinned CFF2 source for the experimental variable build."""
+
     filename = "NotoSerifJP-VF.otf"
     url = (
         "https://raw.githubusercontent.com/notofonts/noto-cjk/"
         f"{NOTO_COMMIT}/Serif/Variable/OTF/Subset/{filename}"
     )
-    return DirectSource(filename, url, NOTO_SERIF_VARIABLE_SHA256)
+    return DirectSource(filename, url, NOTO_SERIF_CFF2_VARIABLE_SHA256)
 
 
 def noto_sans_source(weight: str) -> DirectSource:
@@ -459,7 +483,7 @@ def latin_build_profile(family: LatinFamily, weight: str) -> LatinBuildProfile:
         return LatinBuildProfile(
             family,
             STIX_TWO_SCALE_FACTOR,
-            0,
+            STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS[weight],
             copyright=STIX_TWO_COPYRIGHT,
         )
     if family == "source-serif-4":

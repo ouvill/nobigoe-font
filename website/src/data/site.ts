@@ -16,6 +16,9 @@ export const SITE = {
   supportUrl: "https://github.com/sponsors/ouvill",
 } as const;
 
+export const NOVEL_PROSE_SPECIMEN =
+  "あのイーハトーヴォのすきとおった風、夏でも底に冷たさをもつ青いそら、うつくしい森で飾られたモリーオ市、郊外のぎらぎらひかる草の波。またそのなかでいっしょになったたくさんのひとたち、ファゼーロとロザーロ、羊飼のミーロや、顔の赤いこどもたち、地主のテーモ、山猫博士のボーガント・デストゥパーゴなど、いまこの暗い巨きな石の建物のなかで考えていると、みんなむかし風のなつかしい青い幻燈のように思われます。";
+
 export const WEIGHTS = [
   { name: "ExtraLight", value: 200 },
   { name: "Light", value: 300 },
@@ -30,8 +33,5 @@ export const NAVIGATION = [
   { href: "/", label: "紹介" },
   { href: "/tester/", label: "文字を試す" },
   { href: "/glyphs/", label: "字形一覧" },
-] as const;
-
-export const DEV_NAVIGATION = [
-  { href: "/compare/", label: "かな比較" },
+  { href: "/compare/", label: "制作プレビュー" },
 ] as const;

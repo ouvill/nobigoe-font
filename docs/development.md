@@ -50,6 +50,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | `punctuation.py` / `features.py` | 感嘆符・疑問符合字の合成とOpenType機能の生成・結合 |
 | `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
 | `novel.py` / `novel_katakana.py` / `novel_han.py` / `novel_metrics.py` | Novelひらがな・カタカナの3マスター設計、Unicode 15.1 Han集合と等方縮小、字面・ink・カウンター計測 |
+| `kana_terminals.py` / `terminal_plans/` / `variable_kana.py` | 互換トポロジーの筆端変形、字別・横縦・3マスター台帳、可変制作正本の生成と固定ウェイト実体化 |
 
 ## 自動取得して生成
 
@@ -61,7 +62,7 @@ Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです�
 
 `--autohint`を指定すると、生成後にAFDKO `otfautohint`を実行します。処理対象は今回取り込んだ欧文字形だけに限定し、Noto Serif JP由来の和文字形の既存ヒントには触れません。`otfautohint`が見つからない場合はエラーにして、未ヒントの成果物を正常終了として扱いません。
 
-`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍で取り込みます。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。
+`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍したうえで縦画を中心に-10、-12、-14、-15 units補正します。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。STIX Two Textの補正値は、1.110倍後の`A–Z`・`a–z`・`0–9`について、各字の輪郭面積を送り幅で割り、同ウェイトのNoto Serif JP欧文との差の平均絶対誤差を-40〜0 unitsの整数候補中で最小にする値です。
 
 ```sh
 # Noto版Regular
@@ -75,9 +76,13 @@ for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
   uv run nobigoe-build --weight "$weight" --autohint
 done
 
-# Novel小説仮名版の全7ウェイト
+# Novel可変かな制作正本を一度生成し、そこから固定7ウェイトを作る
+uv run nobigoe-build \
+  --build-variable-kana dist/NobigoeNovelKanaDesign-VF.ttf
 for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-  uv run nobigoe-build --kana-style novel --weight "$weight" --autohint
+  uv run nobigoe-build --kana-style novel --variable-kana \
+    --variable-kana-source dist/NobigoeNovelKanaDesign-VF.ttf \
+    --weight "$weight" --autohint
 done
 
 # 源暎こぶり明朝版Regular
@@ -94,7 +99,7 @@ for latin in noto libertinus stix-two-text source-serif-4; do
 done
 ```
 
-既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`は制作VFを明示した場所へ生成し、`--variable-kana`はそのVFから対象ウェイトのかなを取り込みます。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
 `nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`を取得し、Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharStringに加えて、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。濁点・半濁点の配置と記号の輪郭は200、300、400、500、600、700、900のレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`の約物、欧文・ルビ置換は含みません。
 
@@ -210,7 +215,11 @@ npm run dev
 
 `website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
 
-かな比較`/compare/`は`npm run dev`でだけ有効になる開発用ページです。`npm run build`の静的成果物、公開ナビゲーション、GitHub Pagesには含めず、PagesワークフローもNovel比較用Webfontを生成しません。
+### OMPのLanguage Server
+
+リポジトリ直下からOMPを起動すると、`.omp/lsp.json`に従ってPython、Astro、TypeScript／JavaScript、CSS、HTML、JSONのLanguage Serverが有効になります。`uv sync`でbasedpyrightを、`website/`で`npm ci`を実行してWeb用Language Serverをインストールしてください。`npm ci`後の`astro sync`は自動実行され、Astroの型定義も生成されます。
+
+かな比較`/compare/`は、小説本文用のNovel仮名を制作途中から確認できる公開制作プレビューです。Noto／Koburi／Novelの比較、固定7ウェイト、横組・縦組本文、開発用可変かなソースを掲載し、Pagesワークフローで必要な比較用Webfontを生成します。Novel版は通常の配布ZIPとタグリリースには含めません。
 
 公開サイトは<https://nobigoe.ouvill.net/>です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
 

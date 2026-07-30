@@ -87,9 +87,7 @@ def make_punctuation_ligature(
         source = geometry.glyph_path(font, cmap[source_codepoint])
         contours = list(source.contours)
         if len(contours) != 4:
-            raise ValueError(
-                f"Expected four contours in U+{source_codepoint:04X}"
-            )
+            raise ValueError(f"Expected four contours in U+{source_codepoint:04X}")
         outline = pathops.Path()
         outline.addPath(contours[0])
         outline.addPath(contours[2])
@@ -154,7 +152,6 @@ def punctuation_ligature_rules(
 ) -> str:
     inputs = {"!": exclamation, "?": question}
     return "".join(
-        f"  sub {' '.join(inputs[mark] for mark in sequence)}"
-        f" by {name};\n"
+        f"  sub {' '.join(inputs[mark] for mark in sequence)}" f" by {name};\n"
         for sequence, name in ligatures
     )

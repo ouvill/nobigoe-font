@@ -11,7 +11,7 @@ from fontTools.ttLib import TTFont
 from nobigoe_font import geometry
 from nobigoe_font.features import symbol_feature_source
 from nobigoe_font.operations import feature_ligatures, feature_single_substitutions
-from nobigoe_font.profiles import noto_serif_variable_source
+from nobigoe_font.profiles import noto_serif_cff2_variable_source
 from nobigoe_font.variable_cli import DEFAULT_OUTPUT_PATH, main
 from nobigoe_font.variable_marks import (
     _cap_cut_span,
@@ -230,7 +230,7 @@ class VariableSymbolTests(unittest.TestCase):
 
 class VariableBuildCliTests(unittest.TestCase):
     def test_variable_source_is_pinned_to_the_noto_cff2_subset(self) -> None:
-        source = noto_serif_variable_source()
+        source = noto_serif_cff2_variable_source()
 
         self.assertEqual(source.filename, "NotoSerifJP-VF.otf")
         self.assertTrue(
@@ -274,7 +274,7 @@ class VariableBuildCliTests(unittest.TestCase):
         ):
             main([])
 
-        self.assertEqual(fetch.call_args.args[0], noto_serif_variable_source())
+        self.assertEqual(fetch.call_args.args[0], noto_serif_cff2_variable_source())
         build.assert_called_once_with(cached, DEFAULT_OUTPUT_PATH, 0)
 
 

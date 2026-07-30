@@ -1,14 +1,17 @@
 ---
-import { WEIGHTS } from "../data/site";
+import { NOVEL_PROSE_SPECIMEN, WEIGHTS } from "../data/site";
+import novelExtraLightUrl from "../assets/fonts/NobigoeNovelMincho-ExtraLight-showcase.woff2?url";
+import novelLightUrl from "../assets/fonts/NobigoeNovelMincho-Light-showcase.woff2?url";
+import novelRegularUrl from "../assets/fonts/NobigoeNovelMincho-Regular-showcase.woff2?url";
+import novelMediumUrl from "../assets/fonts/NobigoeNovelMincho-Medium-showcase.woff2?url";
+import novelSemiBoldUrl from "../assets/fonts/NobigoeNovelMincho-SemiBold-showcase.woff2?url";
+import novelBoldUrl from "../assets/fonts/NobigoeNovelMincho-Bold-showcase.woff2?url";
+import novelBlackUrl from "../assets/fonts/NobigoeNovelMincho-Black-showcase.woff2?url";
+import VariableKanaInspector from "./VariableKanaInspector.astro";
 
 const representativeHiragana = "あのぬめょゝ";
 const representativeKatakana = "アウシネヮヽ";
 const representativeKanji = "永漢字山川雨月語本";
-const hiraganaProse =
-  "春の雨が野の道をぬらし、遠い家の灯りがゆっくり揺れていた。夜はまだ静かに続いている。";
-const katakanaProse =
-  "窓辺のラジオからクラシックが流れ、テーブルのコーヒーは静かに湯気を立てていた。";
-const verticalProse = `かがはばぱ、なけせきも。カガハバパ、ナケセキモ。${hiraganaProse}${katakanaProse}`;
 const faces = [
   {
     key: "noto",
@@ -29,11 +32,20 @@ const faces = [
     source: "同ウェイトのNoto Serif JPを本文向けに変形",
   },
 ] as const;
+const novelFontUrls: Record<string, string> = {
+  ExtraLight: novelExtraLightUrl,
+  Light: novelLightUrl,
+  Regular: novelRegularUrl,
+  Medium: novelMediumUrl,
+  SemiBold: novelSemiBoldUrl,
+  Bold: novelBoldUrl,
+  Black: novelBlackUrl,
+};
 const novelFontCss = WEIGHTS.map(
   (weight) => `
 @font-face {
   font-family: "Nobigoe Novel Mincho";
-  src: url("${import.meta.env.BASE_URL}src/assets/fonts/NobigoeNovelMincho-${weight.name}-showcase.woff2") format("woff2");
+  src: url("${novelFontUrls[weight.name]}") format("woff2");
   font-weight: ${weight.value};
   font-style: normal;
   font-display: swap;
@@ -182,7 +194,7 @@ const novelFontCss = WEIGHTS.map(
           spellcheck="false"
           lang="ja"
         >
-          <span>{hiraganaProse}</span><br /><br /><span>{katakanaProse}</span>
+          {NOVEL_PROSE_SPECIMEN}
         </div>
       </article>
 
@@ -201,7 +213,7 @@ const novelFontCss = WEIGHTS.map(
           spellcheck="false"
           lang="ja"
         >
-          <span>{hiraganaProse}</span><br /><br /><span>{katakanaProse}</span>
+          {NOVEL_PROSE_SPECIMEN}
         </div>
       </article>
     </div>
@@ -250,12 +262,14 @@ const novelFontCss = WEIGHTS.map(
               <strong>{face.name} Regular</strong>
               <span>{face.label}</span>
             </header>
-            <p lang="ja">{verticalProse}</p>
+            <p lang="ja">{NOVEL_PROSE_SPECIMEN}</p>
           </article>
         ))
       }
     </div>
   </section>
+
+  <VariableKanaInspector />
 
   <details class="comparison-overlay">
     <summary>

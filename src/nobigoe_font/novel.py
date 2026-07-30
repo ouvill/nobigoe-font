@@ -21,9 +21,12 @@ from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.ttLib import TTFont
 
 from . import geometry, operations
+from .kana_terminals import soften_kana_terminals
 
 NovelGlyphGroup: TypeAlias = Literal["normal", "counter", "small", "iteration"]
 NovelVerticalStemGroup: TypeAlias = Literal["strong", "fragile", "moderate"]
+
+_MAX_CFF_STORAGE_CORRECTIONS = 4
 
 NOVEL_SMALL_KO_CODEPOINT = 0x1B132
 HIRAGANA_CODEPOINTS = frozenset((*range(0x3041, 0x3097), *range(0x309D, 0x30A0)))
@@ -405,14 +408,23 @@ def _round_terminal_path_for_cff(outline: pathops.Path) -> pathops.Path:
     return rounded
 
 
-def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
-    """Select only the connected boundary arc surrounding the lower-left cap."""
-    contours = tuple(outline.contours)
-    contour_index = min(
-        range(len(contours)),
-        key=lambda index: contours[index].bounds[1],
-    )
-    points = tuple(contours[contour_index].points)
+def _ka_terminal_deformation(
+    contours: tuple[tuple[tuple[float, float], ...], ...],
+    amount: float,
+    *,
+    contour_index: int | None = None,
+) -> _KaTerminalArc:
+    """Describe a topology-neutral shortening around the lower-left cap."""
+    if not contours or any(not contour for contour in contours):
+        raise ValueError("Novel ka terminal requires non-empty contours")
+    if contour_index is None:
+        contour_index = min(
+            range(len(contours)),
+            key=lambda index: min(y for _, y in contours[index]),
+        )
+    elif not 0 <= contour_index < len(contours):
+        raise ValueError("Novel ka terminal contour index is out of range")
+    points = contours[contour_index]
     minimum_y = min(y for _, y in points)
     minimum_indices = frozenset(
         index
@@ -506,14 +518,36 @@ def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
         )
         + _KA_TERMINAL_COMPANION_CLEARANCE
     )
+    return _KaTerminalArc(
+        contour_index,
+        strengths,
+        translation,
+        cap_center,
+        axis_unit,
+        companion_lateral_limit,
+        frozenset(),
+    )
+
+
+def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
+    """Select only the connected boundary arc surrounding the lower-left cap."""
+    contours = tuple(outline.contours)
+    deformation = _ka_terminal_deformation(
+        tuple(tuple(contour.points) for contour in contours),
+        amount,
+        contour_index=min(
+            range(len(contours)),
+            key=lambda index: contours[index].bounds[1],
+        ),
+    )
     # Type 2 exposes overlap seams as small clockwise contours nested inside
     # the main stroke; detached marks remain outside and are preserved.
     main_contour = pathops.Path()
-    contours[contour_index].draw(main_contour.getPen())
+    contours[deformation.contour_index].draw(main_contour.getPen())
     omitted_contours = frozenset(
         index
         for index, contour in enumerate(contours)
-        if index != contour_index
+        if index != deformation.contour_index
         and contour.clockwise
         and contour.area <= _KA_OVERLAP_SLIVER_MAX_AREA
         and main_contour.contains(
@@ -524,12 +558,12 @@ def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
         )
     )
     return _KaTerminalArc(
-        contour_index,
-        strengths,
-        translation,
-        cap_center,
-        axis_unit,
-        companion_lateral_limit,
+        deformation.contour_index,
+        deformation.strengths,
+        deformation.translation,
+        deformation.centerline_origin,
+        deformation.axis_unit,
+        deformation.companion_lateral_limit,
         omitted_contours,
     )
 
@@ -846,16 +880,15 @@ def transform_novel_glyph(
                     f"{vertical_profile.stem_adjustment:g} units"
                 ) from error
 
-    terminal_left_side_bearing = (
-        math.floor(transformed.bounds[0])
-        if terminal_raise and transformed.verbs
-        else None
-    )
-    terminal_top_side_bearing = (
-        math.floor(vertical_origin - transformed.bounds[3])
-        if terminal_raise and transformed.verbs and "vmtx" in font
-        else None
-    )
+    terminal_left_side_bearing = None
+    terminal_top_side_bearing = None
+    if terminal_raise and transformed.verbs:
+        metric_outline, _ = soften_kana_terminals(transformed)
+        terminal_left_side_bearing = math.floor(metric_outline.bounds[0])
+        if "vmtx" in font:
+            terminal_top_side_bearing = math.floor(
+                vertical_origin - metric_outline.bounds[3]
+            )
 
     if terminal_raise:
         if "CFF " in font:
@@ -866,6 +899,7 @@ def transform_novel_glyph(
             raise ValueError(
                 f"Could not correct novel ka terminal glyph {glyph_name!r}"
             ) from error
+    transformed, _ = soften_kana_terminals(transformed)
 
     if transformed.verbs:
         operations.replace_glyph(
@@ -876,6 +910,25 @@ def transform_novel_glyph(
             advance_override=1000,
             left_side_bearing_override=terminal_left_side_bearing,
         )
+        if "CFF " in font:
+            for storage_pass in range(_MAX_CFF_STORAGE_CORRECTIONS + 1):
+                stored = geometry.glyph_path(font, glyph_name)
+                stored, stored_count = soften_kana_terminals(stored)
+                if stored_count == 0:
+                    break
+                if storage_pass == _MAX_CFF_STORAGE_CORRECTIONS:
+                    raise ValueError(
+                        f"Could not preserve softened {error_label} terminal "
+                        f"for glyph {glyph_name!r}"
+                    )
+                operations.replace_glyph(
+                    font,
+                    glyph_name,
+                    stored,
+                    vertical_origin,
+                    advance_override=1000,
+                    left_side_bearing_override=terminal_left_side_bearing,
+                )
     else:
         _, left_side_bearing = font["hmtx"].metrics[glyph_name]
         font["hmtx"].metrics[glyph_name] = (1000, left_side_bearing)

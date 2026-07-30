@@ -1,0 +1,68 @@
+{
+  "servers": {
+    "basedpyright": {
+      "settings": {
+        "basedpyright": {
+          "analysis": {
+            "autoSearchPaths": true,
+            "typeCheckingMode": "basic",
+            "useLibraryCodeForTypes": true
+          }
+        }
+      }
+    },
+    "pyright": {
+      "disabled": true
+    },
+    "pylsp": {
+      "disabled": true
+    },
+    "typescript-language-server": {
+      "command": "node",
+      "args": [
+        "website/node_modules/typescript-language-server/lib/cli.mjs",
+        "--stdio"
+      ],
+      "rootMarkers": [".git"]
+    },
+    "astro": {
+      "command": "node",
+      "args": [
+        "website/node_modules/@astrojs/language-server/bin/nodeServer.js",
+        "--stdio"
+      ],
+      "initOptions": {
+        "typescript": {
+          "tsdk": "website/node_modules/typescript/lib"
+        },
+        "contentIntellisense": true
+      },
+      "rootMarkers": [".git"]
+    },
+    "vscode-css-language-server": {
+      "command": "node",
+      "args": [
+        "website/node_modules/vscode-langservers-extracted/bin/vscode-css-language-server",
+        "--stdio"
+      ],
+      "rootMarkers": [".git"]
+    },
+    "vscode-html-language-server": {
+      "command": "node",
+      "args": [
+        "website/node_modules/vscode-langservers-extracted/bin/vscode-html-language-server",
+        "--stdio"
+      ],
+      "rootMarkers": [".git"]
+    },
+    "vscode-json-language-server": {
+      "command": "node",
+      "args": [
+        "website/node_modules/vscode-langservers-extracted/bin/vscode-json-language-server",
+        "--stdio"
+      ],
+      "rootMarkers": [".git"]
+    }
+  },
+  "idleTimeoutMs": 300000
+}

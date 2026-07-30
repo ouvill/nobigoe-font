@@ -973,7 +973,7 @@ def _merge_latin_layout(
     data = BytesIO()
     source_font.save(data)
     data.seek(0)
-    layout_source = TTFont(data, lazy=True)
+    layout_source = TTFont(data)
     old_order = layout_source.getGlyphOrder()
     layout_source.setGlyphOrder([mapping[name] for name in old_order])
     for tag in ("GDEF", "GSUB", "GPOS"):

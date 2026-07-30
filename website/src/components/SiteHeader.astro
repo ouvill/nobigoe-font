@@ -1,11 +1,8 @@
 ---
-import { DEV_NAVIGATION, NAVIGATION, SITE } from "../data/site";
+import { NAVIGATION, SITE } from "../data/site";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const currentPath = Astro.url.pathname;
-const navigation = import.meta.env.DEV
-  ? [...NAVIGATION, ...DEV_NAVIGATION]
-  : NAVIGATION;
 const toPath = (href: string) => (href === "/" ? `${base}/` : `${base}${href}`);
 const isActive = (href: string) => {
   const target = toPath(href);
@@ -28,7 +25,7 @@ const isActive = (href: string) => {
 
   <nav class="desktop-nav" aria-label="メインナビゲーション">
     {
-      navigation.map((item) => (
+      NAVIGATION.map((item) => (
         <a
           href={toPath(item.href)}
           aria-current={isActive(item.href) ? "page" : undefined}
@@ -47,7 +44,7 @@ const isActive = (href: string) => {
     <summary><span>メニュー</span><span aria-hidden="true">＋</span></summary>
     <nav aria-label="モバイルナビゲーション">
       {
-        navigation.map((item) => (
+        NAVIGATION.map((item) => (
           <a
             href={toPath(item.href)}
             aria-current={isActive(item.href) ? "page" : undefined}

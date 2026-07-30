@@ -1,0 +1,273 @@
+---
+import { NOVEL_PROSE_SPECIMEN, WEIGHTS } from "../data/site";
+import variableFontUrl from "../assets/fonts/NobigoeNovelKanaDesign-VF.woff2?url";
+const weightPosition = (weight: number) =>
+  `${((weight - 200) / (900 - 200)) * 100}%`;
+const hiraganaRows = [
+  "あいうえお　ぁぃぅぇぉ",
+  "かきくけこ　がぎぐげご　ゕゖ",
+  "さしすせそ　ざじずぜぞ",
+  "たちつてと　だぢづでど　っ",
+  "なにぬねの",
+  "はひふへほ　ばびぶべぼ　ぱぴぷぺぽ",
+  "まみむめも",
+  "やゆよ　ゃゅょ",
+  "らりるれろ",
+  "わゐゑをん　ゎ　ゔ　ゝゞゟ",
+];
+const katakanaRows = [
+  "アイウエオ　ァィゥェォ",
+  "カキクケコ　ガギグゲゴ　ヵヶ",
+  "サシスセソ　ザジズゼゾ",
+  "タチツテト　ダヂヅデド　ッ",
+  "ナニヌネノ",
+  "ハヒフヘホ　バビブベボ　パピプペポ",
+  "マミムメモ",
+  "ヤユヨ　ャュョ",
+  "ラリルレロ",
+  "ワヰヱヲン ヮ ヴ \u30f7\u30f8\u30f9\u30fa ヽヾヿ \u31f0\u31f1\u31f2\u31f3\u31f4\u31f5\u31f6\u31f7\u31f8\u31f9\u31fa\u31fb\u31fc\u31fd\u31fe\u31ff",
+];
+---
+
+<details
+  class="variable-kana-inspector"
+  data-variable-kana-inspector
+  data-variable-font-src={variableFontUrl}
+  data-state="idle"
+>
+  <summary>
+    <span>
+      <small>05 / OPTIONAL DESIGN VF</small>
+      <strong>開発用の可変かなを検査する</strong>
+    </span>
+    <span aria-hidden="true">＋</span>
+  </summary>
+
+  <div class="variable-kana-inspector__body">
+    <header class="variable-kana-introduction">
+      <p class="variable-kana-badge">DEVELOPMENT SOURCE · NOT A RELEASE</p>
+      <div>
+        <h3>Novel Kana Design VF</h3>
+        <p>
+          これは字形設計を確認するための開発ソースです。配布中の「のびごえ明朝」やNovelの静的7ウェイトとは別物で、リリース済みファミリーではありません。
+        </p>
+      </div>
+      <p
+        class="variable-kana-status"
+        role="status"
+        aria-live="polite"
+        data-variable-kana-status
+      >
+        この項目を開いたときだけ、開発用VFの読み込みを試みます。
+      </p>
+    </header>
+
+    <fieldset class="variable-kana-control" disabled data-variable-kana-control>
+      <legend>可変ウェイト</legend>
+      <div class="variable-kana-control__value">
+        <span>現在値</span>
+        <output for="variable-kana-weight">
+          <strong data-variable-weight-name>Regular</strong>
+          <span data-variable-weight-value>400</span>
+        </output>
+      </div>
+      <input
+        id="variable-kana-weight"
+        type="range"
+        min="200"
+        max="900"
+        step="1"
+        value="400"
+        list="variable-kana-weight-marks"
+        aria-label="可変ウェイト"
+        aria-valuetext="Regular 400"
+        aria-describedby="variable-kana-weight-help"
+        data-variable-kana-range
+      />
+      <datalist id="variable-kana-weight-marks">
+        {
+          WEIGHTS.map((weight) => (
+            <option value={weight.value} label={weight.name} />
+          ))
+        }
+      </datalist>
+      <p id="variable-kana-weight-help">
+        左右の矢印キーで1ずつ調整できます。名前付きの値は下の目盛から選べます。
+      </p>
+      <div class="variable-kana-ticks" aria-label="名前付きウェイト">
+        {
+          WEIGHTS.map((weight) => (
+            <button
+              type="button"
+              value={weight.value}
+              style={`--tick-position: ${weightPosition(weight.value)}`}
+              class:list={{ "is-active": weight.value === 400 }}
+              aria-pressed={weight.value === 400 ? "true" : "false"}
+              data-weight-name={weight.name}
+              data-variable-weight-tick
+            >
+              <strong>{weight.name}</strong>
+              <span>{weight.value}</span>
+            </button>
+          ))
+        }
+      </div>
+    </fieldset>
+
+    <div class="variable-kana-specimens" data-variable-kana-specimens hidden>
+      <section
+        class="variable-kana-prose variable-kana-prose--horizontal"
+        aria-labelledby="variable-horizontal-title"
+      >
+        <header>
+          <h4 id="variable-horizontal-title">横組</h4>
+          <p>wght <span data-variable-specimen-value>400</span></p>
+        </header>
+        <p lang="ja" data-variable-specimen>{NOVEL_PROSE_SPECIMEN}</p>
+      </section>
+
+      <section
+        class="variable-kana-prose variable-kana-prose--vertical"
+        aria-labelledby="variable-vertical-title"
+      >
+        <header>
+          <h4 id="variable-vertical-title">縦組</h4>
+          <p>wght <span data-variable-specimen-value>400</span></p>
+        </header>
+        <p lang="ja" data-variable-specimen>{NOVEL_PROSE_SPECIMEN}</p>
+      </section>
+
+      <section
+        class="variable-kana-sheet"
+        aria-labelledby="variable-kana-sheet-title"
+      >
+        <header>
+          <p>FULL KANA SHEET</p>
+          <h4 id="variable-kana-sheet-title">ひらがな・カタカナ全体見本</h4>
+          <p>wght <span data-variable-specimen-value>400</span></p>
+        </header>
+        <div class="variable-kana-sheet__scripts">
+          <section aria-labelledby="variable-hiragana-title">
+            <h5 id="variable-hiragana-title">ひらがな</h5>
+            <div lang="ja" data-variable-specimen>
+              {hiraganaRows.map((row) => <p>{row}</p>)}
+            </div>
+          </section>
+          <section aria-labelledby="variable-katakana-title">
+            <h5 id="variable-katakana-title">カタカナ</h5>
+            <div lang="ja" data-variable-specimen>
+              {katakanaRows.map((row) => <p>{row}</p>)}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+</details>
+
+<script>
+  const inspector = document.querySelector<HTMLDetailsElement>(
+    "[data-variable-kana-inspector]",
+  );
+
+  if (inspector) {
+    const control = inspector.querySelector<HTMLFieldSetElement>(
+      "[data-variable-kana-control]",
+    )!;
+    const range = inspector.querySelector<HTMLInputElement>(
+      "[data-variable-kana-range]",
+    )!;
+    const status = inspector.querySelector<HTMLElement>(
+      "[data-variable-kana-status]",
+    )!;
+    const specimens = inspector.querySelector<HTMLElement>(
+      "[data-variable-kana-specimens]",
+    )!;
+    const weightName = inspector.querySelector<HTMLElement>(
+      "[data-variable-weight-name]",
+    )!;
+    const weightValue = inspector.querySelector<HTMLElement>(
+      "[data-variable-weight-value]",
+    )!;
+    const specimenValues = [
+      ...inspector.querySelectorAll<HTMLElement>(
+        "[data-variable-specimen-value]",
+      ),
+    ];
+    const specimenText = [
+      ...inspector.querySelectorAll<HTMLElement>("[data-variable-specimen]"),
+    ];
+    const ticks = [
+      ...inspector.querySelectorAll<HTMLButtonElement>(
+        "[data-variable-weight-tick]",
+      ),
+    ];
+    const names = new Map(
+      ticks.map((tick) => [Number(tick.value), tick.dataset.weightName || ""]),
+    );
+    let requested = false;
+
+    const setWeight = (value: number) => {
+      const weight = Math.min(900, Math.max(200, Math.round(value)));
+      const currentName = names.get(weight) || "可変値";
+      range.value = String(weight);
+      range.setAttribute("aria-valuetext", `${currentName} ${weight}`);
+      weightValue.textContent = String(weight);
+      weightName.textContent = currentName;
+      for (const output of specimenValues) output.textContent = String(weight);
+      for (const sample of specimenText) {
+        sample.style.fontWeight = String(weight);
+        sample.style.fontVariationSettings = `"wght" ${weight}`;
+      }
+      for (const tick of ticks) {
+        const active = Number(tick.value) === weight;
+        tick.classList.toggle("is-active", active);
+        tick.setAttribute("aria-pressed", String(active));
+      }
+    };
+
+    range.addEventListener("input", () => setWeight(Number(range.value)));
+    for (const tick of ticks) {
+      tick.addEventListener("click", () => setWeight(Number(tick.value)));
+    }
+
+    const loadVariableFont = async () => {
+      requested = true;
+      inspector.dataset.state = "loading";
+      status.textContent = "開発用の可変かなソースを読み込んでいます。";
+
+      if (!("FontFace" in window) || !document.fonts) {
+        inspector.dataset.state = "unavailable";
+        status.textContent =
+          "このブラウザでは開発用VFを読み込めません。静的な比較はそのまま利用できます。";
+        return;
+      }
+
+      try {
+        const source = inspector.dataset.variableFontSrc;
+        if (!source) throw new Error("The development VF path is missing.");
+        const face = new FontFace(
+          "Nobigoe Novel Kana Design VF",
+          `url("${source}") format("woff2")`,
+          { style: "normal", weight: "200 900", display: "swap" },
+        );
+        const loaded = await face.load();
+        document.fonts.add(loaded);
+        control.disabled = false;
+        specimens.hidden = false;
+        inspector.dataset.state = "loaded";
+        status.textContent =
+          "開発用の可変かなソースを読み込みました。200から900まで連続して確認できます。";
+        setWeight(Number(range.value));
+      } catch {
+        inspector.dataset.state = "unavailable";
+        status.textContent =
+          "開発用VFは現在利用できません。静的7ウェイトと三書体の比較はそのまま利用できます。";
+      }
+    };
+
+    inspector.addEventListener("toggle", () => {
+      if (inspector.open && !requested) void loadVariableFont();
+    });
+  }
+</script>

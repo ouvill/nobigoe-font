@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import variable_marks
-from .profiles import noto_serif_variable_source
+from .profiles import noto_serif_cff2_variable_source
 from .sources import DEFAULT_CACHE_DIR, SourceCache
 
 DEFAULT_OUTPUT_PATH = Path("dist") / "NobigoeVariableMarks-VF.otf"
@@ -53,5 +53,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     source_path = args.source
     if source_path is None:
-        source_path = SourceCache(args.cache_dir).fetch(noto_serif_variable_source())
+        source_path = SourceCache(args.cache_dir).fetch(
+            noto_serif_cff2_variable_source()
+        )
     variable_marks.build_variable_marks(source_path, args.output, args.face)

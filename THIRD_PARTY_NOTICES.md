@@ -21,6 +21,7 @@
 | `NotoSerifJP-Bold.otf` | `1e03488a0d5e819f07fcd74f54703a7961ba466d3ae900f8a2a730541e6d4543` |
 | `NotoSerifJP-Black.otf` | `b7197366b775ccb6cd3473b7b09f2c5759a2fdfdbfedf975029203828d0ad386` |
 | `NotoSerifJP-VF.otf` | `39701fd096bc51204a8444c6c2659f007b29674a13eb62ddfa470638fe8179cd` |
+| `NotoSerifJP-VF.ttf` | `99999f906b3793c7c97661a05ef9d53488d488604683b308c756d084b71df7d1` |
 
 ### 使用箇所と改変
 
@@ -29,6 +30,7 @@
 実験的な`nobigoe-build-variable`では`NotoSerifJP-VF.otf`の既存CFF2 Variationを維持し、Notoにない濁点・半濁点付き仮名の横組・縦組CharString、Manga1 PUA、GSUB規則を追加します。
 
 Novel版のカタカナも源暎こぶり明朝の輪郭をコピーせず、対応する同ウェイトのNoto Serif JP輪郭から派生します。U+30A1–U+30FA、U+30FD–U+30FF、U+31F0–U+31FFの109字、追加するU+1B155、カタカナ`ccmp`出力、全縦組対応字形を、直線主体・曲線主体・小書き・反復記号の4群と3光学マスターで変形します。結合濁点・半濁点は合成後の一体輪郭へ一度だけ適用し、源暎こぶり明朝は寸法と黒みの比較基準としてだけ使用します。
+`--variable-kana`経路は同コミットの`Serif/Variable/TTF/Subset/NotoSerifJP-VF.ttf`を制作正本として使用します。wght 200・400・900から互換輪郭を作り、残る4固定ウェイトを補間します。符号化済みひらがな89字・カタカナ109字と対応する縦組・合成字形の輪郭およびメトリクスはNoto由来です。字別の筆端深度データと局所変形を追加しますが、第三者輪郭を新たに混合しません。`Nobigoe Novel Kana Design` VFはこのNotoソースから生成する編集・比較用中間成果物です。
 
 現行Noto cmapではCJK Radicals Supplement／Kangxi Radicalsの293コードポイントが上記Han対象中の290 glyphを共有します。cmapを変更せず共有glyphを一度だけ変換するため、これらのradical aliasも同じ縮小輪郭を表示します。仮名・カタカナ・約物・Latin・追加記号・PUAとの共有glyphは許可せず、変換前にビルドを失敗させます。
 
@@ -72,7 +74,7 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 
 ### 使用箇所と改変
 
-`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。輪郭と水平メトリクスを1.110倍してNoto Serif JP側のグリフへ移植します。STIX Two TextにネイティブソースがあるRegular、Medium、SemiBold、Boldだけを対象とし、源暎こぶり明朝版には取り込みません。
+`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。輪郭と水平メトリクスを1.110倍し、Regular、Medium、SemiBold、Boldの順に縦画を中心とする水平輪郭を-10、-12、-14、-15 units補正してから、Noto Serif JP側のグリフへ移植します。補正値は1.110倍後の`A–Z`・`a–z`・`0–9`について、各字の輪郭面積を送り幅で割り、同ウェイトのNoto Serif JP欧文との差の平均絶対誤差を-40〜0 unitsの整数候補中で最小にする値です。STIX Two Textにネイティブソースがある4ウェイトだけを対象とし、源暎こぶり明朝版には取り込みません。
 
 ## Source Serif 4
 
