@@ -26,3 +26,8 @@ pattern = '"version"\s*:\s*"(?P<version>[^"]+)"'
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nobigoe_font"]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.39.9",
+]
