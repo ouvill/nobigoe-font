@@ -91,10 +91,23 @@ def repeated_glyph_rules(prefix: str, base: str, replacement: str) -> str:
 """
 
 
+def selected_run_rules(
+    prefix: str, source: str, seed: str, selected: str
+) -> str:
+    return f"""
+  lookup {prefix}_propagate {{
+    sub [{seed} {selected}] {source}' by {selected};
+  }} {prefix}_propagate;
+  lookup {prefix}_activate {{
+    sub {seed}' {selected} by {selected};
+  }} {prefix}_activate;
+"""
+
+
 def feature_source(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
-    relaxed_wave: tuple[str, str, str, list[str]],
+    relaxed_wave: tuple[str, str, str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
     punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
     kana_marks: list[tuple[str, str, str]],
@@ -164,6 +177,8 @@ def feature_source(
         relaxed_wave_prefix,
         relaxed_wave_source,
         relaxed_wave_vertical_source,
+        relaxed_wave_selector,
+        relaxed_wave_seed,
         relaxed_wave_names,
     ) = relaxed_wave
     relaxed_horizontal_names = relaxed_wave_names[:10]
@@ -172,6 +187,15 @@ def feature_source(
     relaxed_vertical_base = relaxed_vertical_names[0]
     relaxed_horizontal_parts = relaxed_horizontal_names[1:]
     relaxed_vertical_parts = relaxed_vertical_names[1:]
+    calt_rules.insert(
+        0,
+        selected_run_rules(
+            f"{relaxed_wave_prefix}_selector",
+            relaxed_wave_source,
+            relaxed_wave_seed,
+            relaxed_horizontal_base,
+        )
+    )
     calt_rules.append(
         phased_wave_rules(
             f"{relaxed_wave_prefix}_h",
@@ -191,6 +215,9 @@ def feature_source(
         for horizontal, vertical in zip(
             relaxed_horizontal_names, relaxed_vertical_names, strict=True
         )
+    )
+    relaxed_vertical_maps += (
+        f"  sub {relaxed_wave_seed} by {relaxed_wave_vertical_source};\n"
     )
     vert_rules.append(
         phased_wave_rules(
@@ -216,6 +243,10 @@ def feature_source(
         f"{relaxed_wave_prefix}_v_style",
         relaxed_wave_vertical_source,
         relaxed_vertical_base,
+    )
+    relaxed_wave_composition = (
+        f"  sub {relaxed_wave_selector} {relaxed_wave_source} "
+        f"by {relaxed_wave_seed};\n"
     )
 
     manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
@@ -285,6 +316,7 @@ def feature_source(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in (*kana_marks, *punctuation_marks)
     )
+    ccmp_rules += relaxed_wave_composition
     liga_rules = "".join(
         f"  sub {base} {mark} by {output};\n"
         for base, mark, output in spacing_marks

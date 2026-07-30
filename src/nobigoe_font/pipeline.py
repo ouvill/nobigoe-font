@@ -62,6 +62,7 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 WAVE_GLYPH_COUNT = 10
 RELAXED_WAVE_GLYPH_COUNT = 20
+WAVE_SELECTOR_GLYPH_COUNT = 1
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 WAVE_STROKE_MODULATION = 0.3
@@ -1112,6 +1113,7 @@ def build(
         [
             0x21,
             0x3F,
+            0x7E,
             0x301C,
             0x3030,
             0x3099,
@@ -1275,6 +1277,7 @@ def build(
         NEW_GLYPH_COUNT * len(linear_codepoints)
         + WAVE_GLYPH_COUNT
         + RELAXED_WAVE_GLYPH_COUNT
+        + WAVE_SELECTOR_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
         + PUNCTUATION_ALTERNATE_COUNT
@@ -1336,10 +1339,23 @@ def build(
         wave_vertical_origin,
         add_stem_hints=False,
     )
+
+    wave_selector_start = relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
+    wave_selector_seed = allocated_names[wave_selector_start]
+    _font_operations.append_glyphs(
+        font,
+        [_font_geometry.glyph_path(font, wave_base)],
+        [wave_selector_seed],
+        wave_base,
+        wave_vertical_origin,
+        add_stem_hints=False,
+    )
     relaxed_wave = (
         "relaxed_wave",
         wave_base,
         wave_vertical,
+        font.getBestCmap()[0x7E],
+        wave_selector_seed,
         relaxed_wave_names,
     )
 
@@ -1348,7 +1364,7 @@ def build(
     manga_wave_vertical_origin = round(
         font["vmtx"].metrics[manga_wave_base][1] + manga_wave_y_max
     )
-    manga_wave_start = relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
+    manga_wave_start = wave_selector_start + WAVE_SELECTOR_GLYPH_COUNT
     manga_wave_names = allocated_names[
         manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     ]
