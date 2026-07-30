@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+import math
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,6 +9,7 @@ from tempfile import TemporaryDirectory
 import pathops
 from fontTools.cffLib import FDArrayIndex, FDSelect, FontDict
 from fontTools.fontBuilder import FontBuilder
+from fontTools.pens.recordingPen import RecordingPen
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
@@ -62,9 +64,13 @@ def _ka_topology_path() -> pathops.Path:
     pen.lineTo((330, 50))
     pen.lineTo((500, 500))
     pen.closePath()
-    pen.moveTo((150, 110))
-    pen.lineTo((190, 220))
-    pen.lineTo((230, 180))
+    pen.moveTo((134, 104))
+    pen.lineTo((244, 316))
+    pen.curveTo((208, 240), (176, 174), (134, 104))
+    pen.closePath()
+    pen.moveTo((350, 340))
+    pen.lineTo((390, 450))
+    pen.lineTo((430, 410))
     pen.closePath()
     return path
 
@@ -200,31 +206,65 @@ class NovelDesignTests(unittest.TestCase):
         for weight, amount in expected.items():
             self.assertAlmostEqual(novel_ka_terminal_raise(weight), amount)
 
-    def test_ka_terminal_moves_only_connected_boundary_arc(self) -> None:
+    def test_ka_terminal_removes_overlap_sliver_and_preserves_other_arcs(
+        self,
+    ) -> None:
         outline = _ka_topology_path()
         shortened = shorten_novel_ka_terminal(outline, 36)
         before_contours = tuple(outline.contours)
         after_contours = tuple(shortened.contours)
 
-        self.assertEqual(shortened.verbs, outline.verbs)
-        changed_outer = {
+        self.assertEqual(len(after_contours), len(before_contours) - 1)
+        main_recording = RecordingPen()
+        after_contours[0].draw(main_recording)
+        curve_indices = tuple(
             index
-            for index, (before, after) in enumerate(
-                zip(
-                    before_contours[0].points,
-                    after_contours[0].points,
-                    strict=True,
-                )
+            for index, (operator, _) in enumerate(main_recording.value)
+            if operator == "curveTo"
+        )
+        self.assertEqual(len(curve_indices), 1)
+        curve_index = curve_indices[0]
+        commands = main_recording.value
+        before_start = commands[curve_index - 2][1][-1]
+        start = commands[curve_index - 1][1][-1]
+        first_control, second_control, end = commands[curve_index][1]
+        after_end = commands[curve_index + 1][1][-1]
+
+        def normalized_cross(
+            first: tuple[float, float],
+            second: tuple[float, float],
+        ) -> float:
+            return abs(first[0] * second[1] - first[1] * second[0]) / (
+                math.hypot(*first) * math.hypot(*second)
             )
-            if before != after
-        }
-        self.assertEqual(changed_outer, {1, 2, 3, 4})
+
+        self.assertLess(
+            normalized_cross(
+                (start[0] - before_start[0], start[1] - before_start[1]),
+                (
+                    first_control[0] - start[0],
+                    first_control[1] - start[1],
+                ),
+            ),
+            0.00001,
+        )
+        self.assertLess(
+            normalized_cross(
+                (end[0] - second_control[0], end[1] - second_control[1]),
+                (after_end[0] - end[0], after_end[1] - end[1]),
+            ),
+            0.00001,
+        )
         for index in (0, 5, 6, 7, 8):
-            self.assertEqual(
-                after_contours[0].points[index],
+            self.assertIn(
                 before_contours[0].points[index],
+                after_contours[0].points,
             )
-        self.assertEqual(after_contours[1].points, before_contours[1].points)
+        self.assertEqual(after_contours[1].points, before_contours[2].points)
+        self.assertEqual(
+            after_contours[1].clockwise,
+            before_contours[2].clockwise,
+        )
 
         cap_deltas = tuple(
             (
@@ -270,12 +310,22 @@ class NovelDesignTests(unittest.TestCase):
             shorten_novel_ka_terminal(stored_before, 44)
         )
 
+        reprepared_after = _round_terminal_path_for_cff(prepared_after)
         self.assertEqual(len(stored_before.verbs), len(outline.verbs) - 1)
-        self.assertNotEqual(unprepared_after.verbs, stored_before.verbs)
-        self.assertEqual(prepared_after.verbs, stored_before.verbs)
-        self.assertEqual(len(prepared_after.points), len(stored_before.points))
+        self.assertNotEqual(unprepared_after.verbs, prepared_after.verbs)
+        self.assertEqual(reprepared_after.verbs, prepared_after.verbs)
+        self.assertEqual(reprepared_after.points, prepared_after.points)
+        self.assertTrue(
+            all(
+                coordinate == round(coordinate)
+                for point in prepared_after.points
+                for coordinate in point
+            )
+        )
 
-    def test_ka_protected_arcs_survive_cff_storage_unchanged(self) -> None:
+    def test_ka_sliver_removal_and_protected_arcs_survive_cff_storage(
+        self,
+    ) -> None:
         reference_font = _novel_cff_test_font()
         corrected_font = _novel_cff_test_font()
         apply_novel_hiragana(
@@ -303,28 +353,45 @@ class NovelDesignTests(unittest.TestCase):
             before = glyph_path(stored_reference, _CFF_TARGET)
             after = glyph_path(stored_corrected, _CFF_TARGET)
 
-            self.assertEqual(after.verbs, before.verbs)
-            self.assertEqual(len(after.points), len(before.points))
             before_contours = tuple(before.contours)
             after_contours = tuple(after.contours)
-            changed_outer = {
-                index
-                for index, (old, new) in enumerate(
-                    zip(
-                        before_contours[0].points,
-                        after_contours[0].points,
-                        strict=True,
-                    )
-                )
-                if old != new
-            }
-            self.assertEqual(changed_outer, {1, 2, 3, 4})
+            expected = _round_terminal_path_for_cff(
+                shorten_novel_ka_terminal(before, 36)
+            )
+            self.assertEqual(after.verbs, expected.verbs)
+            self.assertEqual(after.points, expected.points)
             for index in (0, 5, 6, 7, 8):
-                self.assertEqual(
-                    after_contours[0].points[index],
+                self.assertIn(
                     before_contours[0].points[index],
+                    after_contours[0].points,
                 )
-            self.assertEqual(after_contours[1].points, before_contours[1].points)
+            companion_indices = tuple(
+                index
+                for index, contour in enumerate(before_contours[1:], start=1)
+                if contour.bounds[1] < 300
+            )
+            protected_index = next(
+                index
+                for index, contour in enumerate(before_contours[1:], start=1)
+                if contour.bounds[1] >= 300
+            )
+            self.assertEqual(
+                len(after_contours),
+                len(before_contours) - len(companion_indices),
+            )
+            self.assertFalse(
+                any(
+                    contour.clockwise and contour.bounds[1] < 300
+                    for contour in after_contours[1:]
+                )
+            )
+            protected_after = next(
+                contour for contour in after_contours[1:] if contour.bounds[1] >= 300
+            )
+            self.assertEqual(
+                protected_after.points,
+                before_contours[protected_index].points,
+            )
             self.assertEqual(
                 min(y for _, y in after_contours[0].points)
                 - min(y for _, y in before_contours[0].points),

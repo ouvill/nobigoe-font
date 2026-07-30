@@ -54,6 +54,8 @@ NOVEL_KA_TERMINAL_MASTER_RAISES: Mapping[int, float] = {
 _KA_TERMINAL_AXIS_SAMPLE_RISE = 90
 _KA_TERMINAL_FULL_PROJECTION = 90
 _KA_TERMINAL_FADE_PROJECTION = 280
+_KA_TERMINAL_COMPANION_CLEARANCE = 16
+_KA_TERMINAL_FADE_HANDLE_RATIO = 0.22
 _KA_TERMINAL_MIN_Y_TOLERANCE = 0.001
 _HORIZONTAL_ANCHORS: Mapping[NovelGlyphGroup, tuple[float, float]] = {
     group: (500, 370) for group in _GROUPS
@@ -352,6 +354,38 @@ class _KaTerminalArc:
     contour_index: int
     strengths: dict[int, float]
     translation: tuple[float, float]
+    centerline_origin: tuple[float, float]
+    axis_unit: tuple[float, float]
+    companion_lateral_limit: float
+    omitted_contours: frozenset[int]
+
+    def companion_strength(self, point: tuple[float, float]) -> float:
+        """Return the deformation shared by a separate overlap-seam contour."""
+        delta_x = point[0] - self.centerline_origin[0]
+        delta_y = point[1] - self.centerline_origin[1]
+        axial_projection = (
+            delta_x * self.axis_unit[0] + delta_y * self.axis_unit[1]
+        ) * self.axis_unit[1]
+        lateral_distance = abs(
+            delta_x * self.axis_unit[1] - delta_y * self.axis_unit[0]
+        )
+        if (
+            axial_projection >= _KA_TERMINAL_FADE_PROJECTION
+            or lateral_distance > self.companion_lateral_limit
+        ):
+            return 0
+        return _smootherstep(
+            (_KA_TERMINAL_FADE_PROJECTION - axial_projection)
+            / (_KA_TERMINAL_FADE_PROJECTION - _KA_TERMINAL_FULL_PROJECTION)
+        )
+
+
+@dataclass
+class _TransformedCommand:
+    operator: str
+    operands: tuple[tuple[float, float], ...]
+    contour_index: int
+    point_indices: tuple[int, ...]
 
 
 def _round_terminal_path_for_cff(outline: pathops.Path) -> pathops.Path:
@@ -460,7 +494,103 @@ def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
         else:
             raise ValueError("Novel ka terminal boundary arc has no fade endpoint")
 
-    return _KaTerminalArc(contour_index, strengths, translation)
+    companion_lateral_limit = (
+        max(
+            abs(
+                (points[index][0] - cap_center[0]) * axis_unit[1]
+                - (points[index][1] - cap_center[1]) * axis_unit[0]
+            )
+            for index in strengths
+        )
+        + _KA_TERMINAL_COMPANION_CLEARANCE
+    )
+    candidate = _KaTerminalArc(
+        contour_index,
+        strengths,
+        translation,
+        cap_center,
+        axis_unit,
+        companion_lateral_limit,
+        frozenset(),
+    )
+    omitted_contours = frozenset(
+        index
+        for index, contour in enumerate(contours)
+        if index != contour_index
+        and contour.clockwise
+        and any(candidate.companion_strength(point) for point in contour.points)
+    )
+    return _KaTerminalArc(
+        contour_index,
+        strengths,
+        translation,
+        cap_center,
+        axis_unit,
+        companion_lateral_limit,
+        omitted_contours,
+    )
+
+
+def _smooth_ka_terminal_fade_lines(
+    commands: list[_TransformedCommand],
+    arc: _KaTerminalArc,
+) -> None:
+    """Replace fade-crossing line joins with tangent-continuous curves."""
+    for index, command in enumerate(commands):
+        if (
+            command.contour_index != arc.contour_index
+            or command.operator != "lineTo"
+            or len(command.operands) != 1
+            or index < 2
+            or index + 1 >= len(commands)
+        ):
+            continue
+        previous = commands[index - 1]
+        following = commands[index + 1]
+        if (
+            previous.contour_index != command.contour_index
+            or following.contour_index != command.contour_index
+            or not previous.point_indices
+            or not command.point_indices
+        ):
+            continue
+        start_strength = arc.strengths.get(previous.point_indices[-1], 0)
+        end_strength = arc.strengths.get(command.point_indices[-1], 0)
+        if (start_strength == 0) == (end_strength == 0):
+            continue
+
+        if previous.operator == "curveTo":
+            incoming_origin = previous.operands[-2]
+        elif previous.operator == "lineTo":
+            incoming_origin = commands[index - 2].operands[-1]
+        else:
+            continue
+        if following.operator == "curveTo":
+            outgoing_target = following.operands[0]
+        elif following.operator == "lineTo":
+            outgoing_target = following.operands[-1]
+        else:
+            continue
+
+        start = previous.operands[-1]
+        end = command.operands[-1]
+        incoming = (start[0] - incoming_origin[0], start[1] - incoming_origin[1])
+        outgoing = (outgoing_target[0] - end[0], outgoing_target[1] - end[1])
+        incoming_length = math.hypot(*incoming)
+        outgoing_length = math.hypot(*outgoing)
+        if not incoming_length or not outgoing_length:
+            continue
+        handle_length = math.dist(start, end) * _KA_TERMINAL_FADE_HANDLE_RATIO
+        first_control = (
+            start[0] + incoming[0] / incoming_length * handle_length,
+            start[1] + incoming[1] / incoming_length * handle_length,
+        )
+        second_control = (
+            end[0] - outgoing[0] / outgoing_length * handle_length,
+            end[1] - outgoing[1] / outgoing_length * handle_length,
+        )
+        command.operator = "curveTo"
+        command.operands = (first_control, second_control, end)
 
 
 def shorten_novel_ka_terminal(
@@ -476,21 +606,22 @@ def shorten_novel_ka_terminal(
     arc = _ka_terminal_arc(outline, amount)
     recording = RecordingPen()
     outline.draw(recording)
-    shortened = pathops.Path()
-    pen = shortened.getPen()
+    commands: list[_TransformedCommand] = []
     contour_index = -1
     local_index = 0
     for operator, operands in recording.value:
         if operator == "moveTo":
             contour_index += 1
             local_index = 0
+        point_indices = tuple(range(local_index, local_index + len(operands)))
+        if contour_index in arc.omitted_contours:
+            continue
         transformed = []
         for point in operands:
-            strength = (
-                arc.strengths.get(local_index, 0)
-                if contour_index == arc.contour_index
-                else 0
-            )
+            if contour_index == arc.contour_index:
+                strength = arc.strengths.get(local_index, 0)
+            else:
+                strength = arc.companion_strength(point)
             transformed.append(
                 (
                     point[0] + arc.translation[0] * strength,
@@ -498,7 +629,20 @@ def shorten_novel_ka_terminal(
                 )
             )
             local_index += 1
-        getattr(pen, operator)(*transformed)
+        commands.append(
+            _TransformedCommand(
+                operator,
+                tuple(transformed),
+                contour_index,
+                point_indices,
+            )
+        )
+
+    _smooth_ka_terminal_fade_lines(commands, arc)
+    shortened = pathops.Path()
+    pen = shortened.getPen()
+    for command in commands:
+        getattr(pen, command.operator)(*command.operands)
     return shortened
 
 
