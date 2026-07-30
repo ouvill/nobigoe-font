@@ -20,8 +20,18 @@ from .kana_terminals import (
     inventory_glyf_terminals,
     taper_glyf_terminals,
 )
-from .novel import HIRAGANA_CODEPOINTS, _HORIZONTAL_ANCHORS, _VERTICAL_ANCHORS
-from .novel import novel_group_for_codepoint, novel_transform, novel_vertical_transform
+from .novel import (
+    HIRAGANA_CODEPOINTS,
+    NOVEL_KA_CODEPOINT,
+    _HORIZONTAL_ANCHORS,
+    _VERTICAL_ANCHORS,
+    _ka_terminal_deformation,
+    novel_base_codepoint,
+    novel_group_for_codepoint,
+    novel_ka_terminal_raise,
+    novel_transform,
+    novel_vertical_transform,
+)
 from .novel_katakana import KATAKANA_HORIZONTAL_ANCHORS, KATAKANA_SOURCE_CODEPOINTS
 from .novel_katakana import KATAKANA_VERTICAL_ANCHORS, katakana_transform
 from .novel_katakana import (
@@ -269,6 +279,72 @@ def _transform_glyph(font: TTFont, name: str, transform: Transform) -> None:
         raise ValueError(f"Affine transform changed topology for {name!r}")
 
 
+def _shorten_ka_glyph(font: TTFont, name: str, amount: float) -> None:
+    """Shorten a ka terminal by moving existing TrueType points only."""
+    glyf, glyph = font["glyf"], font["glyf"][name]
+    before = _topology(glyph)
+    if glyph.isComposite() or glyph.numberOfContours <= 0:
+        raise ValueError(f"Variable novel ka glyph {name!r} must be a simple outline")
+
+    contours: list[tuple[tuple[float, float], ...]] = []
+    contour_indices: list[tuple[int, ...]] = []
+    start = 0
+    for raw_end in glyph.endPtsOfContours:
+        end = int(raw_end)
+        indices = tuple(range(start, end + 1))
+        contour_indices.append(indices)
+        contours.append(
+            tuple(
+                (
+                    float(glyph.coordinates[index][0]),
+                    float(glyph.coordinates[index][1]),
+                )
+                for index in indices
+            )
+        )
+        start = end + 1
+    if start != len(glyph.coordinates):
+        raise ValueError(f"Variable novel ka glyph {name!r} has invalid contour ends")
+
+    try:
+        deformation = _ka_terminal_deformation(tuple(contours), amount)
+    except ValueError as error:
+        raise ValueError(
+            f"Could not correct variable novel ka terminal glyph {name!r}"
+        ) from error
+
+    for contour_index, (indices, points) in enumerate(
+        zip(contour_indices, contours, strict=True)
+    ):
+        for local_index, (point_index, point) in enumerate(
+            zip(indices, points, strict=True)
+        ):
+            strength = (
+                deformation.strengths.get(local_index, 0)
+                if contour_index == deformation.contour_index
+                else deformation.companion_strength(point)
+            )
+            if not strength:
+                continue
+            glyph.coordinates[point_index] = (
+                round(point[0] + deformation.translation[0] * strength),
+                round(point[1] + deformation.translation[1] * strength),
+            )
+
+    glyph.recalcBounds(glyf)
+    if _topology(glyph) != before:
+        raise ValueError(f"Novel ka terminal adjustment changed topology for {name!r}")
+
+
+def _transform_owned_glyph(font: TTFont, item: _OwnedGlyph, weight: int) -> None:
+    _transform_glyph(font, item.name, _transform_for(item, weight))
+    if (
+        item.script == "hiragana"
+        and novel_base_codepoint(item.codepoint) == NOVEL_KA_CODEPOINT
+    ):
+        _shorten_ka_glyph(font, item.name, novel_ka_terminal_raise(weight))
+
+
 def _apply_design(
     font: TTFont,
     weight: int,
@@ -335,7 +411,7 @@ def apply_variable_kana_design(font: TTFont, weight_class: int) -> VariableKanaR
         for x in counts_and_items[2]
     }
     for item in counts_and_items[2]:
-        _transform_glyph(font, item.name, _transform_for(item, weight_class))
+        _transform_owned_glyph(font, item, weight_class)
     result = _apply_design(font, weight_class, counts_and_items)
     for name, metric in metrics.items():
         if font["hmtx"].metrics[name] != metric[0] or (
@@ -448,7 +524,7 @@ def build_variable_kana_source(source: Path, output: Path) -> VariableKanaBuildR
             applications,
         ):
             for item in application[2]:
-                _transform_glyph(font, item.name, _transform_for(item, weight))
+                _transform_owned_glyph(font, item, weight)
 
         # Threshold crossings must not give a terminal different semantic
         # ownership at different masters. Candidate IDs are contour/point based,

@@ -16,8 +16,48 @@ from nobigoe_font.terminal_plans import terminal_depth_ratio
 from nobigoe_font.variable_kana import (
     VARIABLE_KANA_DESIGN_FAMILY,
     _rename_design_font,
+    _topology,
+    apply_variable_kana_design,
     is_variable_kana_design_source,
 )
+
+
+def _ka_terminal_glyph():
+    pen = TTGlyphPen(None)
+    pen.moveTo((140, 0))
+    pen.qCurveTo((120, 0), (100, 20), (100, 45))
+    pen.qCurveTo((100, 130), (190, 280), (300, 360))
+    pen.qCurveTo((260, 300), (200, 150), (175, 45))
+    pen.qCurveTo((165, 10), (140, 0))
+    pen.closePath()
+    return pen.glyph()
+
+
+def _variable_ka_test_font():
+    builder = FontBuilder(1000, isTTF=True)
+    glyph_order = [".notdef", "ka", "ga", "ki"]
+    builder.setupGlyphOrder(glyph_order)
+    builder.setupGlyf(
+        {
+            ".notdef": TTGlyphPen(None).glyph(),
+            "ka": _ka_terminal_glyph(),
+            "ga": _ka_terminal_glyph(),
+            "ki": _ka_terminal_glyph(),
+        }
+    )
+    builder.setupHorizontalMetrics({name: (1000, 100) for name in glyph_order})
+    builder.setupHorizontalHeader(ascent=880, descent=-120)
+    builder.setupCharacterMap(
+        {
+            ord("か"): "ka",
+            ord("が"): "ga",
+            ord("き"): "ki",
+        }
+    )
+    builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
+    builder.setupOS2()
+    builder.setupPost()
+    return builder.font
 
 
 class VariableKanaContractTests(unittest.TestCase):
@@ -96,6 +136,31 @@ class VariableKanaContractTests(unittest.TestCase):
             result.glyph.coordinates[first],
             result.glyph.coordinates[second],
         )
+
+    def test_variable_ka_shortening_targets_base_and_preserves_topology(
+        self,
+    ) -> None:
+        for weight, expected_raise in ((200, 32), (400, 36), (900, 44)):
+            font = _variable_ka_test_font()
+            names = ("ka", "ga", "ki")
+            topology = {name: _topology(font["glyf"][name]) for name in names}
+            metrics = dict(font["hmtx"].metrics)
+
+            apply_variable_kana_design(font, weight)
+
+            self.assertEqual(
+                font["glyf"]["ka"].yMin - font["glyf"]["ki"].yMin,
+                expected_raise,
+            )
+            self.assertEqual(
+                font["glyf"]["ga"].yMin - font["glyf"]["ki"].yMin,
+                expected_raise,
+            )
+            self.assertEqual(
+                {name: _topology(font["glyf"][name]) for name in names},
+                topology,
+            )
+            self.assertEqual(font["hmtx"].metrics, metrics)
 
     def test_design_source_has_an_explicit_reusable_identity(self) -> None:
         builder = FontBuilder(1000, isTTF=True)

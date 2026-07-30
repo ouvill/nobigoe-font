@@ -408,14 +408,23 @@ def _round_terminal_path_for_cff(outline: pathops.Path) -> pathops.Path:
     return rounded
 
 
-def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
-    """Select only the connected boundary arc surrounding the lower-left cap."""
-    contours = tuple(outline.contours)
-    contour_index = min(
-        range(len(contours)),
-        key=lambda index: contours[index].bounds[1],
-    )
-    points = tuple(contours[contour_index].points)
+def _ka_terminal_deformation(
+    contours: tuple[tuple[tuple[float, float], ...], ...],
+    amount: float,
+    *,
+    contour_index: int | None = None,
+) -> _KaTerminalArc:
+    """Describe a topology-neutral shortening around the lower-left cap."""
+    if not contours or any(not contour for contour in contours):
+        raise ValueError("Novel ka terminal requires non-empty contours")
+    if contour_index is None:
+        contour_index = min(
+            range(len(contours)),
+            key=lambda index: min(y for _, y in contours[index]),
+        )
+    elif not 0 <= contour_index < len(contours):
+        raise ValueError("Novel ka terminal contour index is out of range")
+    points = contours[contour_index]
     minimum_y = min(y for _, y in points)
     minimum_indices = frozenset(
         index
@@ -509,14 +518,36 @@ def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
         )
         + _KA_TERMINAL_COMPANION_CLEARANCE
     )
+    return _KaTerminalArc(
+        contour_index,
+        strengths,
+        translation,
+        cap_center,
+        axis_unit,
+        companion_lateral_limit,
+        frozenset(),
+    )
+
+
+def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
+    """Select only the connected boundary arc surrounding the lower-left cap."""
+    contours = tuple(outline.contours)
+    deformation = _ka_terminal_deformation(
+        tuple(tuple(contour.points) for contour in contours),
+        amount,
+        contour_index=min(
+            range(len(contours)),
+            key=lambda index: contours[index].bounds[1],
+        ),
+    )
     # Type 2 exposes overlap seams as small clockwise contours nested inside
     # the main stroke; detached marks remain outside and are preserved.
     main_contour = pathops.Path()
-    contours[contour_index].draw(main_contour.getPen())
+    contours[deformation.contour_index].draw(main_contour.getPen())
     omitted_contours = frozenset(
         index
         for index, contour in enumerate(contours)
-        if index != contour_index
+        if index != deformation.contour_index
         and contour.clockwise
         and contour.area <= _KA_OVERLAP_SLIVER_MAX_AREA
         and main_contour.contains(
@@ -527,12 +558,12 @@ def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
         )
     )
     return _KaTerminalArc(
-        contour_index,
-        strengths,
-        translation,
-        cap_center,
-        axis_unit,
-        companion_lateral_limit,
+        deformation.contour_index,
+        deformation.strengths,
+        deformation.translation,
+        deformation.centerline_origin,
+        deformation.axis_unit,
+        deformation.companion_lateral_limit,
         omitted_contours,
     )
 
