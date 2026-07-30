@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+from io import BytesIO
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pathops
+from fontTools.cffLib import FDArrayIndex, FDSelect, FontDict
 from fontTools.fontBuilder import FontBuilder
+from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
+from fontTools.ttLib import TTFont
 
 from nobigoe_font.cli import parse_args
 from nobigoe_font.geometry import glyph_path
@@ -20,6 +26,7 @@ from nobigoe_font.novel import (
     NOVEL_VERTICAL_STEM_MASTER_PROFILES,
     NOVEL_SMALL_KO_CODEPOINT,
     SMALL_HIRAGANA_CODEPOINTS,
+    _round_terminal_path_for_cff,
     apply_novel_hiragana,
     novel_group_for_codepoint,
     novel_ka_terminal_raise,
@@ -40,6 +47,88 @@ def _rectangle_glyph() -> object:
     pen.lineTo((100, 800))
     pen.closePath()
     return pen.glyph()
+
+
+def _ka_topology_path() -> pathops.Path:
+    path = pathops.Path()
+    pen = path.getPen()
+    pen.moveTo((250, 350))
+    pen.lineTo((130, 100))
+    pen.lineTo((100, 0))
+    pen.lineTo((140, 0))
+    pen.lineTo((200, 100))
+    pen.lineTo((300, 350))
+    pen.lineTo((360, 80))
+    pen.lineTo((330, 50))
+    pen.lineTo((500, 500))
+    pen.closePath()
+    pen.moveTo((150, 110))
+    pen.lineTo((190, 220))
+    pen.lineTo((230, 180))
+    pen.closePath()
+    return path
+
+
+def _ka_topology_charstring():
+    pen = T2CharStringPen(1000, None)
+    _ka_topology_path().draw(pen)
+    return pen.getCharString()
+
+
+_CFF_TARGET = "cid00001"
+
+
+def _novel_cff_test_font() -> TTFont:
+    builder = FontBuilder(1000, isTTF=False)
+    glyph_order = [".notdef", _CFF_TARGET]
+    builder.setupGlyphOrder(glyph_order)
+    builder.setupHorizontalMetrics({name: (1000, 100) for name in glyph_order})
+    builder.setupHorizontalHeader(ascent=880, descent=-120)
+    builder.setupVerticalMetrics({name: (1000, 80) for name in glyph_order})
+    builder.setupVerticalHeader(ascent=500, descent=-500)
+    builder.setupCharacterMap({ord("か"): _CFF_TARGET})
+    builder.setupNameTable(
+        {
+            "familyName": "Test",
+            "styleName": "Regular",
+            "psName": "Test-Regular",
+        }
+    )
+    builder.setupOS2()
+    builder.setupPost()
+    builder.setupCFF(
+        "Test-Regular",
+        {},
+        {name: _ka_topology_charstring() for name in glyph_order},
+        {},
+    )
+    font = builder.font
+    top = font["CFF "].cff.topDictIndex[0]
+    private = top.Private
+    fd_array = FDArrayIndex()
+    fd_array.strings = None
+    fd_array.GlobalSubrs = top.GlobalSubrs
+    font_dict = FontDict()
+    font_dict.setCFF2(False)
+    font_dict.FontName = "Test-Regular-Kana"
+    font_dict.Private = private
+    fd_array.append(font_dict)
+    fd_select = FDSelect()
+    fd_select.format = 3
+    fd_select.gidArray = [0] * len(glyph_order)
+    top.FDArray = fd_array
+    top.FDSelect = fd_select
+    top.ROS = ("Adobe", "Identity", 0)
+    top.CIDCount = len(glyph_order)
+    del top.Private
+    top.CharStrings.fdArray = fd_array
+    top.CharStrings.fdSelect = fd_select
+    for charstring in top.CharStrings.values():
+        charstring.fdSelectIndex = 0
+    buffer = BytesIO()
+    font.save(buffer)
+    buffer.seek(0)
+    return TTFont(buffer)
 
 
 def _novel_test_font():
@@ -111,28 +200,146 @@ class NovelDesignTests(unittest.TestCase):
         for weight, amount in expected.items():
             self.assertAlmostEqual(novel_ka_terminal_raise(weight), amount)
 
-    def test_ka_terminal_correction_is_smooth_and_local(self) -> None:
-        outline = pathops.Path()
-        pen = outline.getPen()
-        pen.moveTo((140, 7))
-        pen.lineTo((250, 120))
-        pen.lineTo((350, 250))
-        pen.lineTo((300, 450))
-        pen.lineTo((390, 17))
-        pen.closePath()
-
+    def test_ka_terminal_moves_only_connected_boundary_arc(self) -> None:
+        outline = _ka_topology_path()
         shortened = shorten_novel_ka_terminal(outline, 36)
-        before = list(outline.points)
-        after = list(shortened.points)
-        self.assertEqual([point[0] for point in after], [point[0] for point in before])
-        self.assertEqual(after[0][1] - before[0][1], 36)
-        self.assertEqual(after[1][1] - before[1][1], 36)
-        self.assertGreater(after[2][1] - before[2][1], 0)
-        self.assertLess(after[2][1] - before[2][1], 36)
-        self.assertEqual(after[3], before[3])
-        self.assertEqual(after[4], before[4])
+        before_contours = tuple(outline.contours)
+        after_contours = tuple(shortened.contours)
+
+        self.assertEqual(shortened.verbs, outline.verbs)
+        changed_outer = {
+            index
+            for index, (before, after) in enumerate(
+                zip(
+                    before_contours[0].points,
+                    after_contours[0].points,
+                    strict=True,
+                )
+            )
+            if before != after
+        }
+        self.assertEqual(changed_outer, {1, 2, 3, 4})
+        for index in (0, 5, 6, 7, 8):
+            self.assertEqual(
+                after_contours[0].points[index],
+                before_contours[0].points[index],
+            )
+        self.assertEqual(after_contours[1].points, before_contours[1].points)
+
+        cap_deltas = tuple(
+            (
+                after_contours[0].points[index][0]
+                - before_contours[0].points[index][0],
+                after_contours[0].points[index][1]
+                - before_contours[0].points[index][1],
+            )
+            for index in (2, 3)
+        )
+        self.assertEqual(cap_deltas[0], cap_deltas[1])
+        self.assertGreater(cap_deltas[0][0], 0)
+        self.assertEqual(cap_deltas[0][1], 36)
         with self.assertRaisesRegex(ValueError, "must not be negative"):
             shorten_novel_ka_terminal(outline, -1)
+
+    def test_ka_cff_normalization_does_not_reveal_subpixel_segments(
+        self,
+    ) -> None:
+        outline = pathops.Path()
+        pen = outline.getPen()
+        pen.moveTo((250, 350))
+        pen.lineTo((130, 280))
+        pen.lineTo((130, 185))
+        pen.lineTo((130.49, 185.49))
+        pen.lineTo((130, 100))
+        pen.lineTo((100, 0))
+        pen.lineTo((140, 0))
+        pen.lineTo((200, 100))
+        pen.lineTo((220, 185))
+        pen.lineTo((220, 280))
+        pen.lineTo((300, 350))
+        pen.lineTo((360, 80))
+        pen.lineTo((330, 50))
+        pen.lineTo((500, 500))
+        pen.closePath()
+
+        stored_before = _round_terminal_path_for_cff(outline)
+        unprepared_after = _round_terminal_path_for_cff(
+            shorten_novel_ka_terminal(outline, 44)
+        )
+        prepared_after = _round_terminal_path_for_cff(
+            shorten_novel_ka_terminal(stored_before, 44)
+        )
+
+        self.assertEqual(len(stored_before.verbs), len(outline.verbs) - 1)
+        self.assertNotEqual(unprepared_after.verbs, stored_before.verbs)
+        self.assertEqual(prepared_after.verbs, stored_before.verbs)
+        self.assertEqual(len(prepared_after.points), len(stored_before.points))
+
+    def test_ka_protected_arcs_survive_cff_storage_unchanged(self) -> None:
+        reference_font = _novel_cff_test_font()
+        corrected_font = _novel_cff_test_font()
+        apply_novel_hiragana(
+            reference_font,
+            400,
+            {_CFF_TARGET: "normal"},
+            {},
+            horizontal_codepoints={_CFF_TARGET: ord("き")},
+        )
+        apply_novel_hiragana(
+            corrected_font,
+            400,
+            {_CFF_TARGET: "normal"},
+            {},
+            horizontal_codepoints={_CFF_TARGET: ord("か")},
+        )
+
+        with TemporaryDirectory() as temporary_directory:
+            reference_path = Path(temporary_directory) / "reference.otf"
+            corrected_path = Path(temporary_directory) / "corrected.otf"
+            reference_font.save(reference_path)
+            corrected_font.save(corrected_path)
+            stored_reference = TTFont(reference_path)
+            stored_corrected = TTFont(corrected_path)
+            before = glyph_path(stored_reference, _CFF_TARGET)
+            after = glyph_path(stored_corrected, _CFF_TARGET)
+
+            self.assertEqual(after.verbs, before.verbs)
+            self.assertEqual(len(after.points), len(before.points))
+            before_contours = tuple(before.contours)
+            after_contours = tuple(after.contours)
+            changed_outer = {
+                index
+                for index, (old, new) in enumerate(
+                    zip(
+                        before_contours[0].points,
+                        after_contours[0].points,
+                        strict=True,
+                    )
+                )
+                if old != new
+            }
+            self.assertEqual(changed_outer, {1, 2, 3, 4})
+            for index in (0, 5, 6, 7, 8):
+                self.assertEqual(
+                    after_contours[0].points[index],
+                    before_contours[0].points[index],
+                )
+            self.assertEqual(after_contours[1].points, before_contours[1].points)
+            self.assertEqual(
+                min(y for _, y in after_contours[0].points)
+                - min(y for _, y in before_contours[0].points),
+                36,
+            )
+            self.assertEqual(
+                stored_corrected["hmtx"].metrics[_CFF_TARGET],
+                stored_reference["hmtx"].metrics[_CFF_TARGET],
+            )
+            self.assertEqual(
+                stored_corrected["vmtx"].metrics[_CFF_TARGET],
+                stored_reference["vmtx"].metrics[_CFF_TARGET],
+            )
+            stored_reference.close()
+            stored_corrected.close()
 
     def test_vertical_masters_and_glyph_corrections_are_independent(self) -> None:
         self.assertEqual(tuple(NOVEL_VERTICAL_MASTER_PROFILES), (200, 400, 900))

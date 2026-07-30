@@ -7,14 +7,17 @@ convention. Full-width advances and source vertical origins remain invariant.
 
 from __future__ import annotations
 
+import math
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import AbstractSet, Literal, TypeAlias
 
 import pathops
 from fontTools.misc.transform import Transform
 from fontTools.pens.recordingPen import RecordingPen
+from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.ttLib import TTFont
 
 from . import geometry, operations
@@ -48,10 +51,10 @@ NOVEL_KA_TERMINAL_MASTER_RAISES: Mapping[int, float] = {
     400: 36,
     900: 44,
 }
-_KA_TERMINAL_FULL_X = 330
-_KA_TERMINAL_FADE_X = 370
-_KA_TERMINAL_FULL_Y = 160
-_KA_TERMINAL_FADE_Y = 320
+_KA_TERMINAL_AXIS_SAMPLE_RISE = 90
+_KA_TERMINAL_FULL_PROJECTION = 90
+_KA_TERMINAL_FADE_PROJECTION = 280
+_KA_TERMINAL_MIN_Y_TOLERANCE = 0.001
 _HORIZONTAL_ANCHORS: Mapping[NovelGlyphGroup, tuple[float, float]] = {
     group: (500, 370) for group in _GROUPS
 }
@@ -344,32 +347,157 @@ def _smootherstep(value: float) -> float:
     return value * value * value * (value * (value * 6 - 15) + 10)
 
 
+@dataclass(frozen=True)
+class _KaTerminalArc:
+    contour_index: int
+    strengths: dict[int, float]
+    translation: tuple[float, float]
+
+
+def _round_terminal_path_for_cff(outline: pathops.Path) -> pathops.Path:
+    """Match reachable Type 2 topology before computing local arc strengths."""
+    type_2_pen = T2CharStringPen(1000, None)
+    outline.draw(type_2_pen)
+    private = SimpleNamespace(nominalWidthX=0, defaultWidthX=1000, Subrs=[])
+    char_string = type_2_pen.getCharString(private=private, globalSubrs=[])
+    recording = RecordingPen()
+    char_string.draw(recording)
+    rounded = pathops.Path()
+    pen = rounded.getPen()
+    for operator, operands in recording.value:
+        getattr(pen, operator)(*operands)
+    return rounded
+
+
+def _ka_terminal_arc(outline: pathops.Path, amount: float) -> _KaTerminalArc:
+    """Select only the connected boundary arc surrounding the lower-left cap."""
+    contours = tuple(outline.contours)
+    contour_index = min(
+        range(len(contours)),
+        key=lambda index: contours[index].bounds[1],
+    )
+    points = tuple(contours[contour_index].points)
+    minimum_y = min(y for _, y in points)
+    minimum_indices = frozenset(
+        index
+        for index, (_, y) in enumerate(points)
+        if y <= minimum_y + _KA_TERMINAL_MIN_Y_TOLERANCE
+    )
+    cap_starts = tuple(
+        index
+        for index in minimum_indices
+        if (index - 1) % len(points) not in minimum_indices
+    )
+    cap_ends = tuple(
+        index
+        for index in minimum_indices
+        if (index + 1) % len(points) not in minimum_indices
+    )
+    if len(cap_starts) != 1 or len(cap_ends) != 1:
+        raise ValueError("Novel ka terminal cap is not one connected boundary arc")
+    cap_start = cap_starts[0]
+    cap_end = cap_ends[0]
+    cap_points = tuple(points[index] for index in minimum_indices)
+    cap_center = (
+        sum(x for x, _ in cap_points) / len(cap_points),
+        sum(y for _, y in cap_points) / len(cap_points),
+    )
+
+    def axis_sample(direction: int, start: int) -> tuple[float, float]:
+        index = start
+        for _ in points:
+            point = points[index]
+            if point[1] >= minimum_y + _KA_TERMINAL_AXIS_SAMPLE_RISE:
+                return point
+            index = (index + direction) % len(points)
+        raise ValueError("Novel ka terminal side has no centerline sample")
+
+    negative_sample = axis_sample(-1, (cap_start - 1) % len(points))
+    positive_sample = axis_sample(1, (cap_end + 1) % len(points))
+    sample_midpoint = (
+        (negative_sample[0] + positive_sample[0]) / 2,
+        (negative_sample[1] + positive_sample[1]) / 2,
+    )
+    axis = (
+        sample_midpoint[0] - cap_center[0],
+        sample_midpoint[1] - cap_center[1],
+    )
+    axis_length = math.hypot(*axis)
+    if not axis_length:
+        raise ValueError("Novel ka terminal centerline has zero length")
+    axis_unit = (axis[0] / axis_length, axis[1] / axis_length)
+    if axis_unit[1] <= 0.75 or abs(axis_unit[0]) >= 0.66:
+        raise ValueError(
+            f"Novel ka terminal centerline is outside its design corridor: {axis_unit!r}"
+        )
+    translation = (
+        amount * axis_unit[0] / axis_unit[1],
+        amount,
+    )
+
+    def axial_projection(point: tuple[float, float]) -> float:
+        delta_x = point[0] - cap_center[0]
+        delta_y = point[1] - cap_center[1]
+        return (delta_x * axis_unit[0] + delta_y * axis_unit[1]) * axis_unit[1]
+
+    strengths = {index: 1.0 for index in minimum_indices}
+    for direction, start in (
+        (-1, (cap_start - 1) % len(points)),
+        (1, (cap_end + 1) % len(points)),
+    ):
+        index = start
+        for _ in points:
+            projection = axial_projection(points[index])
+            if projection >= _KA_TERMINAL_FADE_PROJECTION:
+                break
+            if index in strengths:
+                raise ValueError("Novel ka terminal boundary arc overlaps itself")
+            strengths[index] = _smootherstep(
+                (_KA_TERMINAL_FADE_PROJECTION - projection)
+                / (_KA_TERMINAL_FADE_PROJECTION - _KA_TERMINAL_FULL_PROJECTION)
+            )
+            index = (index + direction) % len(points)
+        else:
+            raise ValueError("Novel ka terminal boundary arc has no fade endpoint")
+
+    return _KaTerminalArc(contour_index, strengths, translation)
+
+
 def shorten_novel_ka_terminal(
     outline: pathops.Path,
     amount: float,
 ) -> pathops.Path:
-    """Raise the lower-left terminal while smoothly retaining its source shape."""
+    """Shorten only the connected second-stroke terminal along its centerline."""
     if amount < 0:
         raise ValueError("Novel ka terminal correction must not be negative")
     if not outline.verbs or amount == 0:
         return outline
 
-    def transform_point(point: tuple[float, float]) -> tuple[float, float]:
-        x, y = point
-        x_strength = _smootherstep(
-            (_KA_TERMINAL_FADE_X - x) / (_KA_TERMINAL_FADE_X - _KA_TERMINAL_FULL_X)
-        )
-        y_strength = _smootherstep(
-            (_KA_TERMINAL_FADE_Y - y) / (_KA_TERMINAL_FADE_Y - _KA_TERMINAL_FULL_Y)
-        )
-        return x, y + amount * x_strength * y_strength
-
+    arc = _ka_terminal_arc(outline, amount)
     recording = RecordingPen()
     outline.draw(recording)
     shortened = pathops.Path()
     pen = shortened.getPen()
+    contour_index = -1
+    local_index = 0
     for operator, operands in recording.value:
-        transformed = tuple(transform_point(point) for point in operands)
+        if operator == "moveTo":
+            contour_index += 1
+            local_index = 0
+        transformed = []
+        for point in operands:
+            strength = (
+                arc.strengths.get(local_index, 0)
+                if contour_index == arc.contour_index
+                else 0
+            )
+            transformed.append(
+                (
+                    point[0] + arc.translation[0] * strength,
+                    point[1] + arc.translation[1] * strength,
+                )
+            )
+            local_index += 1
         getattr(pen, operator)(*transformed)
     return shortened
 
@@ -571,8 +699,26 @@ def transform_novel_glyph(
                     f"{vertical_profile.stem_adjustment:g} units"
                 ) from error
 
+    terminal_left_side_bearing = (
+        math.floor(transformed.bounds[0])
+        if terminal_raise and transformed.verbs
+        else None
+    )
+    terminal_top_side_bearing = (
+        math.floor(vertical_origin - transformed.bounds[3])
+        if terminal_raise and transformed.verbs and "vmtx" in font
+        else None
+    )
+
     if terminal_raise:
-        transformed = shorten_novel_ka_terminal(transformed, terminal_raise)
+        if "CFF " in font:
+            transformed = _round_terminal_path_for_cff(transformed)
+        try:
+            transformed = shorten_novel_ka_terminal(transformed, terminal_raise)
+        except ValueError as error:
+            raise ValueError(
+                f"Could not correct novel ka terminal glyph {glyph_name!r}"
+            ) from error
 
     if transformed.verbs:
         operations.replace_glyph(
@@ -581,13 +727,17 @@ def transform_novel_glyph(
             transformed,
             vertical_origin,
             advance_override=1000,
+            left_side_bearing_override=terminal_left_side_bearing,
         )
     else:
         _, left_side_bearing = font["hmtx"].metrics[glyph_name]
         font["hmtx"].metrics[glyph_name] = (1000, left_side_bearing)
 
     if "vmtx" in font:
-        _, top_side_bearing = font["vmtx"].metrics[glyph_name]
+        if terminal_top_side_bearing is None:
+            _, top_side_bearing = font["vmtx"].metrics[glyph_name]
+        else:
+            top_side_bearing = terminal_top_side_bearing
         font["vmtx"].metrics[glyph_name] = (1000, top_side_bearing)
 
 
