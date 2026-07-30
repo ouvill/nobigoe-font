@@ -16,6 +16,7 @@ from nobigoe_font.release import (
     parse_args,
     release_specs,
 )
+from nobigoe_font.profiles import VERSION_NUMBER
 
 
 class ReleasePackagingTests(unittest.TestCase):
@@ -71,7 +72,10 @@ class ReleasePackagingTests(unittest.TestCase):
         self.assertTrue(parse_args(["--include-experimental"]).include_experimental)
 
     def test_novel_release_is_a_separate_seven_weight_archive(self) -> None:
-        self.assertEqual(NOVEL_RELEASE.archive, "NobigoeNovelMincho-v1.030.zip")
+        self.assertEqual(
+            NOVEL_RELEASE.archive,
+            f"NobigoeNovelMincho-v{VERSION_NUMBER}.zip",
+        )
         self.assertEqual(len(NOVEL_RELEASE.fonts), 7)
         self.assertEqual(
             NOVEL_RELEASE.fonts[0],

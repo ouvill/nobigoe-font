@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Literal, TypeAlias, TypedDict, cast
+from typing import Literal, NamedTuple, TypeAlias, TypedDict, cast
 
 from fontTools.misc.transform import Transform
 
@@ -21,9 +21,16 @@ Orientation: TypeAlias = Literal["horizontal", "vertical"]
 KanaScript: TypeAlias = Literal["hiragana", "katakana"]
 MarkPair: TypeAlias = tuple[int, int]
 
+class MarkPlacement(NamedTuple):
+    scale: float
+    x: float
+    y: float
+    rotation: float
+
+
 class MarkPosition(TypedDict):
-    horizontal: Transform
-    vertical: Transform
+    horizontal: MarkPlacement
+    vertical: MarkPlacement
 
 MarkPositionMap: TypeAlias = dict[MarkPair, MarkPosition]
 JsonObject: TypeAlias = dict[str, object]
@@ -318,17 +325,17 @@ def _finite_mark_position_values(
     return cast(list[float | int], value)
 
 
-def _mark_position_transform(
+def _parse_mark_placement(
     path: Path,
     label: str,
     value: object,
-) -> Transform:
-    scale, x_offset, y_offset = _finite_mark_position_values(
-        path, label, value, 3, "[scale, x, y]"
+) -> MarkPlacement:
+    scale, x_offset, y_offset, rotation = _finite_mark_position_values(
+        path, label, value, 4, "[scale, x, y, rotation]"
     )
     if scale <= 0:
         raise ValueError(f"{path}: {label} scale must be positive")
-    return Transform(scale, 0, 0, scale, x_offset, y_offset)
+    return MarkPlacement(scale, x_offset, y_offset, rotation)
 
 
 def _parse_mark_position(
@@ -340,10 +347,10 @@ def _parse_mark_position(
         path, label, value, set(ORIENTATIONS)
     )
     return MarkPosition(
-        horizontal=_mark_position_transform(
+        horizontal=_parse_mark_placement(
             path, f"{label} horizontal", orientations["horizontal"]
         ),
-        vertical=_mark_position_transform(
+        vertical=_parse_mark_placement(
             path, f"{label} vertical", orientations["vertical"]
         ),
     )

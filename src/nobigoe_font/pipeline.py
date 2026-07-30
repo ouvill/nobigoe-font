@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 import math
 import shutil
 import subprocess
@@ -67,6 +68,15 @@ OVERLAP = 0
 KOBURI_RUBY_RULE_COUNT = 289
 KOBURI_RUBY_OUTPUT_COUNT = 288
 KOBURI_RUBY_VERTICAL_ORIGIN = 880
+
+COMBINING_MARK_INPUTS = {
+    0x3099: 0x3099,
+    0x309A: 0x309A,
+}
+SPACING_MARK_INPUTS = {
+    0x3099: 0x309B,
+    0x309A: 0x309C,
+}
 
 
 def _add_novel_glyph_group(
@@ -887,6 +897,18 @@ def import_koburi_ruby(
     return list(substitutions.items()), vertical_maps
 
 
+def mark_ligature_rules(
+    cmap: Mapping[int, str],
+    pairs: Sequence[_mark_positioning.MarkPair],
+    outputs: Mapping[_mark_positioning.MarkPair, str],
+    mark_inputs: Mapping[int, int],
+) -> list[tuple[str, str, str]]:
+    return [
+        (cmap[base], cmap[mark_inputs[mark]], outputs[(base, mark)])
+        for base, mark in pairs
+    ]
+
+
 def autohint_latin_glyphs(
     output_path: Path,
     glyph_names: tuple[str, ...],
@@ -1002,6 +1024,8 @@ def build(
             0x3030,
             0x3099,
             0x309A,
+            0x309B,
+            0x309C,
             0xFF01,
             0xFF1F,
             0xFF5E,
@@ -1140,11 +1164,9 @@ def build(
         base=base_type,
         weight=identity.style,
     )
-    punctuation_mark_positions = (
-        _mark_positioning.load_punctuation_mark_positions(
-            base=base_type,
-            weight=identity.style,
-        )
+    punctuation_mark_positions = _mark_positioning.load_punctuation_mark_positions(
+        base=base_type,
+        weight=identity.style,
     )
     generated_mark_pairs = [
         pair for pair in supported_mark_pairs if pair not in native_mark_outputs
@@ -1358,20 +1380,13 @@ def build(
         advance_override=1000,
     )
 
-    punctuation_mark_start = (
-        punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
-    )
+    punctuation_mark_start = punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
     punctuation_mark_count = len(_mark_positioning.PUNCTUATION_MARK_PAIRS)
     punctuation_mark_names = allocated_names[
-        punctuation_mark_start
-        : punctuation_mark_start + 2 * punctuation_mark_count
+        punctuation_mark_start : punctuation_mark_start + 2 * punctuation_mark_count
     ]
-    punctuation_mark_horizontal_names = punctuation_mark_names[
-        :punctuation_mark_count
-    ]
-    punctuation_mark_vertical_names = punctuation_mark_names[
-        punctuation_mark_count:
-    ]
+    punctuation_mark_horizontal_names = punctuation_mark_names[:punctuation_mark_count]
+    punctuation_mark_vertical_names = punctuation_mark_names[punctuation_mark_count:]
     mark_paths = {
         codepoint: _font_geometry.glyph_path(font, cmap[codepoint])
         for codepoint in (0x3099, 0x309A)
@@ -1384,19 +1399,23 @@ def build(
             _font_geometry.compose_mark_glyph(
                 _font_geometry.glyph_path(font, cmap[base]),
                 mark_paths[mark],
-                punctuation_mark_positions[pair]["horizontal"],
+                _font_geometry.mark_placement_transform(
+                    mark_paths[mark],
+                    punctuation_mark_positions[pair]["horizontal"],
+                ),
             )
         )
         punctuation_mark_vertical_paths.append(
             _font_geometry.compose_mark_glyph(
                 _font_geometry.glyph_path(
                     font,
-                    _font_operations.vertical_glyph_or_self(
-                        font, cmap[base]
-                    ),
+                    _font_operations.vertical_glyph_or_self(font, cmap[base]),
                 ),
                 mark_paths[mark],
-                punctuation_mark_positions[pair]["vertical"],
+                _font_geometry.mark_placement_transform(
+                    mark_paths[mark],
+                    punctuation_mark_positions[pair]["vertical"],
+                ),
             )
         )
     _font_operations.append_glyphs(
@@ -1492,7 +1511,10 @@ def build(
                 mark_paths[mark], 1, target_x, target_y
             )
         else:
-            mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
+            mark_transform = _font_geometry.mark_placement_transform(
+                mark_paths[mark],
+                mark_position_overrides[(base, mark)]["horizontal"],
+            )
         horizontal_mark_paths.append(
             _font_geometry.compose_mark_glyph(
                 base_path, mark_paths[mark], mark_transform
@@ -1533,7 +1555,10 @@ def build(
                 mark_paths[mark], 1, target_x, target_y
             )
         else:
-            mark_transform = mark_position_overrides[(base, mark)]["vertical"]
+            mark_transform = _font_geometry.mark_placement_transform(
+                mark_paths[mark],
+                mark_position_overrides[(base, mark)]["vertical"],
+            )
         vertical_mark_paths.append(
             _font_geometry.compose_mark_glyph(
                 base_path, mark_paths[mark], mark_transform
@@ -1624,13 +1649,47 @@ def build(
         _mark_positioning.CHOON_DAKUTEN_PUA,
         mark_outputs[_mark_positioning.CHOON_DAKUTEN_PAIR],
     )
-    kana_marks = [
-        (cmap[base], cmap[mark], mark_outputs[(base, mark)])
-        for base, mark in supported_mark_pairs
-    ]
+    kana_marks = mark_ligature_rules(
+        cmap,
+        supported_mark_pairs,
+        mark_outputs,
+        COMBINING_MARK_INPUTS,
+    )
+    spacing_marks = mark_ligature_rules(
+        cmap,
+        supported_mark_pairs,
+        mark_outputs,
+        SPACING_MARK_INPUTS,
+    )
     kana_marks.extend(
-        (cmap[base], cmap[mark], heart_outputs[(base, mark)])
-        for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
+        mark_ligature_rules(
+            cmap,
+            _mark_positioning.KOBURI_HEART_MARK_PAIRS,
+            heart_outputs,
+            COMBINING_MARK_INPUTS,
+        )
+    )
+    spacing_marks.extend(
+        mark_ligature_rules(
+            cmap,
+            _mark_positioning.KOBURI_HEART_MARK_PAIRS,
+            heart_outputs,
+            SPACING_MARK_INPUTS,
+        )
+    )
+    punctuation_marks = mark_ligature_rules(
+        cmap,
+        _mark_positioning.PUNCTUATION_MARK_PAIRS,
+        punctuation_mark_outputs,
+        COMBINING_MARK_INPUTS,
+    )
+    spacing_marks.extend(
+        mark_ligature_rules(
+            cmap,
+            _mark_positioning.PUNCTUATION_MARK_PAIRS,
+            punctuation_mark_outputs,
+            SPACING_MARK_INPUTS,
+        )
     )
     punctuation_marks = [
         (cmap[base], cmap[mark], punctuation_mark_outputs[(base, mark)])
@@ -1708,6 +1767,7 @@ def build(
             manga_wave,
             punctuation_variants,
             kana_marks,
+            spacing_marks,
             kana_vertical_maps,
             ruby_substitutions,
             punctuation_marks,

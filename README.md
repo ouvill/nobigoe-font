@@ -86,7 +86,7 @@ uv run nobigoe-measure-kana --strict --json \
 
 ### Manga1方式の濁点・半濁点付き仮名
 
-Adobe-Manga1-0が規定する濁点77列と半濁点114列の計191列を、OpenTypeの `ccmp` で1グリフへ置換します。入力には結合濁点（U+3099）または結合半濁点（U+309A）を使用します。
+Adobe-Manga1-0が規定する濁点77列と半濁点114列の計191列を、OpenTypeの `ccmp` で1グリフへ置換します。正式な入力には結合濁点（U+3099）または結合半濁点（U+309A）を使用します。入力互換のため、全角幅濁点（U+309B）または全角幅半濁点（U+309C）を基字に続けた場合も、既定で有効な `liga` により同じ一体字形へ置換します。`liga` を無効にすると全角幅記号だけが基字と分離し、単独のU+309B・U+309Cは設定にかかわらず変更しません。
 
 ```text
 あ゙ ぁ゙ な゙ ん゙ ア゙ ン゙
@@ -232,8 +232,8 @@ uv run nobigoe-package
 ```
 
 ```text
-dist/NobigoeMincho-v1.030.zip
-dist/NobigoeKoburiMincho-v1.030.zip
+dist/NobigoeMincho-v1.033.zip
+dist/NobigoeKoburiMincho-v1.033.zip
 ```
 
 ローカル検証用にNovel版ZIPも必要な場合だけ、Novel全7ウェイトを生成してから明示的に追加します。このオプションはGitHub Releaseでは使用しません。
@@ -248,7 +248,7 @@ dist/NobigoeNovelMincho-v1.030.zip
 
 ### GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.030`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/profiles.py`の`VERSION_NUMBER`と同じタグ（例: `v1.033`）で起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。`v*`タグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ### ローカルの元フォントを使用
 
@@ -288,12 +288,12 @@ src/nobigoe_font/mark_positions/koburi.json
 src/nobigoe_font/mark_positions/punctuation.json
 ```
 
-各字の `horizontal` と `vertical` は `[scale, x, y]` です。`scale` は結合記号の等方倍率、`x` と `y` は拡大後の平行移動量で、正の値は右・上へ移動します。`nobigoe-build`は共通4ファイルの記号種、キー集合、配列長、正の倍率を検証し、191列の不足や重複があれば生成を停止します。Noto版で生成する167列は、実際のウェイトの輪郭で基字との交差も検査します。交差時は記号の大きさを変えず、基字と記号の中心関係から求めた上・横・斜めの外向き候補を比較し、縦メトリクス内で輪郭が離れる最短距離の移動を採用します。
+各字の `horizontal` と `vertical` は `[scale, x, y, rotation]` です。`scale` は結合記号の等方倍率、`x` と `y` は拡大後の平行移動量で、正の値は右・上へ移動します。`rotation` は度数法の回転角で、正の値は反時計回りです。回転の中心には `scale`、`x`、`y` 適用後の記号輪郭のバウンディングボックス中心を使うため、角度を変えても記号の中心位置は動きません。`nobigoe-build`は共通4ファイルの記号種、キー集合、配列長、有限値、正の倍率を検証し、191列の不足や重複があれば生成を停止します。収録値では濁点だけを文字ごと・横縦別に光学調整し、半濁点は回転させていません。Noto版で生成する167列は、実際のウェイトの輪郭で基字との交差も検査します。交差時は記号の大きさを変えず、基字と記号の中心関係から求めた上・横・斜めの外向き候補を比較し、縦メトリクス内で輪郭が離れる最短距離の移動を採用します。
 
 ```json
 "30A1": {
-  "horizontal": [0.8, 955, -57],
-  "vertical": [0.8, 1036, 171]
+  "horizontal": [0.8, 955, -57, 3],
+  "vertical": [0.8, 1036, 171, 3]
 }
 ```
 
@@ -301,7 +301,7 @@ Version 1.015の配置値は、[源暎こぶり明朝](https://okoneya.jp/font/g
 
 長音濁点はManga1の191列には含まれないため、`src/nobigoe_font/marks.py`の`CHOON_DAKUTEN_MARK_CENTERS`で横組・縦組の記号中心を管理します。この値も源暎こぶり明朝のU+E0DBを1000 units/emへ正規化したものです。
 
-`src/nobigoe_font/mark_positions/punctuation.json`は、感嘆符・疑問符と結合濁点・半濁点の4列について、Noto版7ウェイトと源暎こぶり明朝版Regularの横組・縦組配置をすべて明示します。ビルド時にファミリー、ウェイト、4つのキー集合と各変換値を検証し、不足や未定義ウェイトがあれば生成を停止します。
+`src/nobigoe_font/mark_positions/punctuation.json`は、感嘆符・疑問符と結合濁点・半濁点の4列について、Noto版7ウェイトと源暎こぶり明朝版Regularの横組・縦組配置をすべて明示します。実輪郭の候補比較と視覚調整に基づき、感嘆符・疑問符の濁点は両ファミリー・全ウェイト・横縦とも時計回り3度（`rotation: -3`）、半濁点は0度に設定しています。ビルド時にファミリー、ウェイト、4つのキー集合と各変換値を検証し、不足や未定義ウェイトがあれば生成を停止します。
 
 `src/nobigoe_font/mark_positions/koburi.json`は、源暎こぶり明朝に一体字形がない103列だけを上書きします。源暎こぶり明朝v6.1の既存88列から、基字に対する記号の相対位置と寸法を通常仮名・小書き仮名、濁点・半濁点、横組・縦組ごとに測定して配置へ反映しています。元フォントの88列は専用レイヤーで上書きせず、元の一体字形をそのまま使用します。設定ファイルには測定元のSHA-256、units/em、GPOS機能、対象数も記録し、ビルド時に検証します。
 
@@ -343,6 +343,7 @@ uv run pyftsubset dist/NobigoeMincho-Regular.otf \
 | feature | 用途 |
 |---|---|
 | `ccmp` | 全角感嘆符・疑問符合字と濁点・半濁点付き仮名 |
+| `liga` | 全角幅濁点・半濁点を既存の一体字形へ置換 |
 | `aalt` | 全角感嘆符・疑問符および合字の3異体字を列挙 |
 | `ss01` | 全角感嘆符・疑問符および合字を斜体明朝へ置換 |
 | `ss02` | 全角感嘆符・疑問符および合字をゴシックへ置換 |
@@ -351,9 +352,9 @@ uv run pyftsubset dist/NobigoeMincho-Regular.otf \
 | `calt` | 連続する長音・ダッシュ・波線の始端／中間／終端置換 |
 | `vert` / `vrt2` | 縦組用の伸長記号、濁点・半濁点付き仮名、`ㇷ゚`ルビ字形 |
 
-一般的なシェーピングエンジンでは `ccmp` と `calt` は既定で有効です。アプリケーション側で `calt` を無効にすると、伸長記号の自動連結は行われません。
+一般的なシェーピングエンジンでは `ccmp`、`liga`、`calt` は既定で有効です。アプリケーション側で `liga` を無効にするとU+309B・U+309Cは全角幅の独立字形になり、結合文字U+3099・U+309Aの `ccmp` は維持されます。ただし、欧文の `fi`・`fl` などの標準合字も同時に無効になります。`calt` を無効にすると、伸長記号の自動連結は行われません。
 
-CSSでは、たとえば `font-feature-settings: "ss03" 1;` で全角感嘆符・疑問符を斜体ゴシックへ、`font-feature-settings: "ruby" 1;` で対象の半濁点付き仮名をルビ字形へ切り替えられます。
+CSSでは、たとえば `font-feature-settings: "liga" 0;` で全角幅濁点・半濁点を分離し、`font-feature-settings: "ss03" 1;` で全角感嘆符・疑問符を斜体ゴシックへ、`font-feature-settings: "ruby" 1;` で対象の半濁点付き仮名をルビ字形へ切り替えられます。
 
 ## ライセンス
 

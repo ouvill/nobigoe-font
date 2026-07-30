@@ -16,6 +16,7 @@ from .marks import (
     HEART_DAKUTEN_CLEARANCE_RATIO,
     HEART_DAKUTEN_CLEARANCE_STEPS,
     HEART_DAKUTEN_MARK_TRANSFORMS,
+    MarkPlacement,
 )
 
 
@@ -132,6 +133,39 @@ def centered_transform(
         scale,
         target_x - scale * center_x,
         target_y - scale * center_y,
+    )
+
+
+def mark_placement_transform(
+    outline: pathops.Path,
+    placement: MarkPlacement,
+) -> Transform:
+    if placement.rotation == 0:
+        return Transform(
+            placement.scale,
+            0,
+            0,
+            placement.scale,
+            placement.x,
+            placement.y,
+        )
+    x_min, y_min, x_max, y_max = outline.bounds
+    center_x = (x_min + x_max) / 2
+    center_y = (y_min + y_max) / 2
+    angle = math.radians(placement.rotation)
+    cosine = math.cos(angle)
+    sine = math.sin(angle)
+    xx = placement.scale * cosine
+    xy = placement.scale * sine
+    yx = -placement.scale * sine
+    yy = placement.scale * cosine
+    return Transform(
+        xx,
+        xy,
+        yx,
+        yy,
+        placement.x + placement.scale * center_x - xx * center_x - yx * center_y,
+        placement.y + placement.scale * center_y - xy * center_x - yy * center_y,
     )
 
 

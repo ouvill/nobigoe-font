@@ -24,12 +24,15 @@ from nobigoe_font.features import (
     merge_features,
 )
 from nobigoe_font.pipeline import (
+    COMBINING_MARK_INPUTS,
     _apply_novel_style,
     _novel_hiragana_mappings,
     _novel_katakana_mappings,
     _native_novel_ccmp_outputs,
     build,
     import_koburi_ruby,
+    SPACING_MARK_INPUTS,
+    mark_ligature_rules,
     make_manga_wave_parts,
     make_wave_parts,
 )
@@ -45,6 +48,7 @@ from nobigoe_font.marks import (
     KOBURI_PUA_START,
     MANGA_MISSING_SMALL_KANA,
     MANGA_MARK_PAIRS,
+    MarkPlacement,
 )
 from nobigoe_font.novel_katakana import (
     KATAKANA_CODEPOINTS,
@@ -70,6 +74,7 @@ from nobigoe_font.geometry import (
     adjust_outline_weight,
     adjust_outline_horizontal_weight,
     centered_transform,
+    mark_placement_transform,
     glyph_path,
     transform_path,
 )
@@ -472,6 +477,31 @@ class TrueTypeBuildTests(unittest.TestCase):
             advance_override=1000,
         )
 
+    def test_zero_mark_rotation_matches_the_original_transform(self) -> None:
+        transform = mark_placement_transform(
+            rectangle_path(),
+            MarkPlacement(0.8, 900, -50, 0),
+        )
+
+        self.assertEqual(transform, Transform(0.8, 0, 0, 0.8, 900, -50))
+
+    def test_mark_rotation_preserves_center_and_uses_positive_ccw(self) -> None:
+        mark = rectangle_path()
+        transform = mark_placement_transform(
+            mark,
+            MarkPlacement(0.8, 900, -50, 90),
+        )
+        placed = transform_path(mark, transform)
+        x_min, y_min, x_max, y_max = placed.bounds
+
+        self.assertAlmostEqual((x_min + x_max) / 2, 1300)
+        self.assertAlmostEqual((y_min + y_max) / 2, 190)
+        self.assertAlmostEqual(x_max - x_min, 320)
+        self.assertAlmostEqual(y_max - y_min, 640)
+        right_edge_x, right_edge_y = transform.transformPoint((900, 300))
+        self.assertAlmostEqual(right_edge_x, 1300)
+        self.assertAlmostEqual(right_edge_y, 510)
+
     def test_choon_dakuten_uses_koburi_mark_centers(self) -> None:
         mark = transform_path(rectangle_path(), Transform(0.2, 0, 0, 0.2, -300, 500))
         for orientation, (target_x, target_y) in CHOON_DAKUTEN_MARK_CENTERS.items():
@@ -488,6 +518,8 @@ class TrueTypeBuildTests(unittest.TestCase):
         base_codepoint, mark_codepoint = CHOON_DAKUTEN_PAIR
         base = f"uni{base_codepoint:04X}"
         mark = f"uni{mark_codepoint:04X}"
+        spacing_mark_codepoint = 0x309B
+        spacing_mark = f"uni{spacing_mark_codepoint:04X}"
         output = "choon.dakuten"
         vertical_output = f"{output}.vert"
         wave_names = [f"wave.{index}" for index in range(10)]
@@ -505,6 +537,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                     ".notdef",
                     base,
                     mark,
+                    spacing_mark,
                     output,
                     vertical_output,
                     "wave.base",
@@ -518,29 +551,97 @@ class TrueTypeBuildTests(unittest.TestCase):
         )
         font = named_true_type_font(
             glyph_order,
-            {base_codepoint: base, mark_codepoint: mark},
+            {
+                base_codepoint: base,
+                mark_codepoint: mark,
+                spacing_mark_codepoint: spacing_mark,
+            },
         )
         source = feature_source(
             [],
             ("wave", "wave.base", "wave.vert", wave_names),
             ("manga-wave", "manga-wave.base", manga_wave_names),
             punctuation_variants,
-            [(base, mark, output)],
+            mark_ligature_rules(
+                font.getBestCmap(),
+                [CHOON_DAKUTEN_PAIR],
+                {CHOON_DAKUTEN_PAIR: output},
+                COMBINING_MARK_INPUTS,
+            ),
+            mark_ligature_rules(
+                font.getBestCmap(),
+                [CHOON_DAKUTEN_PAIR],
+                {CHOON_DAKUTEN_PAIR: output},
+                SPACING_MARK_INPUTS,
+            ),
             [(output, vertical_output)],
             [],
         )
 
         addOpenTypeFeaturesFromString(font, source, tables={"GSUB"})
 
-        self.assertEqual(feature_ligatures(font, "ccmp")[(base, mark)], output)
+        ccmp = feature_ligatures(font, "ccmp")
+        liga = feature_ligatures(font, "liga")
+        self.assertEqual(ccmp[(base, mark)], output)
+        self.assertNotIn((base, spacing_mark), ccmp)
+        self.assertEqual(liga[(base, spacing_mark)], output)
         self.assertEqual(
             feature_single_substitutions(font, "vert")[output],
             vertical_output,
         )
 
+    def test_mark_ligature_rules_alias_spacing_marks(self) -> None:
+        pairs = ((0x3042, 0x3099), (0x304B, 0x309A))
+        outputs = {
+            pairs[0]: "hiragana-a.dakuten",
+            pairs[1]: "hiragana-ka.handakuten",
+        }
+        cmap = {
+            0x3042: "hiragana-a",
+            0x304B: "hiragana-ka",
+            0x3099: "dakuten",
+            0x309A: "handakuten",
+            0x309B: "spacing-dakuten",
+            0x309C: "spacing-handakuten",
+        }
+
+        combining_rules = {
+            (base, mark): output
+            for base, mark, output in mark_ligature_rules(
+                cmap, pairs, outputs, COMBINING_MARK_INPUTS
+            )
+        }
+        spacing_rules = {
+            (base, mark): output
+            for base, mark, output in mark_ligature_rules(
+                cmap, pairs, outputs, SPACING_MARK_INPUTS
+            )
+        }
+
+        self.assertEqual(
+            combining_rules,
+            {
+                ("hiragana-a", "dakuten"): "hiragana-a.dakuten",
+                ("hiragana-ka", "handakuten"): "hiragana-ka.handakuten",
+            },
+        )
+        self.assertEqual(
+            spacing_rules,
+            {
+                ("hiragana-a", "spacing-dakuten"): "hiragana-a.dakuten",
+                (
+                    "hiragana-ka",
+                    "spacing-handakuten",
+                ): "hiragana-ka.handakuten",
+            },
+        )
+
     def test_feature_source_builds_punctuation_mark_substitutions(self) -> None:
         punctuation_variants = [
-            ("!", ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3")),
+            (
+                "!",
+                ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3"),
+            ),
             ("?", ("question", "question.a1", "question.a2", "question.a3")),
         ]
         marks = ("dakuten", "handakuten")
@@ -572,11 +673,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                     *wave_names,
                     "manga-wave.base",
                     *manga_wave_names,
-                    *(
-                        name
-                        for _, names in punctuation_variants
-                        for name in names
-                    ),
+                    *(name for _, names in punctuation_variants for name in names),
                 ]
             )
         )
@@ -587,6 +684,7 @@ class TrueTypeBuildTests(unittest.TestCase):
             ("manga-wave", "manga-wave.base", manga_wave_names),
             punctuation_variants,
             [],
+            [],
             vertical_maps,
             [],
             punctuation_marks,
@@ -596,21 +694,14 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         ccmp = feature_ligatures(font, "ccmp")
         self.assertEqual(
-            {
-                (base, mark): ccmp[(base, mark)]
-                for base, mark, _ in punctuation_marks
-            },
-            {
-                (base, mark): output
-                for base, mark, output in punctuation_marks
-            },
+            {(base, mark): ccmp[(base, mark)] for base, mark, _ in punctuation_marks},
+            {(base, mark): output for base, mark, output in punctuation_marks},
         )
         vert = feature_single_substitutions(font, "vert")
         self.assertEqual(
             {output: vert[output] for output in outputs},
             dict(vertical_maps),
         )
-
 
     def test_horizontal_choon_calt_is_added_to_kana_script(self) -> None:
         glyph_order = [
