@@ -219,6 +219,14 @@ STIX_TWO_OTF_SHA256 = {
     "Bold": "7ef76c666a6704f76ed3fa27bcdda55b36e558b5c2c93b49b03d854db96bdeb5",
 }
 STIX_TWO_SCALE_FACTOR = 1.110
+# Minimize the mean absolute per-glyph area/advance error against Noto Serif JP
+# over A-Z, a-z, and 0-9 after applying the shared STIX Two scale factor.
+STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS = {
+    "Regular": -10,
+    "Medium": -12,
+    "SemiBold": -14,
+    "Bold": -15,
+}
 STIX_TWO_COPYRIGHT = (
     "Copyright 2001-2021 The STIX Fonts Project Authors "
     "(https://github.com/stipub/stixfonts)"
@@ -462,7 +470,7 @@ def latin_build_profile(family: LatinFamily, weight: str) -> LatinBuildProfile:
         return LatinBuildProfile(
             family,
             STIX_TWO_SCALE_FACTOR,
-            0,
+            STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS[weight],
             copyright=STIX_TWO_COPYRIGHT,
         )
     if family == "source-serif-4":

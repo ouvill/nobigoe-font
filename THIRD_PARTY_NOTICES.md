@@ -71,7 +71,7 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 
 ### 使用箇所と改変
 
-`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。輪郭と水平メトリクスを1.110倍してNoto Serif JP側のグリフへ移植します。STIX Two TextにネイティブソースがあるRegular、Medium、SemiBold、Boldだけを対象とし、源暎こぶり明朝版には取り込みません。
+`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。輪郭と水平メトリクスを1.110倍し、Regular、Medium、SemiBold、Boldの順に縦画を中心とする水平輪郭を-10、-12、-14、-15 units補正してから、Noto Serif JP側のグリフへ移植します。補正値は1.110倍後の`A–Z`・`a–z`・`0–9`について、各字の輪郭面積を送り幅で割り、同ウェイトのNoto Serif JP欧文との差の平均絶対誤差を-40〜0 unitsの整数候補中で最小にする値です。STIX Two Textにネイティブソースがある4ウェイトだけを対象とし、源暎こぶり明朝版には取り込みません。
 
 ## Source Serif 4
 
