@@ -9,6 +9,7 @@
     "build:images": "node tools/generate-share-images.mjs",
     "build:specimen": "node tools/generate-vertical-specimen.mjs",
     "check": "astro check",
+    "postinstall": "astro sync",
     "format": "prettier --write 'src/**/*.{astro,ts,css}' astro.config.mjs tsconfig.json package.json tools/share-images.html tools/generate-share-images.mjs",
     "format:check": "prettier --check 'src/**/*.{astro,ts,css}' astro.config.mjs tsconfig.json package.json tools/share-images.html tools/generate-share-images.mjs"
   },
@@ -27,12 +28,15 @@
   "homepage": "https://nobigoe.ouvill.net/",
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@astrojs/language-server": "^2.16.13",
     "@types/fontkit": "^2.0.9",
     "astro": "^7.1.4",
     "fontkit": "^2.0.4",
     "playwright": "^1.62.0",
     "prettier": "^3.9.6",
     "prettier-plugin-astro": "^0.14.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-language-server": "^5.3.0",
+    "vscode-langservers-extracted": "^4.10.0"
   }
 }

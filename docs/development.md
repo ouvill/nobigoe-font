@@ -209,6 +209,10 @@ npm run dev
 
 `website/`内で`npm run check`を実行するとAstroの型検査、`npm run build`を実行すると`website/site-dist/`への静的ビルドを行います。
 
+### OMPのLanguage Server
+
+リポジトリ直下からOMPを起動すると、`.omp/lsp.json`に従ってPython、Astro、TypeScript／JavaScript、CSS、HTML、JSONのLanguage Serverが有効になります。`uv sync`でbasedpyrightを、`website/`で`npm ci`を実行してWeb用Language Serverをインストールしてください。`npm ci`後の`astro sync`は自動実行され、Astroの型定義も生成されます。
+
 かな比較`/compare/`は、小説本文用のNovel仮名を制作途中から確認できる公開制作プレビューです。Noto／Koburi／Novelの比較、固定7ウェイト、横組・縦組本文、開発用可変かなソースを掲載し、Pagesワークフローで必要な比較用Webfontを生成します。Novel版は通常の配布ZIPとタグリリースには含めません。
 
 公開サイトは<https://nobigoe.ouvill.net/>です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
