@@ -38,11 +38,11 @@ const faces = [
   data-novel-comparison
 >
   <header class="comparison-app__header">
-    <p class="comparison-step">かなと漢字の設計比較</p>
+    <p class="comparison-step">比較内容</p>
     <div>
-      <h2 id="comparison-tool-title">大きさと余白を、同じ言葉で見比べる。</h2>
+      <h2 id="comparison-tool-title">字形、ウェイト、組方向</h2>
       <p>
-        ひらがなとカタカナの代表字、太さ、横組と縦組を上から順に確認できます。文章見本は直接編集できます。
+        三書体の代表字、Novelの7ウェイト、横組と縦組の文章見本を順に表示します。文章見本は直接編集できます。
       </p>
     </div>
     <p class="comparison-provenance">
@@ -62,7 +62,7 @@ const faces = [
     >
       <header class="comparison-section-heading">
         <p>01 / THREE FACES</p>
-        <h3 id="representative-title">同じ代表字、三つのかな</h3>
+        <h3 id="representative-title">三書体の代表字</h3>
       </header>
       <div class="representative-list" role="list">
         {
@@ -112,7 +112,7 @@ const faces = [
     <section class="novel-weights" aria-labelledby="novel-weights-title">
       <header class="comparison-section-heading">
         <p>02 / SEVEN WEIGHTS</p>
-        <h3 id="novel-weights-title">Novel、かなの七つの太さ</h3>
+        <h3 id="novel-weights-title">Novelの7ウェイト</h3>
       </header>
       <ol class="novel-weight-list">
         {
@@ -148,7 +148,7 @@ const faces = [
       class="comparison-section-heading comparison-section-heading--prose"
     >
       <p>03 / PROSE</p>
-      <h3 id="comparison-prose-title">文章の呼吸を、横と縦で確かめる</h3>
+      <h3 id="comparison-prose-title">Novel Regularの横組・縦組</h3>
       <p>
         Novelはひらがなとカタカナを本文向けに変形し、漢字の字面をセル中央基準で縮小しています。Latinと約物は土台ののびごえ明朝と共通です。
       </p>
@@ -201,15 +201,13 @@ const faces = [
   >
     <header class="comparison-section-heading">
       <p>04 / VERTICAL THREE FACES</p>
-      <h3 id="vertical-face-comparison-title">
-        同じ本文、同じ大きさで縦の余白を比べる
-      </h3>
+      <h3 id="vertical-face-comparison-title">三書体の縦組比較</h3>
       <p>
         三書体ともRegular、36px、行送り72px、縦送り1000
         unitsです。Novelの漢字は送りを保ったまま97.65625%へ縮小しています。
       </p>
     </header>
-    <h4 class="vertical-face-subtitle">代表漢字9字の字面と本文余白</h4>
+    <h4 class="vertical-face-subtitle">代表漢字9字</h4>
     <div class="vertical-face-grid vertical-face-grid--han" role="list">
       {
         faces.map((face) => (
@@ -227,9 +225,7 @@ const faces = [
         ))
       }
     </div>
-    <h4 class="vertical-face-subtitle">
-      ひらがな・カタカナ・漢字を混植した本文
-    </h4>
+    <h4 class="vertical-face-subtitle">かな・カタカナ・漢字の混植</h4>
     <div class="vertical-face-grid vertical-face-grid--mixed" role="list">
       {
         faces.map((face) => (
@@ -251,7 +247,7 @@ const faces = [
 
   <details class="comparison-overlay">
     <summary>
-      <span>任意表示：三書体を輪郭風に重ねる</span>
+      <span>任意表示：三書体の簡易重ね表示</span>
       <span aria-hidden="true">＋</span>
     </summary>
     <div class="comparison-overlay__body">
@@ -265,7 +261,7 @@ const faces = [
         <span data-overlay-family="novel" aria-hidden="true">のぬ</span>
       </div>
       <div class="overlay-explanation">
-        <h3>輪郭の差を、位置を揃えて見る</h3>
+        <h3>簡易重ね表示</h3>
         <p>
           CSSの文字ストロークで作る簡易比較です。赤がNoto、緑がKoburi、濃色がNovel。正確なアウトライン計測図ではありません。
         </p>
