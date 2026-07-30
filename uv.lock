@@ -236,7 +236,6 @@ wheels = [
 
 [[package]]
 name = "nobigoe-font"
-version = "1.34"
 source = { editable = "." }
 dependencies = [
     { name = "afdko" },

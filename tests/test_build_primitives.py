@@ -70,11 +70,8 @@ from nobigoe_font.operations import (
     remove_repeated_ligatures,
     tt_glyph,
 )
-from nobigoe_font.profiles import (
-    LatinBuildProfile,
-    VERSION_NUMBER,
-    font_identity,
-)
+from nobigoe_font.profiles import LatinBuildProfile, font_identity
+from nobigoe_font.version import VERSION_NUMBER
 from nobigoe_font.geometry import (
     bounds,
     adjust_outline_weight,

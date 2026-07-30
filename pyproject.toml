@@ -1,6 +1,6 @@
 [project]
 name = "nobigoe-font"
-version = "1.034"
+dynamic = ["version"]
 description = "Build Nobigoe Mincho font families"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
@@ -19,6 +19,10 @@ nobigoe-measure-kana = "nobigoe_font.novel_metrics:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/nobigoe_font/version.json"
+pattern = '"version"\s*:\s*"(?P<version>[^"]+)"'
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nobigoe_font"]

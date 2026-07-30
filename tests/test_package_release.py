@@ -16,7 +16,7 @@ from nobigoe_font.release import (
     parse_args,
     release_specs,
 )
-from nobigoe_font.profiles import VERSION_NUMBER
+from nobigoe_font.version import VERSION_NUMBER
 
 
 class ReleasePackagingTests(unittest.TestCase):
