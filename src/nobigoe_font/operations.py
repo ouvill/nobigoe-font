@@ -91,9 +91,7 @@ def find_vertical_glyph(font: TTFont, base_name: str) -> str:
     raise ValueError(f"The source font has no vertical substitution for {base_name}")
 
 
-def feature_single_substitutions(
-    font: TTFont, feature_tag: str
-) -> dict[str, str]:
+def feature_single_substitutions(font: TTFont, feature_tag: str) -> dict[str, str]:
     lookup_indices: list[int] = []
     for record in font["GSUB"].table.FeatureList.FeatureRecord:
         if record.FeatureTag == feature_tag:
@@ -118,9 +116,7 @@ def vertical_glyph_or_self(font: TTFont, base_name: str) -> str:
         return base_name
 
 
-def feature_ligatures(
-    font: TTFont, feature_tag: str
-) -> dict[tuple[str, ...], str]:
+def feature_ligatures(font: TTFont, feature_tag: str) -> dict[tuple[str, ...], str]:
     lookup_indices: list[int] = []
     for record in font["GSUB"].table.FeatureList.FeatureRecord:
         if record.FeatureTag == feature_tag:
@@ -137,15 +133,11 @@ def feature_ligatures(
                 continue
             for first, records in ligatures.items():
                 for ligature in records:
-                    substitutions[
-                        (first, *ligature.Component)
-                    ] = ligature.LigGlyph
+                    substitutions[(first, *ligature.Component)] = ligature.LigGlyph
     return substitutions
 
 
-def remove_repeated_ligatures(
-    font: TTFont, feature_tag: str, glyph_name: str
-) -> int:
+def remove_repeated_ligatures(font: TTFont, feature_tag: str, glyph_name: str) -> int:
     """Remove feature ligatures made entirely from repeated copies of one glyph."""
 
     table = font["GSUB"].table
@@ -289,6 +281,7 @@ def replace_cff_glyph(
     *,
     advance_override: int | None = None,
     left_side_bearing_override: int | None = None,
+    round_tolerance: float = 0.5,
 ) -> None:
     cff = font["CFF "].cff
     top = cff.topDictIndex[0]
@@ -297,15 +290,11 @@ def replace_cff_glyph(
     fd_index = top.FDSelect[glyph_id]
     private = top.FDArray[fd_index].Private
     advance = (
-        font["hmtx"].metrics[name][0]
-        if advance_override is None
-        else advance_override
+        font["hmtx"].metrics[name][0] if advance_override is None else advance_override
     )
-    pen = T2CharStringPen(advance, None)
+    pen = T2CharStringPen(advance, None, roundTolerance=round_tolerance)
     outline.draw(pen)
-    char_string = pen.getCharString(
-        private=private, globalSubrs=cff.GlobalSubrs
-    )
+    char_string = pen.getCharString(private=private, globalSubrs=cff.GlobalSubrs)
     char_strings.charStringsIndex[char_strings.charStrings[name]] = char_string
     x_min, _, _, y_max = outline.bounds
     left_side_bearing = (
@@ -371,9 +360,7 @@ def replace_ttf_glyph(
 ) -> None:
     font["glyf"][name] = tt_glyph(outline, font["head"].unitsPerEm)
     advance = (
-        font["hmtx"].metrics[name][0]
-        if advance_override is None
-        else advance_override
+        font["hmtx"].metrics[name][0] if advance_override is None else advance_override
     )
     x_min, _, _, y_max = outline.bounds
     left_side_bearing = (
@@ -430,18 +417,30 @@ def replace_glyph(
     *,
     advance_override: int | None = None,
     left_side_bearing_override: int | None = None,
+    cff_round_tolerance: float = 0.5,
 ) -> None:
-    replace = replace_cff_glyph if "CFF " in font else replace_ttf_glyph
-    if "CFF " not in font and "glyf" not in font:
-        raise ValueError("Only OpenType/CFF and TrueType outlines are supported")
-    replace(
-        font,
-        name,
-        outline,
-        vertical_origin,
-        advance_override=advance_override,
-        left_side_bearing_override=left_side_bearing_override,
-    )
+    if "CFF " in font:
+        replace_cff_glyph(
+            font,
+            name,
+            outline,
+            vertical_origin,
+            advance_override=advance_override,
+            left_side_bearing_override=left_side_bearing_override,
+            round_tolerance=cff_round_tolerance,
+        )
+        return
+    if "glyf" in font:
+        replace_ttf_glyph(
+            font,
+            name,
+            outline,
+            vertical_origin,
+            advance_override=advance_override,
+            left_side_bearing_override=left_side_bearing_override,
+        )
+        return
+    raise ValueError("Only OpenType/CFF and TrueType outlines are supported")
 
 
 def replace_glyph_from_source(
@@ -460,9 +459,7 @@ def replace_glyph_from_source(
     except ValueError:
         target_y_max = 0
     vertical_origin = (
-        font["vmtx"].metrics[target_name][1] + target_y_max
-        if "vmtx" in font
-        else 0
+        font["vmtx"].metrics[target_name][1] + target_y_max if "vmtx" in font else 0
     )
     source_advance, source_lsb = source_font["hmtx"].metrics[source_name]
     outline = _font_geometry.glyph_path(source_font, source_name)
@@ -514,8 +511,7 @@ def replace_latin_glyphs(
     ]
     if missing:
         raise ValueError(
-            "The base and Latin sources must contain Basic Latin: "
-            + ", ".join(missing)
+            "The base and Latin sources must contain Basic Latin: " + ", ".join(missing)
         )
 
     replaced: list[int] = []
@@ -544,7 +540,6 @@ def replace_latin_glyphs(
         replaced.append(codepoint)
         replaced_names.add(target_name)
     return tuple(replaced)
-
 
 
 @dataclass(frozen=True)
@@ -645,8 +640,7 @@ def _subset_latin_font(
                 lang_system.FeatureIndex = [
                     index
                     for index in lang_system.FeatureIndex
-                    if table.FeatureList.FeatureRecord[index].FeatureTag
-                    in common_tags
+                    if table.FeatureList.FeatureRecord[index].FeatureTag in common_tags
                 ]
                 lang_system.FeatureCount = len(lang_system.FeatureIndex)
         common_scripts = [
@@ -656,10 +650,7 @@ def _subset_latin_font(
                 lang_system is not None and lang_system.FeatureIndex
                 for lang_system in (
                     record.Script.DefaultLangSys,
-                    *(
-                        language.LangSys
-                        for language in record.Script.LangSysRecord
-                    ),
+                    *(language.LangSys for language in record.Script.LangSysRecord),
                 )
             )
         ]
@@ -673,13 +664,10 @@ def _subset_latin_font(
                 *(record.LangSys for record in script.LangSysRecord),
             ]
             if any(
-                lang_system is not None
-                and lang_system.ReqFeatureIndex != 0xFFFF
+                lang_system is not None and lang_system.ReqFeatureIndex != 0xFFFF
                 for lang_system in lang_systems
             ):
-                raise ValueError(
-                    f"Latin {tag} required features are not supported"
-                )
+                raise ValueError(f"Latin {tag} required features are not supported")
     return subset_font
 
 
@@ -773,9 +761,7 @@ def _append_glyph_from_source(
     except ValueError:
         donor_y_max = 0
     vertical_origin = (
-        font["vmtx"].metrics[donor_name][1] + donor_y_max
-        if "vmtx" in font
-        else 0
+        font["vmtx"].metrics[donor_name][1] + donor_y_max if "vmtx" in font else 0
     )
     source_advance = source_font["hmtx"].metrics[source_name][0]
     append_glyphs(
@@ -831,9 +817,7 @@ def _remap_source_mark_attachment_classes(
     if "GDEF" not in source_font:
         return
     target_definition = (
-        font["GDEF"].table.MarkAttachClassDef
-        if "GDEF" in font
-        else None
+        font["GDEF"].table.MarkAttachClassDef if "GDEF" in font else None
     )
     source_definition = source_font["GDEF"].table.MarkAttachClassDef
     if source_definition is None:
@@ -860,8 +844,7 @@ def _remap_source_mark_attachment_classes(
     }
     if conflicts:
         raise ValueError(
-            "Latin mark attachment classes conflict for "
-            + ", ".join(sorted(conflicts))
+            "Latin mark attachment classes conflict for " + ", ".join(sorted(conflicts))
         )
     for tag in ("GSUB", "GPOS"):
         if tag not in source_font:
@@ -869,9 +852,9 @@ def _remap_source_mark_attachment_classes(
         for lookup in source_font[tag].table.LookupList.Lookup:
             old_class = lookup.LookupFlag >> 8
             if old_class:
-                lookup.LookupFlag = (
-                    lookup.LookupFlag & 0x00FF
-                ) | (class_mapping[old_class] << 8)
+                lookup.LookupFlag = (lookup.LookupFlag & 0x00FF) | (
+                    class_mapping[old_class] << 8
+                )
 
 
 def _validate_glyph_class_conflicts(
@@ -901,8 +884,7 @@ def _script_lang_systems(script: object) -> dict[str | None, object]:
     if script.DefaultLangSys is not None:
         systems[None] = script.DefaultLangSys
     systems.update(
-        (record.LangSysTag, record.LangSys)
-        for record in script.LangSysRecord
+        (record.LangSysTag, record.LangSys) for record in script.LangSysRecord
     )
     return systems
 
@@ -934,8 +916,7 @@ def _replace_target_latin_feature_assignments(
             if source_system is None:
                 continue
             source_by_tag = {
-                feature.FeatureTag: feature
-                for feature in source_system.FeatureIndex
+                feature.FeatureTag: feature for feature in source_system.FeatureIndex
             }
             target_system.FeatureIndex = [
                 feature
@@ -957,16 +938,13 @@ def _sort_layout_records(font: TTFont) -> None:
             key=lambda index: feature_records[index].FeatureTag,
         )
         feature_mapping = {
-            old_index: new_index
-            for new_index, old_index in enumerate(feature_order)
+            old_index: new_index for new_index, old_index in enumerate(feature_order)
         }
         table.FeatureList.FeatureRecord = [
             feature_records[index] for index in feature_order
         ]
         table.FeatureList.FeatureCount = len(feature_records)
-        table.ScriptList.ScriptRecord.sort(
-            key=lambda record: record.ScriptTag
-        )
+        table.ScriptList.ScriptRecord.sort(key=lambda record: record.ScriptTag)
         for script_record in table.ScriptList.ScriptRecord:
             script = script_record.Script
             script.LangSysRecord.sort(key=lambda record: record.LangSysTag)
@@ -977,8 +955,7 @@ def _sort_layout_records(font: TTFont) -> None:
                 if lang_system is None:
                     continue
                 lang_system.FeatureIndex = sorted(
-                    feature_mapping[index]
-                    for index in lang_system.FeatureIndex
+                    feature_mapping[index] for index in lang_system.FeatureIndex
                 )
                 lang_system.FeatureCount = len(lang_system.FeatureIndex)
                 if lang_system.ReqFeatureIndex != 0xFFFF:
@@ -1012,9 +989,7 @@ def _merge_latin_layout(
         if tag in layout_source:
             scaler.visit(layout_source[tag].table)
     if profile.baseline_shift and "GPOS" in layout_source:
-        _AnchorShiftVisitor(profile.baseline_shift).visit(
-            layout_source["GPOS"].table
-        )
+        _AnchorShiftVisitor(profile.baseline_shift).visit(layout_source["GPOS"].table)
     _remap_source_mark_attachment_classes(font, layout_source)
     _validate_glyph_class_conflicts(font, layout_source)
 
@@ -1099,8 +1074,7 @@ def import_latin_font(
     _merge_latin_layout(font, subset_font, mapping, profile)
     imported_names = tuple(
         dict.fromkeys(
-            mapping[source_name]
-            for source_name in subset_font.getGlyphOrder()[1:]
+            mapping[source_name] for source_name in subset_font.getGlyphOrder()[1:]
         )
     )
     return LatinImportResult(imported_codepoints, imported_names)

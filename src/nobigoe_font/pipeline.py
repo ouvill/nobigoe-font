@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import shutil
 import subprocess
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -12,6 +13,7 @@ from .profiles import (
     BaseType,
     FontIdentity,
     KOBURI_RUBY_STROKE_ADJUSTMENTS,
+    KanaStyle,
     LatinBuildProfile,
     SHIPPORI_COPYRIGHT,
     SHIPPORI_STROKE_ADJUSTMENTS,
@@ -22,6 +24,21 @@ from . import marks as _mark_positioning
 from .features import feature_source, merge_features
 from .hinting import autohint_latin_glyphs
 from .metadata import rename_font
+from .novel import (
+    HIRAGANA_CODEPOINTS,
+    NOVEL_SMALL_KO_CODEPOINT,
+    apply_novel_hiragana,
+    novel_base_codepoint,
+    novel_group_for_codepoint,
+)
+from .novel_katakana import (
+    KATAKANA_CODEPOINTS,
+    KATAKANA_SOURCE_CODEPOINTS,
+    apply_novel_katakana,
+    katakana_base_codepoint,
+    novel_katakana_group_for_codepoint,
+)
+from .novel_han import apply_novel_han
 from .punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
     PUNCTUATION_ALTERNATE_COUNT,
@@ -52,12 +69,249 @@ KOBURI_RUBY_OUTPUT_COUNT = 288
 KOBURI_RUBY_VERTICAL_ORIGIN = 880
 
 
+def _add_novel_glyph_group(
+    mapping: dict[str, str],
+    glyph_name: str,
+    group: str,
+    *,
+    codepoint: int | None = None,
+    codepoints: dict[str, int] | None = None,
+    base_codepoint: Callable[[int], int] = novel_base_codepoint,
+    script: str = "hiragana",
+) -> None:
+    previous = mapping.setdefault(glyph_name, group)
+    if previous != group:
+        raise ValueError(
+            f"Conflicting novel {script} groups for {glyph_name!r}: "
+            f"{previous!r} and {group!r}"
+        )
+    if codepoint is not None and codepoints is not None:
+        previous_codepoint = codepoints.setdefault(glyph_name, codepoint)
+        if base_codepoint(previous_codepoint) != base_codepoint(codepoint):
+            raise ValueError(
+                f"Conflicting novel {script} vertical bases for {glyph_name!r}"
+            )
 
 
+def _native_novel_ccmp_outputs(
+    font: TTFont,
+    cmap: dict[int, str],
+    ligatures: dict[tuple[str, ...], str],
+    codepoints: Iterable[int],
+) -> tuple[dict[tuple[int, int], str], dict[tuple[int, int], str]]:
+    horizontal_outputs: dict[tuple[int, int], str] = {}
+    vertical_outputs: dict[tuple[int, int], str] = {}
+    for base in codepoints:
+        base_name = cmap.get(base)
+        if base_name is None:
+            continue
+        vertical_base_name = _font_operations.vertical_glyph_or_self(font, base_name)
+        for mark in (0x3099, 0x309A):
+            mark_name = cmap.get(mark)
+            if mark_name is None:
+                continue
+            pair = (base, mark)
+            horizontal_output = ligatures.get((base_name, mark_name))
+            if horizontal_output is not None:
+                horizontal_outputs[pair] = horizontal_output
+            vertical_output = ligatures.get((vertical_base_name, mark_name))
+            if vertical_output is not None:
+                vertical_outputs[pair] = vertical_output
+    return horizontal_outputs, vertical_outputs
 
-def stroke_band(
-    outline: pathops.Path, axis: str, seam: float
-) -> tuple[int, int]:
+
+def _novel_hiragana_mappings(
+    font: TTFont,
+    cmap: dict[int, str],
+    mark_outputs: dict[tuple[int, int], str],
+    vertical_mark_outputs: dict[tuple[int, int], str],
+    missing_small_glyphs: dict[int, tuple[str, str]],
+) -> tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]]:
+    horizontal: dict[str, str] = {}
+    vertical: dict[str, str] = {}
+    vertical_codepoints: dict[str, int] = {}
+    vertical_marked_glyphs: set[str] = set()
+    hiragana_bases = frozenset(HIRAGANA_CODEPOINTS) | {NOVEL_SMALL_KO_CODEPOINT}
+
+    for codepoint in HIRAGANA_CODEPOINTS:
+        glyph_name = cmap.get(codepoint)
+        if glyph_name is None:
+            continue
+        group = novel_group_for_codepoint(codepoint)
+        _add_novel_glyph_group(horizontal, glyph_name, group)
+        vertical_name = _font_operations.vertical_glyph_or_self(font, glyph_name)
+        if vertical_name != glyph_name:
+            _add_novel_glyph_group(
+                vertical,
+                vertical_name,
+                group,
+                codepoint=codepoint,
+                codepoints=vertical_codepoints,
+            )
+            if novel_base_codepoint(codepoint) != codepoint:
+                vertical_marked_glyphs.add(vertical_name)
+
+    generated_small = missing_small_glyphs.get(NOVEL_SMALL_KO_CODEPOINT)
+    if generated_small is not None:
+        horizontal_name, vertical_name = generated_small
+        _add_novel_glyph_group(horizontal, horizontal_name, "small")
+        _add_novel_glyph_group(
+            vertical,
+            vertical_name,
+            "small",
+            codepoint=NOVEL_SMALL_KO_CODEPOINT,
+            codepoints=vertical_codepoints,
+        )
+
+    for pair, horizontal_name in mark_outputs.items():
+        base, _ = pair
+        if base not in hiragana_bases:
+            continue
+        group = novel_group_for_codepoint(base)
+        _add_novel_glyph_group(horizontal, horizontal_name, group)
+        vertical_name = vertical_mark_outputs.get(pair)
+        if vertical_name is None:
+            vertical_name = _font_operations.vertical_glyph_or_self(
+                font, horizontal_name
+            )
+        if vertical_name != horizontal_name:
+            _add_novel_glyph_group(
+                vertical,
+                vertical_name,
+                group,
+                codepoint=base,
+                codepoints=vertical_codepoints,
+            )
+            vertical_marked_glyphs.add(vertical_name)
+
+    return (
+        horizontal,
+        vertical,
+        vertical_codepoints,
+        frozenset(vertical_marked_glyphs),
+    )
+
+
+def _novel_katakana_mappings(
+    font: TTFont,
+    cmap: dict[int, str],
+    mark_outputs: dict[tuple[int, int], str],
+    vertical_mark_outputs: dict[tuple[int, int], str],
+    missing_small_glyphs: dict[int, tuple[str, str]],
+) -> tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]]:
+    horizontal: dict[str, str] = {}
+    vertical: dict[str, str] = {}
+    vertical_codepoints: dict[str, int] = {}
+    vertical_marked_glyphs: set[str] = set()
+
+    def add(
+        mapping: dict[str, str],
+        glyph_name: str,
+        group: str,
+        *,
+        codepoint: int | None = None,
+        codepoints: dict[str, int] | None = None,
+    ) -> None:
+        _add_novel_glyph_group(
+            mapping,
+            glyph_name,
+            group,
+            codepoint=codepoint,
+            codepoints=codepoints,
+            base_codepoint=katakana_base_codepoint,
+            script="katakana",
+        )
+
+    for codepoint in KATAKANA_SOURCE_CODEPOINTS:
+        glyph_name = cmap.get(codepoint)
+        if glyph_name is None:
+            continue
+        group = novel_katakana_group_for_codepoint(codepoint)
+        add(horizontal, glyph_name, group)
+        vertical_name = _font_operations.vertical_glyph_or_self(font, glyph_name)
+        if vertical_name != glyph_name:
+            add(
+                vertical,
+                vertical_name,
+                group,
+                codepoint=codepoint,
+                codepoints=vertical_codepoints,
+            )
+            if katakana_base_codepoint(codepoint) != codepoint:
+                vertical_marked_glyphs.add(vertical_name)
+
+    generated_small = missing_small_glyphs.get(0x1B155)
+    if generated_small is not None:
+        horizontal_name, vertical_name = generated_small
+        add(horizontal, horizontal_name, "small")
+        add(
+            vertical,
+            vertical_name,
+            "small",
+            codepoint=0x1B155,
+            codepoints=vertical_codepoints,
+        )
+
+    for pair, horizontal_name in mark_outputs.items():
+        base, _ = pair
+        if base not in KATAKANA_CODEPOINTS:
+            continue
+        group = novel_katakana_group_for_codepoint(base)
+        add(horizontal, horizontal_name, group)
+        vertical_name = vertical_mark_outputs.get(pair)
+        if vertical_name is None:
+            vertical_name = _font_operations.vertical_glyph_or_self(
+                font, horizontal_name
+            )
+        if vertical_name != horizontal_name:
+            add(
+                vertical,
+                vertical_name,
+                group,
+                codepoint=base,
+                codepoints=vertical_codepoints,
+            )
+            vertical_marked_glyphs.add(vertical_name)
+
+    for glyph_name in horizontal.keys() & vertical.keys():
+        if horizontal[glyph_name] != vertical[glyph_name]:
+            raise ValueError(
+                f"Conflicting novel katakana groups for {glyph_name!r}: "
+                f"{horizontal[glyph_name]!r} and {vertical[glyph_name]!r}"
+            )
+        del vertical[glyph_name]
+        vertical_codepoints.pop(glyph_name, None)
+        vertical_marked_glyphs.discard(glyph_name)
+
+    return (
+        horizontal,
+        vertical,
+        vertical_codepoints,
+        frozenset(vertical_marked_glyphs),
+    )
+
+
+def _apply_novel_style(
+    font: TTFont,
+    weight_class: int,
+    kana_style: KanaStyle,
+    hiragana_mappings: (
+        tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]] | None
+    ) = None,
+    katakana_mappings: (
+        tuple[dict[str, str], dict[str, str], dict[str, int], frozenset[str]] | None
+    ) = None,
+) -> None:
+    if kana_style != "novel":
+        return
+    if hiragana_mappings is None or katakana_mappings is None:
+        raise ValueError("Novel kana mappings are required for the novel style")
+    apply_novel_hiragana(font, weight_class, *hiragana_mappings)
+    apply_novel_katakana(font, weight_class, *katakana_mappings)
+    apply_novel_han(font)
+
+
+def stroke_band(outline: pathops.Path, axis: str, seam: float) -> tuple[int, int]:
     if axis == "horizontal":
         sample = _font_geometry.rectangle(seam - 0.5, -4096, seam + 0.5, 4096)
         clipped = pathops.op(outline, sample, pathops.PathOp.INTERSECTION)
@@ -82,7 +336,9 @@ def make_horizontal_parts(
     left_cap = pathops.op(outline, clip_left, pathops.PathOp.INTERSECTION)
     right_cap = pathops.op(outline, clip_right, pathops.PathOp.INTERSECTION)
 
-    start_bar = _font_geometry.rectangle(seam - OVERLAP, y_min, advance + OVERLAP, y_max)
+    start_bar = _font_geometry.rectangle(
+        seam - OVERLAP, y_min, advance + OVERLAP, y_max
+    )
     middle = _font_geometry.rectangle(-OVERLAP, y_min, advance + OVERLAP, y_max)
     end_bar = _font_geometry.rectangle(-OVERLAP, y_min, seam + OVERLAP, y_max)
     start = pathops.op(left_cap, start_bar, pathops.PathOp.UNION)
@@ -90,21 +346,19 @@ def make_horizontal_parts(
     return start, middle, end
 
 
-def flatten_horizontal_centerline(
-    outline: pathops.Path, advance: int
-) -> pathops.Path:
+def flatten_horizontal_centerline(outline: pathops.Path, advance: int) -> pathops.Path:
     sample_start = advance * 0.3
     sample_end = advance * 0.7
-    start_low, start_high = stroke_band(
-        outline, "horizontal", sample_start
-    )
+    start_low, start_high = stroke_band(outline, "horizontal", sample_start)
     end_low, end_high = stroke_band(outline, "horizontal", sample_end)
     start_center = (start_low + start_high) / 2
     end_center = (end_low + end_high) / 2
     slope = (end_center - start_center) / (sample_end - sample_start)
     seam = advance / 2
-    return _font_geometry.transform_path(outline,
-    Transform(1, -slope, 0, 1, 0, slope * seam),)
+    return _font_geometry.transform_path(
+        outline,
+        Transform(1, -slope, 0, 1, 0, slope * seam),
+    )
 
 
 def make_vertical_parts(
@@ -119,14 +373,16 @@ def make_vertical_parts(
 
     cell_top = vertical_origin
     cell_bottom = vertical_origin - advance
-    start_bar = _font_geometry.rectangle(x_min, cell_bottom - OVERLAP, x_max, seam + OVERLAP)
-    middle = _font_geometry.rectangle(x_min, cell_bottom - OVERLAP, x_max, cell_top + OVERLAP)
+    start_bar = _font_geometry.rectangle(
+        x_min, cell_bottom - OVERLAP, x_max, seam + OVERLAP
+    )
+    middle = _font_geometry.rectangle(
+        x_min, cell_bottom - OVERLAP, x_max, cell_top + OVERLAP
+    )
     end_bar = _font_geometry.rectangle(x_min, seam - OVERLAP, x_max, cell_top + OVERLAP)
     start = pathops.op(top_cap, start_bar, pathops.PathOp.UNION)
     end = pathops.op(end_bar, bottom_cap, pathops.PathOp.UNION)
     return start, middle, end
-
-
 
 
 def make_sine_wave_tile(
@@ -158,8 +414,7 @@ def make_sine_wave_tile(
     baseline = (peak_center + trough_center) / 2
     amplitude = (peak_center - trough_center) / 2
     thickness = (
-        (sample_peak_max - sample_peak_min)
-        + (sample_trough_max - sample_trough_min)
+        (sample_peak_max - sample_peak_min) + (sample_trough_max - sample_trough_min)
     ) / 2
     half_stroke = thickness / 2
     direction = -1 if inverted else 1
@@ -170,19 +425,13 @@ def make_sine_wave_tile(
     start_taper_length = taper_length - drawing_start
     end_taper_length = drawing_end - (advance - taper_length)
 
-    terminal_phase_extension = (
-        WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
-    )
+    terminal_phase_extension = WAVE_TERMINAL_EXTENSION_HALF_WAVES * math.pi
 
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
 
     def smootherstep(progress: float) -> float:
-        return (
-            6 * progress**5
-            - 15 * progress**4
-            + 10 * progress**3
-        )
+        return 6 * progress**5 - 15 * progress**4 + 10 * progress**3
 
     def smootherstep_derivative(progress: float) -> float:
         return 30 * progress**2 * (progress - 1) ** 2
@@ -197,12 +446,8 @@ def make_sine_wave_tile(
             if position <= correction_start:
                 phase -= terminal_phase_extension
             elif position < correction_end:
-                progress = (
-                    position - correction_start
-                ) / correction_length
-                phase -= terminal_phase_extension * (
-                    1 - smootherstep(progress)
-                )
+                progress = (position - correction_start) / correction_length
+                phase -= terminal_phase_extension * (1 - smootherstep(progress))
                 phase_velocity += (
                     terminal_phase_extension
                     * smootherstep_derivative(progress)
@@ -212,19 +457,14 @@ def make_sine_wave_tile(
             if position >= correction_end:
                 phase += terminal_phase_extension
             elif position > correction_start:
-                progress = (
-                    position - correction_start
-                ) / correction_length
-                phase += terminal_phase_extension * smootherstep(
-                    progress
-                )
+                progress = (position - correction_start) / correction_length
+                phase += terminal_phase_extension * smootherstep(progress)
                 phase_velocity += (
                     terminal_phase_extension
                     * smootherstep_derivative(progress)
                     / correction_length
                 )
         return phase, phase_velocity
-
 
     def width_at(position: float) -> float:
         scale = 1.0
@@ -244,7 +484,6 @@ def make_sine_wave_tile(
             )
             scale *= smoothstep(progress)
         return half_stroke * scale
-
 
     breakpoints = {drawing_start, drawing_end}
     if taper_start:
@@ -272,16 +511,8 @@ def make_sine_wave_tile(
     for position in sorted(breakpoints):
         phase, phase_velocity = phase_at(position)
         center = baseline + direction * amplitude * math.sin(phase)
-        sine_slope = (
-            direction
-            * amplitude
-            * phase_velocity
-            * math.cos(phase)
-        )
-        points.append(
-            (position, center, sine_slope, abs(sine_slope) < 1e-9)
-        )
-
+        sine_slope = direction * amplitude * phase_velocity * math.cos(phase)
+        points.append((position, center, sine_slope, abs(sine_slope) < 1e-9))
 
     segments = []
     for start, end in zip(points, points[1:]):
@@ -349,9 +580,7 @@ def make_wave_parts(
             end_margin=end_margin,
         ),
     )
-    tile_center_y = (
-        horizontal[1].bounds[1] + horizontal[1].bounds[3]
-    ) / 2
+    tile_center_y = (horizontal[1].bounds[1] + horizontal[1].bounds[3]) / 2
     vertical_phase_flip = Transform(
         0,
         -1,
@@ -393,9 +622,7 @@ def make_manga_wave_parts(
         start_margin=start_margin,
         **parameters,
     )
-    horizontal_middle = make_sine_wave_tile(
-        source, advance, **parameters
-    )
+    horizontal_middle = make_sine_wave_tile(source, advance, **parameters)
     horizontal_end = make_sine_wave_tile(
         source,
         advance,
@@ -403,9 +630,7 @@ def make_manga_wave_parts(
         end_margin=end_margin,
         **parameters,
     )
-    tile_center_y = (
-        horizontal_middle.bounds[1] + horizontal_middle.bounds[3]
-    ) / 2
+    tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
     vertical_rotation = Transform(
         0,
         -1,
@@ -435,10 +660,6 @@ def make_manga_wave_parts(
     return horizontal_isolated, added
 
 
-
-
-
-
 def add_linear_extension(
     font: TTFont,
     base: str,
@@ -453,9 +674,7 @@ def add_linear_extension(
 
     horizontal_outline = _font_geometry.glyph_path(font, base)
     if flatten_horizontal:
-        horizontal_outline = flatten_horizontal_centerline(
-            horizontal_outline, advance
-        )
+        horizontal_outline = flatten_horizontal_centerline(horizontal_outline, advance)
     horizontal_parts = make_horizontal_parts(horizontal_outline, advance)
     _, _, _, vertical_y_max = _font_geometry.bounds(font, vertical)
     vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
@@ -470,8 +689,6 @@ def add_linear_extension(
         vertical_origin,
     )
     return vertical, names
-
-
 
 
 def import_koburi_ruby(
@@ -495,8 +712,7 @@ def import_koburi_ruby(
     source_outputs = list(dict.fromkeys(source_substitutions.values()))
     if len(source_outputs) != KOBURI_RUBY_OUTPUT_COUNT:
         raise ValueError(
-            "The ruby source must contain "
-            f"{KOBURI_RUBY_OUTPUT_COUNT} ruby glyphs"
+            "The ruby source must contain " f"{KOBURI_RUBY_OUTPUT_COUNT} ruby glyphs"
         )
     if len(names) != len(source_outputs):
         raise ValueError("Ruby glyph allocation does not match the source")
@@ -508,11 +724,9 @@ def import_koburi_ruby(
 
     source_vertical: dict[str, str] = {}
     for feature_tag in ("vert", "vrt2"):
-        for horizontal, vertical in (
-            _font_operations.feature_single_substitutions(
-                ruby_font, feature_tag
-            ).items()
-        ):
+        for horizontal, vertical in _font_operations.feature_single_substitutions(
+            ruby_font, feature_tag
+        ).items():
             if (
                 horizontal not in source_substitutions
                 or vertical not in source_substitutions
@@ -520,19 +734,14 @@ def import_koburi_ruby(
                 continue
             previous = source_vertical.setdefault(horizontal, vertical)
             if previous != vertical:
-                raise ValueError(
-                    f"Ambiguous vertical mapping for {horizontal!r}"
-                )
+                raise ValueError(f"Ambiguous vertical mapping for {horizontal!r}")
     vertical_to_horizontal = {
-        vertical: horizontal
-        for horizontal, vertical in source_vertical.items()
+        vertical: horizontal for horizontal, vertical in source_vertical.items()
     }
     if len(vertical_to_horizontal) != len(source_vertical):
         raise ValueError("Vertical ruby inputs are not one-to-one")
 
-    source_fwid = _font_operations.feature_single_substitutions(
-        ruby_font, "fwid"
-    )
+    source_fwid = _font_operations.feature_single_substitutions(ruby_font, "fwid")
     target_fwid = _font_operations.feature_single_substitutions(font, "fwid")
     source_bullet = source_fwid[source_cmap[0x2022]]
     target_bullet = target_fwid.get(cmap[0x2022], cmap[0x2022])
@@ -544,9 +753,7 @@ def import_koburi_ruby(
         and glyph_name not in vertical_to_horizontal
         and glyph_name != source_bullet
     ]
-    if len(unencoded_horizontal) != len(
-        _mark_positioning.MANGA_MISSING_SMALL_KANA
-    ):
+    if len(unencoded_horizontal) != len(_mark_positioning.MANGA_MISSING_SMALL_KANA):
         raise ValueError(
             "The ruby source must contain the two unencoded small-ko glyphs"
         )
@@ -632,13 +839,6 @@ def import_koburi_ruby(
     return list(substitutions.items()), vertical_maps
 
 
-
-
-
-
-
-
-
 def autohint_latin_glyphs(
     output_path: Path,
     glyph_names: tuple[str, ...],
@@ -650,9 +850,7 @@ def autohint_latin_glyphs(
         return
     command = executable or shutil.which("otfautohint")
     if command is None:
-        raise RuntimeError(
-            "--autohint requires the AFDKO otfautohint command on PATH"
-        )
+        raise RuntimeError("--autohint requires the AFDKO otfautohint command on PATH")
     with TemporaryDirectory(
         prefix=f".{output_path.stem}-autohint-",
         dir=output_path.parent,
@@ -687,7 +885,12 @@ def build(
     face: int,
     base_type: BaseType,
     autohint: bool = False,
+    kana_style: KanaStyle = "noto",
 ) -> None:
+    if kana_style not in {"noto", "novel"}:
+        raise ValueError(f"Unknown kana style {kana_style!r}")
+    if kana_style == "novel" and base_type != "noto":
+        raise ValueError("--kana-style novel requires --base noto")
     if autohint and latin_source_path is None:
         raise ValueError("--autohint requires an imported Latin source")
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
@@ -725,19 +928,12 @@ def build(
     ]
     if punctuation_missing:
         raise ValueError(
-            "The punctuation source does not contain "
-            + ", ".join(punctuation_missing)
+            "The punctuation source does not contain " + ", ".join(punctuation_missing)
         )
-    upright_punctuation = shippori_upright_punctuation_paths(
-        punctuation_font
-    )
-    if (
-        punctuation_font["head"].unitsPerEm
-        != font["head"].unitsPerEm
-    ):
+    upright_punctuation = shippori_upright_punctuation_paths(punctuation_font)
+    if punctuation_font["head"].unitsPerEm != font["head"].unitsPerEm:
         raise ValueError(
-            "The base and punctuation sources must use the same "
-            "units per em"
+            "The base and punctuation sources must use the same " "units per em"
         )
     sans_missing = [
         f"U+{codepoint:04X}"
@@ -745,13 +941,9 @@ def build(
         if codepoint not in sans_cmap
     ]
     if sans_missing:
-        raise ValueError(
-            "The sans source does not contain " + ", ".join(sans_missing)
-        )
+        raise ValueError("The sans source does not contain " + ", ".join(sans_missing))
     if sans_font["head"].unitsPerEm != font["head"].unitsPerEm:
-        raise ValueError(
-            "The base and sans sources must use the same units per em"
-        )
+        raise ValueError("The base and sans sources must use the same units per em")
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
     required_codepoints.extend(
@@ -791,7 +983,9 @@ def build(
         raise AssertionError("Expected 53 vertical Manga1 kana mark sequences")
     if len(_mark_positioning.KOBURI_PUA_MARK_PAIRS) != 88:
         raise AssertionError("Expected 88 Koburi Mincho PUA mappings")
-    if not set(_mark_positioning.KOBURI_PUA_MARK_PAIRS) <= set(_mark_positioning.MANGA_MARK_PAIRS):
+    if not set(_mark_positioning.KOBURI_PUA_MARK_PAIRS) <= set(
+        _mark_positioning.MANGA_MARK_PAIRS
+    ):
         raise AssertionError("Koburi Mincho PUA mappings must use Manga1 sequences")
     if len(_mark_positioning.KOBURI_GENERATED_MARK_PAIRS) != 103:
         raise AssertionError("Expected 103 generated Koburi mark sequences")
@@ -804,6 +998,29 @@ def build(
     )
 
     source_ccmp_ligatures = _font_operations.feature_ligatures(font, "ccmp")
+    native_hiragana_ccmp_outputs: dict[tuple[int, int], str] = {}
+    native_hiragana_vertical_ccmp_outputs: dict[tuple[int, int], str] = {}
+    native_katakana_ccmp_outputs: dict[tuple[int, int], str] = {}
+    native_katakana_vertical_ccmp_outputs: dict[tuple[int, int], str] = {}
+    if kana_style == "novel":
+        (
+            native_hiragana_ccmp_outputs,
+            native_hiragana_vertical_ccmp_outputs,
+        ) = _native_novel_ccmp_outputs(
+            font,
+            cmap,
+            source_ccmp_ligatures,
+            HIRAGANA_CODEPOINTS,
+        )
+        (
+            native_katakana_ccmp_outputs,
+            native_katakana_vertical_ccmp_outputs,
+        ) = _native_novel_ccmp_outputs(
+            font,
+            cmap,
+            source_ccmp_ligatures,
+            KATAKANA_SOURCE_CODEPOINTS,
+        )
     supported_mark_pairs = (
         *_mark_positioning.MANGA_MARK_PAIRS,
         _mark_positioning.CHOON_DAKUTEN_PAIR,
@@ -843,12 +1060,9 @@ def build(
             )
         if _mark_positioning.CHOON_DAKUTEN_PAIR not in native_mark_outputs:
             raise ValueError(
-                "GenEi Koburi Mincho ccmp mappings must contain "
-                "U+30FC+U+3099"
+                "GenEi Koburi Mincho ccmp mappings must contain " "U+30FC+U+3099"
             )
-        if set(native_heart_outputs) != set(
-            _mark_positioning.KOBURI_HEART_MARK_PAIRS
-        ):
+        if set(native_heart_outputs) != set(_mark_positioning.KOBURI_HEART_MARK_PAIRS):
             raise ValueError(
                 "GenEi Koburi Mincho ccmp mappings must contain its "
                 "two native heart-dakuten sequences"
@@ -864,9 +1078,7 @@ def build(
             if (
                 base_pua not in cmap
                 or output_pua not in cmap
-                or source_ccmp_ligatures.get(
-                    (cmap[base_pua], cmap[mark])
-                )
+                or source_ccmp_ligatures.get((cmap[base_pua], cmap[mark]))
                 != native_output
                 or cmap[output_pua] != native_output
             ):
@@ -921,9 +1133,7 @@ def build(
         font["vmtx"].metrics[wave_vertical][1] + wave_vertical_y_max
     )
     wave_start = len(linear_codepoints) * NEW_GLYPH_COUNT
-    wave_names = allocated_names[
-        wave_start : wave_start + WAVE_GLYPH_COUNT
-    ]
+    wave_names = allocated_names[wave_start : wave_start + WAVE_GLYPH_COUNT]
     wave_parts = make_wave_parts(
         _font_geometry.glyph_path(font, wave_base), 1000, wave_vertical_origin
     )
@@ -969,8 +1179,7 @@ def build(
 
     punctuation_start = manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     punctuation_names = allocated_names[
-        punctuation_start : punctuation_start
-        + len(MANGA_PUNCTUATION_SEQUENCES)
+        punctuation_start : punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
     ]
     punctuation_vertical_origin = round(
         font["vmtx"].metrics[cmap[0xFF01]][1]
@@ -1014,8 +1223,7 @@ def build(
         advance_override=1000,
     )
     punctuation_paths = [
-        mincho_punctuation_paths[sequence]
-        for sequence in MANGA_PUNCTUATION_SEQUENCES
+        mincho_punctuation_paths[sequence] for sequence in MANGA_PUNCTUATION_SEQUENCES
     ]
     _font_operations.append_glyphs(
         font,
@@ -1048,26 +1256,22 @@ def build(
             )
         ),
     }
-    punctuation_alternate_start = (
-        punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
-    )
+    punctuation_alternate_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
     punctuation_alternate_names = allocated_names[
-        punctuation_alternate_start
-        : punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
+        punctuation_alternate_start : punctuation_alternate_start
+        + PUNCTUATION_ALTERNATE_COUNT
     ]
     punctuation_alternate_paths: list[pathops.Path] = []
-    punctuation_variants: list[
-        tuple[str, tuple[str, str, str, str]]
-    ] = []
+    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]] = []
     for index, sequence in enumerate(PUNCTUATION_VARIANT_SEQUENCES):
         default_path = default_punctuation_paths[sequence]
         if len(sequence) == 1:
-            sans_path = _font_geometry.glyph_path(sans_font,
-            sans_cmap[0xFF01 if sequence == "!" else 0xFF1F],)
-        else:
-            sans_path = make_sans_punctuation_ligature(
-                sans_font, sequence
+            sans_path = _font_geometry.glyph_path(
+                sans_font,
+                sans_cmap[0xFF01 if sequence == "!" else 0xFF1F],
             )
+        else:
+            sans_path = make_sans_punctuation_ligature(sans_font, sequence)
         alternate_paths = (
             slant_punctuation_outline(default_path),
             sans_path,
@@ -1101,16 +1305,28 @@ def build(
     small_kana_names = allocated_names[
         kana_start : kana_start + 2 * len(_mark_positioning.MANGA_MISSING_SMALL_KANA)
     ]
-    small_hiragana = _font_geometry.centered_scaled_path(_font_geometry.glyph_path(font, cmap[0x3053]), 0.775, 500, 253)
-    small_katakana = _font_geometry.centered_scaled_path(_font_geometry.glyph_path(font, cmap[0x30B3]), 0.775, 500, 253)
-    small_hiragana_vertical = _font_geometry.centered_scaled_path(_font_geometry.glyph_path(font, _font_operations.vertical_glyph_or_self(font, cmap[0x3053])),
-    0.78,
-    654,
-    397,)
-    small_katakana_vertical = _font_geometry.centered_scaled_path(_font_geometry.glyph_path(font, _font_operations.vertical_glyph_or_self(font, cmap[0x30B3])),
-    0.78,
-    654,
-    397,)
+    small_hiragana = _font_geometry.centered_scaled_path(
+        _font_geometry.glyph_path(font, cmap[0x3053]), 0.775, 500, 253
+    )
+    small_katakana = _font_geometry.centered_scaled_path(
+        _font_geometry.glyph_path(font, cmap[0x30B3]), 0.775, 500, 253
+    )
+    small_hiragana_vertical = _font_geometry.centered_scaled_path(
+        _font_geometry.glyph_path(
+            font, _font_operations.vertical_glyph_or_self(font, cmap[0x3053])
+        ),
+        0.78,
+        654,
+        397,
+    )
+    small_katakana_vertical = _font_geometry.centered_scaled_path(
+        _font_geometry.glyph_path(
+            font, _font_operations.vertical_glyph_or_self(font, cmap[0x30B3])
+        ),
+        0.78,
+        654,
+        397,
+    )
     _font_operations.append_glyphs(
         font,
         [
@@ -1128,17 +1344,14 @@ def build(
         0x1B132: (small_kana_names[0], small_kana_names[2]),
         0x1B155: (small_kana_names[1], small_kana_names[3]),
     }
-    kana_vertical_maps = [
-        glyphs for glyphs in missing_small_glyphs.values()
-    ]
+    kana_vertical_maps = [glyphs for glyphs in missing_small_glyphs.values()]
     for codepoint, (horizontal, _) in missing_small_glyphs.items():
         _font_operations.add_unicode_mapping(font, codepoint, horizontal)
         cmap[codepoint] = horizontal
 
     mark_horizontal_start = kana_start + len(small_kana_names)
     generated_mark_names = allocated_names[
-        mark_horizontal_start
-        : mark_horizontal_start + len(generated_mark_pairs)
+        mark_horizontal_start : mark_horizontal_start + len(generated_mark_pairs)
     ]
     generated_mark_outputs = dict(
         zip(generated_mark_pairs, generated_mark_names, strict=True)
@@ -1151,16 +1364,18 @@ def build(
     for base, mark in generated_mark_pairs:
         base_path = _font_geometry.glyph_path(font, cmap[base])
         if (base, mark) == _mark_positioning.CHOON_DAKUTEN_PAIR:
-            target_x, target_y = (
-                _mark_positioning.CHOON_DAKUTEN_MARK_CENTERS["horizontal"]
-            )
+            target_x, target_y = _mark_positioning.CHOON_DAKUTEN_MARK_CENTERS[
+                "horizontal"
+            ]
             mark_transform = _font_geometry.centered_transform(
                 mark_paths[mark], 1, target_x, target_y
             )
         else:
             mark_transform = mark_position_overrides[(base, mark)]["horizontal"]
         horizontal_mark_paths.append(
-            _font_geometry.compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
+            _font_geometry.compose_mark_glyph(
+                base_path, mark_paths[mark], mark_transform
+            )
         )
     _font_operations.append_glyphs(
         font,
@@ -1171,13 +1386,17 @@ def build(
         add_stem_hints=False,
     )
 
-    mark_vertical_start = mark_horizontal_start + len(
-        generated_mark_pairs
-    )
+    mark_vertical_start = mark_horizontal_start + len(generated_mark_pairs)
     generated_vertical_mark_names = allocated_names[
-        mark_vertical_start
-        : mark_vertical_start + len(generated_vertical_mark_pairs)
+        mark_vertical_start : mark_vertical_start + len(generated_vertical_mark_pairs)
     ]
+    generated_vertical_mark_outputs = dict(
+        zip(
+            generated_vertical_mark_pairs,
+            generated_vertical_mark_names,
+            strict=True,
+        )
+    )
     vertical_mark_paths = []
     for base, mark in generated_vertical_mark_pairs:
         if base in missing_small_glyphs:
@@ -1186,16 +1405,18 @@ def build(
             vertical_base = _font_operations.vertical_glyph_or_self(font, cmap[base])
         base_path = _font_geometry.glyph_path(font, vertical_base)
         if (base, mark) == _mark_positioning.CHOON_DAKUTEN_PAIR:
-            target_x, target_y = (
-                _mark_positioning.CHOON_DAKUTEN_MARK_CENTERS["vertical"]
-            )
+            target_x, target_y = _mark_positioning.CHOON_DAKUTEN_MARK_CENTERS[
+                "vertical"
+            ]
             mark_transform = _font_geometry.centered_transform(
                 mark_paths[mark], 1, target_x, target_y
             )
         else:
             mark_transform = mark_position_overrides[(base, mark)]["vertical"]
         vertical_mark_paths.append(
-            _font_geometry.compose_mark_glyph(base_path, mark_paths[mark], mark_transform)
+            _font_geometry.compose_mark_glyph(
+                base_path, mark_paths[mark], mark_transform
+            )
         )
     _font_operations.append_glyphs(
         font,
@@ -1207,10 +1428,7 @@ def build(
     )
     kana_vertical_maps.extend(
         zip(
-            (
-                generated_mark_outputs[pair]
-                for pair in generated_vertical_mark_pairs
-            ),
+            (generated_mark_outputs[pair] for pair in generated_vertical_mark_pairs),
             generated_vertical_mark_names,
             strict=True,
         )
@@ -1241,17 +1459,13 @@ def build(
             add_stem_hints=False,
         )
     heart_outputs = dict(native_heart_outputs)
-    heart_outputs.update(
-        zip(generated_heart_pairs, heart_names, strict=True)
-    )
+    heart_outputs.update(zip(generated_heart_pairs, heart_names, strict=True))
     for codepoint, (base, _) in zip(
         _mark_positioning.KOBURI_HEART_BASE_PUA,
         _mark_positioning.KOBURI_HEART_MARK_PAIRS,
         strict=True,
     ):
-        _font_operations.add_unicode_mapping_if_missing(
-            font, codepoint, cmap[base]
-        )
+        _font_operations.add_unicode_mapping_if_missing(font, codepoint, cmap[base])
     for codepoint, pair in zip(
         _mark_positioning.KOBURI_HEART_OUTPUT_PUA,
         _mark_positioning.KOBURI_HEART_MARK_PAIRS,
@@ -1264,8 +1478,7 @@ def build(
     mark_outputs = native_mark_outputs | generated_mark_outputs
     ruby_start = heart_start + len(generated_heart_pairs)
     ruby_names = allocated_names[
-        ruby_start : ruby_start
-        + (KOBURI_RUBY_OUTPUT_COUNT if ruby_font else 0)
+        ruby_start : ruby_start + (KOBURI_RUBY_OUTPUT_COUNT if ruby_font else 0)
     ]
     ruby_substitutions: list[tuple[str, str]] = []
     if ruby_font is not None:
@@ -1298,26 +1511,42 @@ def build(
         (cmap[base], cmap[mark], heart_outputs[(base, mark)])
         for base, mark in _mark_positioning.KOBURI_HEART_MARK_PAIRS
     )
+    hiragana_mappings = None
+    katakana_mappings = None
+    if kana_style == "novel":
+        hiragana_mappings = _novel_hiragana_mappings(
+            font,
+            cmap,
+            native_hiragana_ccmp_outputs | mark_outputs,
+            native_hiragana_vertical_ccmp_outputs | generated_vertical_mark_outputs,
+            missing_small_glyphs,
+        )
+        katakana_mappings = _novel_katakana_mappings(
+            font,
+            cmap,
+            native_katakana_ccmp_outputs | mark_outputs,
+            native_katakana_vertical_ccmp_outputs | generated_vertical_mark_outputs,
+            missing_small_glyphs,
+        )
+    _apply_novel_style(
+        font,
+        identity.weight_class,
+        kana_style,
+        hiragana_mappings,
+        katakana_mappings,
+    )
 
     if base_type == "noto":
-        _font_operations.remove_repeated_ligatures(
-            font, "ccmp", cmap[0x2015]
-        )
+        _font_operations.remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
 
     latin_copyright = (
         (latin_font["name"].getDebugName(0) or latin_profile.copyright)
         if latin_font
         else None
     )
-    ruby_copyright = (
-        ruby_font["name"].getDebugName(0) if ruby_font else None
-    )
-    ruby_license = (
-        ruby_font["name"].getDebugName(13) if ruby_font else None
-    )
-    latin_license = (
-        latin_font["name"].getDebugName(13) if latin_font else None
-    )
+    ruby_copyright = ruby_font["name"].getDebugName(0) if ruby_font else None
+    ruby_license = ruby_font["name"].getDebugName(13) if ruby_font else None
+    latin_license = latin_font["name"].getDebugName(13) if latin_font else None
     copyright_notices = [
         notice
         for notice in (

@@ -92,6 +92,56 @@
   .glyph-grid {
     grid-template-columns: repeat(4, 1fr);
   }
+  .comparison-hero,
+  .comparison-app__header {
+    grid-template-columns: minmax(120px, 0.25fr) minmax(0, 1fr);
+  }
+
+  .comparison-hero > p:last-child,
+  .comparison-provenance {
+    grid-column: 2;
+  }
+
+  .comparison-section-heading--prose {
+    grid-template-columns: minmax(120px, 0.25fr) minmax(0, 1fr);
+  }
+
+  .comparison-section-heading--prose > p:last-child {
+    grid-column: 2;
+  }
+
+  .comparison-prose-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  }
+
+  .representative-glyphs {
+    font-size: clamp(42px, 4.5vw, 60px);
+  }
+
+  .novel-weight-list li {
+    grid-template-columns: 96px minmax(160px, 1fr);
+  }
+
+  .novel-weight-list li > span,
+  .novel-weight-list p {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .comparison-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .novel-weight-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .novel-weight-list li:nth-child(odd) {
+    border-right: 1px solid var(--line);
+  }
 }
 
 @media (max-width: 760px) {
@@ -303,6 +353,181 @@
 
   .glyph-character {
     font-size: clamp(46px, 15vw, 62px);
+  }
+
+  .comparison-hero {
+    display: block;
+    padding-top: 48px;
+    padding-bottom: 48px;
+  }
+
+  .comparison-hero h1 {
+    font-size: clamp(38px, 10vw, 50px);
+  }
+
+  .comparison-hero > p:last-child {
+    margin-top: 20px;
+  }
+
+  .comparison-app {
+    padding-top: 44px;
+  }
+
+  .comparison-app__header {
+    display: block;
+    margin-bottom: 24px;
+  }
+
+  .comparison-app__header h2 {
+    margin-top: 10px;
+    font-size: 29px;
+  }
+
+  .comparison-provenance {
+    margin-top: 20px;
+  }
+
+  .comparison-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-section-heading {
+    padding: 16px 18px;
+  }
+
+  .representative-row {
+    min-height: 116px;
+    grid-template-columns: 112px minmax(0, 1fr);
+  }
+
+  .representative-label {
+    padding: 14px 12px;
+  }
+
+  .representative-label span {
+    font-size: 9px;
+  }
+
+  .representative-label small {
+    font-size: 8px;
+  }
+
+  .representative-glyphs,
+  .representative-script-label {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .representative-glyphs {
+    font-size: clamp(24px, 7vw, 34px);
+  }
+
+  .novel-weight-list {
+    display: block;
+  }
+
+  .novel-weight-list li:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .novel-weight-list li {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+
+  .novel-weight-list p {
+    font-size: clamp(27px, 9vw, 37px);
+  }
+
+  .comparison-prose {
+    margin-top: 28px;
+  }
+
+  .comparison-section-heading--prose {
+    display: block;
+  }
+
+  .comparison-section-heading--prose h3 {
+    margin-top: 6px;
+  }
+
+  .comparison-section-heading--prose > p:last-child {
+    margin-top: 12px;
+  }
+
+  .comparison-prose-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prose-sample + .prose-sample {
+    border-top: 1px solid
+      color-mix(in srgb, var(--paper-bright) 22%, transparent);
+    border-left: 0;
+  }
+
+  .prose-sample header {
+    display: grid;
+    gap: 2px;
+  }
+
+  .prose-sample--horizontal .prose-editor {
+    min-height: 300px;
+    padding: 28px 22px;
+  }
+
+  .prose-sample--vertical .prose-editor {
+    max-height: 420px;
+    min-height: 340px;
+    padding: 28px 22px;
+  }
+
+  .vertical-face-comparison {
+    margin-top: 28px;
+  }
+
+  .vertical-face-comparison .comparison-section-heading {
+    display: block;
+  }
+
+  .vertical-face-comparison .comparison-section-heading h3 {
+    margin-top: 6px;
+  }
+
+  .vertical-face-comparison .comparison-section-heading > p:last-child {
+    margin-top: 12px;
+  }
+
+  .vertical-face-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vertical-face-sample + .vertical-face-sample {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .vertical-face-sample > p {
+    max-width: 100%;
+    height: 420px;
+    padding: 24px 18px;
+    font-size: 30px;
+  }
+
+  .comparison-overlay__body {
+    grid-template-columns: 1fr;
+  }
+
+  .overlay-glyph {
+    min-height: 240px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .overlay-explanation {
+    padding: 28px 22px;
+  }
+
+  .overlay-explanation ul {
+    flex-wrap: wrap;
   }
 
   .next-page {

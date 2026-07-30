@@ -19,8 +19,6 @@ from .marks import (
 )
 
 
-
-
 def rectangle(
     x_min: float,
     y_min: float,
@@ -37,11 +35,31 @@ def rectangle(
     return path
 
 
+def _cff_fd_transform(font: TTFont, glyph_name: str) -> Transform | None:
+    """Return the relative CID Font DICT matrix omitted by fontTools glyph sets."""
+
+    if "CFF " not in font:
+        return None
+    top = font["CFF "].cff.topDictIndex[0]
+    if not all(hasattr(top, name) for name in ("FDArray", "FDSelect")):
+        return None
+    expected_scale = 1 / font["head"].unitsPerEm
+    expected_top = (expected_scale, 0, 0, expected_scale, 0, 0)
+    if tuple(top.FontMatrix) != expected_top:
+        return None
+    fd_index = top.FDSelect[font.getGlyphID(glyph_name)]
+    matrix = getattr(top.FDArray[fd_index], "FontMatrix", None)
+    if matrix is None:
+        return None
+    return Transform(*(value / expected_scale for value in matrix))
+
+
 def glyph_path(font: TTFont, glyph_name: str) -> pathops.Path:
     path = pathops.Path()
     glyph_set = font.getGlyphSet()
     glyph_set[glyph_name].draw(DecomposingFilterPen(path.getPen(), glyph_set))
-    return path
+    transform = _cff_fd_transform(font, glyph_name)
+    return transform_path(path, transform) if transform is not None else path
 
 
 def bounds(font: TTFont, glyph_name: str) -> tuple[float, float, float, float]:
@@ -57,6 +75,7 @@ def transform_path(outline: pathops.Path, transform: Transform) -> pathops.Path:
     outline.draw(TransformPen(transformed.getPen(), transform))
     return transformed
 
+
 def adjust_outline_weight(outline: pathops.Path, amount: float) -> pathops.Path:
     if amount == 0 or not outline.verbs:
         return outline
@@ -69,9 +88,7 @@ def adjust_outline_weight(outline: pathops.Path, amount: float) -> pathops.Path:
         4,
     )
     boundary.convertConicsToQuads()
-    operation = (
-        pathops.PathOp.UNION if amount > 0 else pathops.PathOp.DIFFERENCE
-    )
+    operation = pathops.PathOp.UNION if amount > 0 else pathops.PathOp.DIFFERENCE
     adjusted = pathops.op(outline, boundary, operation)
     if outline.verbs and not adjusted.verbs:
         raise ValueError("Latin weight adjustment removed an entire glyph")
@@ -128,8 +145,6 @@ def centered_scaled_path(
         outline,
         centered_transform(outline, scale, target_x, target_y),
     )
-
-
 
 
 def compose_mark_glyph(

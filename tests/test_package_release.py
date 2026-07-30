@@ -7,7 +7,12 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from nobigoe_font.release import ARCHIVE_TIMESTAMP, ReleaseSpec, package_release
+from nobigoe_font.release import (
+    ARCHIVE_TIMESTAMP,
+    NOVEL_RELEASE,
+    ReleaseSpec,
+    package_release,
+)
 
 
 class ReleasePackagingTests(unittest.TestCase):
@@ -48,6 +53,19 @@ class ReleasePackagingTests(unittest.TestCase):
                     f"{hashlib.sha256(b'font-data').hexdigest()}  Fonts/{font.name}",
                     manifest,
                 )
+
+    def test_novel_release_is_a_separate_seven_weight_archive(self) -> None:
+        self.assertEqual(NOVEL_RELEASE.archive, "NobigoeNovelMincho-v1.030.zip")
+        self.assertEqual(len(NOVEL_RELEASE.fonts), 7)
+        self.assertEqual(
+            NOVEL_RELEASE.fonts[0],
+            "NobigoeNovelMincho-ExtraLight.otf",
+        )
+        self.assertEqual(
+            NOVEL_RELEASE.fonts[-1],
+            "NobigoeNovelMincho-Black.otf",
+        )
+
 
     def test_missing_font_stops_packaging(self) -> None:
         with TemporaryDirectory() as directory:

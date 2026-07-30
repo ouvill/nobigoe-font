@@ -1,0 +1,20 @@
+---
+import NovelComparison from "../components/NovelComparison.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { SITE } from "../data/site";
+---
+
+<BaseLayout
+  title={`かな比較 — ${SITE.name}`}
+  description="Noto、Koburi、Novelの代表的なひらがなとカタカナ、のびごえ小説明朝の7ウェイト、横組・縦組の文章を比較できます。"
+  pageClass="comparison-page"
+>
+  <section class="comparison-hero">
+    <p class="page-index">かな比較</p>
+    <h1>小さくするだけではない、<br />小説かなの読み心地。</h1>
+    <p>
+      Notoの標準かな、Koburiの小ぶりなかな、新しいNovelのかな。同じ文字を並べ、字面と余白が文章のリズムをどう変えるか確かめます。ひらがなとカタカナを、三書体のRegularとNovelの七つの太さで見比べられます。
+    </p>
+  </section>
+  <NovelComparison />
+</BaseLayout>

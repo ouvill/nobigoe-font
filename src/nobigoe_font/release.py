@@ -1,4 +1,4 @@
-"""Package the two Nobigoe font families as separate release archives."""
+"""Package the Nobigoe font families as separate release archives."""
 
 from __future__ import annotations
 
@@ -26,12 +26,20 @@ NOTO_RELEASE = ReleaseSpec(
     archive=f"NobigoeMincho-v{VERSION_NUMBER}.zip",
     fonts=tuple(f"NobigoeMincho-{weight}.otf" for weight in NOTO_WEIGHT_CLASSES),
 )
+NOVEL_RELEASE = ReleaseSpec(
+    directory=f"NobigoeNovelMincho-v{VERSION_NUMBER}",
+    archive=f"NobigoeNovelMincho-v{VERSION_NUMBER}.zip",
+    fonts=tuple(
+        f"NobigoeNovelMincho-{weight}.otf"
+        for weight in NOTO_WEIGHT_CLASSES
+    ),
+)
 KOBURI_RELEASE = ReleaseSpec(
     directory=f"NobigoeKoburiMincho-v{VERSION_NUMBER}",
     archive=f"NobigoeKoburiMincho-v{VERSION_NUMBER}.zip",
     fonts=("NobigoeKoburiMincho-Regular.ttf",),
 )
-RELEASES = (NOTO_RELEASE, KOBURI_RELEASE)
+RELEASES = (NOTO_RELEASE, KOBURI_RELEASE, NOVEL_RELEASE)
 
 
 def parse_args() -> argparse.Namespace:

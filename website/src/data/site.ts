@@ -10,7 +10,7 @@ export const SITE = {
     socialHandle: "@ouvill",
     socialUrl: "https://twitter.com/ouvill",
   },
-  version: "1.029",
+  version: "1.030",
   releaseUrl: "https://github.com/ouvill/nobigoe-font/releases",
   repositoryUrl: "https://github.com/ouvill/nobigoe-font",
   supportUrl: "https://github.com/sponsors/ouvill",
@@ -30,4 +30,5 @@ export const NAVIGATION = [
   { href: "/", label: "紹介" },
   { href: "/tester/", label: "文字を試す" },
   { href: "/glyphs/", label: "字形一覧" },
+  { href: "/compare/", label: "かな比較" },
 ] as const;
