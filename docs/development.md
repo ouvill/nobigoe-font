@@ -78,6 +78,9 @@ uv run nobigoe-build-variable
 # 固定7ウェイトへLibertinus Serifを取り込んだ後、欧文字形だけを再ヒント
 uv run nobigoe-build-variable --autohint
 
+# CI用に可変フォントとRegularだけを生成
+uv run nobigoe-build-variable --static-weight Regular --autohint
+
 # STIX欧文の調整済み制作VFを一度生成し、そこから固定7ウェイトを作る
 uv run nobigoe-build \
   --build-variable-stix dist/NobigoeSTIXLatinDesign-VF.ttf
@@ -109,6 +112,8 @@ done
 ```
 
 既定の`nobigoe-build-variable`は、カスタマイズ済みCFF2可変フォントを`dist/NobigoeVariableMarks-VF.otf`へ作り、そこから`dist/NobigoeMincho-<Weight>.otf`の固定7ウェイトを実体化します。固定化の後にだけ、可変化されていないLibertinus Serif欧文の取り込み、リリース用の命名と著作権表示、任意の欧文再ヒントを適用します。可変フォントの出力先は`--output`、固定ウェイトの出力ディレクトリは`--static-output-dir`で変更できます。`nobigoe-build`の既定出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`と`--build-variable-stix OUTPUT`は、それぞれの調整済み制作VFを明示した場所へ生成します。`--variable-kana`は前者から対象ウェイトのかなを取り込み、`--latin-family stix-two-text`は公式STIX可変TTFまたは後者から対象ウェイトの欧文を実体化します。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+
+`--static-weight <Weight>`を指定すると、可変フォントは通常どおり生成したうえで、指定した固定ウェイトだけを実体化します。省略時はリリース用の固定7ウェイトをすべて生成します。
 
 Noto版の生成順序は、固定コミットの`NotoSerifJP-VF.otf`、のびごえ字形・OpenType機能の可変化、固定7ウェイトの実体化、固定ウェイト専用処理の順です。濁点・半濁点、感嘆符・疑問符合字、連結記号は可変フォントへ一度だけ追加され、固定版は同じ輪郭とレイアウトを各ウェイト位置から受け取ります。
 
