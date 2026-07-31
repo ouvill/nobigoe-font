@@ -294,12 +294,12 @@ def symbol_feature_source(
     relaxed_wave: tuple[str, str, str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
 ) -> str:
-    ccmp, ss04, calt, vert, vrt2 = _symbol_feature_rules(
+    liga, ss04, calt, vert, vrt2 = _symbol_feature_rules(
         extensions, wave, relaxed_wave, manga_wave
     )
     return (
         "languagesystem DFLT dflt;\n\n"
-        f"feature ccmp {{\n{ccmp}}} ccmp;\n\n"
+        f"feature liga {{\n{liga}}} liga;\n\n"
         f"feature ss04 {{\n{ss04}}} ss04;\n\n"
         f"feature calt {{\n{calt}}} calt;\n\n"
         f"feature vert {{\n{vert}}} vert;\n\n"
