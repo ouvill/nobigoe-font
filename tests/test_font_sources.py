@@ -32,7 +32,6 @@ class SourceCacheTests(unittest.TestCase):
         self.cache_directory = Path(self.temporary_directory.name) / "cache"
 
         self.noto_content = b"noto serif"
-        self.sans_content = b"noto sans"
         self.latin_content = b"libertinus"
         self.punctuation_content = b"shippori"
         self.koburi_content = b"koburi"
@@ -40,11 +39,6 @@ class SourceCacheTests(unittest.TestCase):
             "NotoSerifJP-Regular.otf",
             "https://fonts.example/noto.otf",
             digest(self.noto_content),
-        )
-        self.sans = DirectSource(
-            "NotoSansJP-Regular.otf",
-            "https://fonts.example/sans.otf",
-            digest(self.sans_content),
         )
         self.latin, latin_archive = self._zip_source(
             "libertinus.zip",
@@ -66,7 +60,6 @@ class SourceCacheTests(unittest.TestCase):
         )
         self.payloads = {
             self.noto.url: self.noto_content,
-            self.sans.url: self.sans_content,
             self.latin.archive_url: latin_archive,
             self.punctuation.archive_url: punctuation_archive,
             self.koburi.archive_url: koburi_archive,
@@ -92,9 +85,6 @@ class SourceCacheTests(unittest.TestCase):
         with ExitStack() as stack:
             stack.enter_context(
                 patch("nobigoe_font.sources.noto_serif_source", return_value=self.noto)
-            )
-            stack.enter_context(
-                patch("nobigoe_font.sources.noto_sans_source", return_value=self.sans)
             )
             stack.enter_context(
                 patch(
@@ -130,16 +120,14 @@ class SourceCacheTests(unittest.TestCase):
                 source=self.cache_directory / self.noto.filename,
                 latin_source=self.cache_directory / self.latin.filename,
                 punctuation_source=self.cache_directory / self.punctuation.filename,
-                sans_source=self.cache_directory / self.sans.filename,
             ),
         )
-        self.assertEqual(retrieve.call_count, 4)
+        self.assertEqual(retrieve.call_count, 3)
         self.assertEqual(resolved.source.read_bytes(), self.noto_content)
         self.assertEqual(resolved.latin_source.read_bytes(), self.latin_content)
         self.assertEqual(
             resolved.punctuation_source.read_bytes(), self.punctuation_content
         )
-        self.assertEqual(resolved.sans_source.read_bytes(), self.sans_content)
 
     def test_noto_latin_profile_keeps_the_base_latin_glyphs(self) -> None:
         cache = SourceCache(self.cache_directory)
@@ -155,7 +143,7 @@ class SourceCacheTests(unittest.TestCase):
             )
 
         self.assertIsNone(resolved.latin_source)
-        self.assertEqual(retrieve.call_count, 3)
+        self.assertEqual(retrieve.call_count, 2)
 
     def test_second_resolution_reuses_the_same_cached_paths_without_network(
         self,
@@ -170,7 +158,7 @@ class SourceCacheTests(unittest.TestCase):
             second = cache.resolve("noto", "Regular", SourceOverrides())
 
         self.assertEqual(second, first)
-        self.assertEqual(first_call_count, 4)
+        self.assertEqual(first_call_count, 3)
         self.assertEqual(retrieve.call_count, first_call_count)
 
     def test_zip_members_are_not_reextracted_after_they_are_cached(self) -> None:
@@ -212,7 +200,6 @@ class SourceCacheTests(unittest.TestCase):
             source=source_directory / "base.otf",
             latin_source=source_directory / "latin.otf",
             punctuation_source=source_directory / "punctuation.otf",
-            sans_source=source_directory / "sans.otf",
         )
         cache = SourceCache(self.cache_directory)
         with self._pinned_sources(), patch(
@@ -226,7 +213,6 @@ class SourceCacheTests(unittest.TestCase):
                 source=overrides.source,
                 latin_source=overrides.latin_source,
                 punctuation_source=overrides.punctuation_source,
-                sans_source=overrides.sans_source,
             ),
         )
         retrieve.assert_not_called()
@@ -243,7 +229,7 @@ class SourceCacheTests(unittest.TestCase):
 
         self.assertEqual(second.source, first.source)
         self.assertEqual(second.source.read_bytes(), self.noto_content)
-        self.assertEqual(retrieve.call_count, 5)
+        self.assertEqual(retrieve.call_count, 4)
 
     def test_corrupt_cached_archive_is_downloaded_again(self) -> None:
         cache = SourceCache(self.cache_directory)
@@ -258,7 +244,7 @@ class SourceCacheTests(unittest.TestCase):
             )
             cache.resolve("noto", "Regular", SourceOverrides())
 
-        self.assertEqual(retrieve.call_count, 5)
+        self.assertEqual(retrieve.call_count, 4)
 
     def test_koburi_resolves_without_a_latin_source(self) -> None:
         source_directory = Path(self.temporary_directory.name) / "explicit"
@@ -266,7 +252,6 @@ class SourceCacheTests(unittest.TestCase):
         overrides = SourceOverrides(
             source=source_directory / "base.ttf",
             punctuation_source=source_directory / "punctuation.otf",
-            sans_source=source_directory / "sans.otf",
         )
         with self._pinned_sources(), patch(
             "nobigoe_font.sources.urllib.request.urlretrieve"

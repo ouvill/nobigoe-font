@@ -48,13 +48,12 @@ from .novel_katakana import (
 from .novel_han import apply_novel_han
 from .punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
-    PUNCTUATION_ALTERNATE_COUNT,
+    PUNCTUATION_ITALIC_COUNT,
     PUNCTUATION_VARIANT_SEQUENCES,
     SHIPPORI_PRECOMPOSED_LIGATURES,
     SHIPPORI_UPRIGHT_EXCLAMATIONS,
     SHIPPORI_UPRIGHT_PUNCTUATION,
     make_punctuation_ligature,
-    make_sans_punctuation_ligature,
     shippori_upright_punctuation_paths,
     slant_punctuation_outline,
 )
@@ -1034,7 +1033,6 @@ def build(
     source_path: Path,
     latin_source_path: Path | None,
     punctuation_source_path: Path,
-    sans_source_path: Path,
     output_path: Path,
     identity: FontIdentity,
     latin_profile: LatinBuildProfile,
@@ -1071,10 +1069,8 @@ def build(
     if latin_font and latin_font["head"].unitsPerEm != 1000:
         scale_upem(latin_font, 1000)
     punctuation_font = TTFont(punctuation_source_path)
-    sans_font = TTFont(sans_source_path)
     cmap = font.getBestCmap()
     punctuation_cmap = punctuation_font.getBestCmap()
-    sans_cmap = sans_font.getBestCmap()
     punctuation_missing = [
         f"U+{codepoint:04X}"
         for codepoint in (
@@ -1093,15 +1089,6 @@ def build(
         raise ValueError(
             "The base and punctuation sources must use the same " "units per em"
         )
-    sans_missing = [
-        f"U+{codepoint:04X}"
-        for codepoint in (0xFF01, 0xFF1F)
-        if codepoint not in sans_cmap
-    ]
-    if sans_missing:
-        raise ValueError("The sans source does not contain " + ", ".join(sans_missing))
-    if sans_font["head"].unitsPerEm != font["head"].unitsPerEm:
-        raise ValueError("The base and sans sources must use the same units per em")
     linear_codepoints = [("choon", 0x30FC), ("dash", 0x2015)]
     required_codepoints = [codepoint for _, codepoint in linear_codepoints]
     required_codepoints.extend(
@@ -1281,7 +1268,7 @@ def build(
         + WAVE_SELECTOR_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
-        + PUNCTUATION_ALTERNATE_COUNT
+        + PUNCTUATION_ITALIC_COUNT
         + 2 * len(_mark_positioning.MANGA_MISSING_SMALL_KANA)
         + len(generated_mark_pairs)
         + len(generated_vertical_mark_pairs)
@@ -1457,63 +1444,38 @@ def build(
             )
         ),
     }
-    default_punctuation_paths = {
-        "!": upright_exclamation,
-        "?": upright_question,
-        **dict(
-            zip(
-                MANGA_PUNCTUATION_SEQUENCES,
-                punctuation_paths,
-                strict=True,
-            )
-        ),
-    }
-    punctuation_alternate_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
-    punctuation_alternate_names = allocated_names[
-        punctuation_alternate_start : punctuation_alternate_start
-        + PUNCTUATION_ALTERNATE_COUNT
+    punctuation_italic_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
+    punctuation_italic_names = allocated_names[
+        punctuation_italic_start : punctuation_italic_start
+        + PUNCTUATION_ITALIC_COUNT
     ]
-    punctuation_alternate_paths: list[pathops.Path] = []
-    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]] = []
-    for index, sequence in enumerate(PUNCTUATION_VARIANT_SEQUENCES):
-        default_path = default_punctuation_paths[sequence]
-        if len(sequence) == 1:
-            sans_path = _font_geometry.glyph_path(
-                sans_font,
-                sans_cmap[0xFF01 if sequence == "!" else 0xFF1F],
-            )
-        else:
-            sans_path = make_sans_punctuation_ligature(sans_font, sequence)
-        alternate_paths = (
-            slant_punctuation_outline(default_path),
-            sans_path,
-            slant_punctuation_outline(sans_path),
-        )
-        punctuation_alternate_paths.extend(alternate_paths)
-        name_start = index * 3
-        alternate_names = tuple(
-            punctuation_alternate_names[name_start : name_start + 3]
+    punctuation_italic_paths: list[pathops.Path] = []
+    punctuation_variants: list[tuple[str, tuple[str, str]]] = []
+    for sequence, italic_name in zip(
+        PUNCTUATION_VARIANT_SEQUENCES,
+        punctuation_italic_names,
+        strict=True,
+    ):
+        punctuation_italic_paths.append(
+            slant_punctuation_outline(mincho_punctuation_paths[sequence])
         )
         punctuation_variants.append(
             (
                 sequence,
-                (
-                    default_punctuation_names[sequence],
-                    *alternate_names,
-                ),
+                (default_punctuation_names[sequence], italic_name),
             )
         )
     _font_operations.append_glyphs(
         font,
-        punctuation_alternate_paths,
-        punctuation_alternate_names,
+        punctuation_italic_paths,
+        punctuation_italic_names,
         cmap[0xFF01],
         punctuation_vertical_origin,
         add_stem_hints=False,
         advance_override=1000,
     )
 
-    punctuation_mark_start = punctuation_alternate_start + PUNCTUATION_ALTERNATE_COUNT
+    punctuation_mark_start = punctuation_italic_start + PUNCTUATION_ITALIC_COUNT
     punctuation_mark_count = len(_mark_positioning.PUNCTUATION_MARK_PAIRS)
     punctuation_mark_names = allocated_names[
         punctuation_mark_start : punctuation_mark_start + 2 * punctuation_mark_count

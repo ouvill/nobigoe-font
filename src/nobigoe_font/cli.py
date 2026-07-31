@@ -72,11 +72,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--sans-source",
-        type=Path,
-        help="local Noto Sans JP OTF used for sans punctuation variants",
-    )
-    parser.add_argument(
         "--variable-kana",
         action="store_true",
         help=(
@@ -126,7 +121,6 @@ def _build_variable_kana(args: argparse.Namespace) -> None:
             ("--source", args.source is not None),
             ("--latin-source", args.latin_source is not None),
             ("--punctuation-source", args.punctuation_source is not None),
-            ("--sans-source", args.sans_source is not None),
             ("--autohint", args.autohint),
             ("--face", args.face != 0),
             ("--base koburi", args.base != "noto"),
@@ -212,7 +206,6 @@ def main(argv: Sequence[str] | None = None) -> None:
             source=args.source,
             latin_source=args.latin_source,
             punctuation_source=args.punctuation_source,
-            sans_source=args.sans_source,
             variable_kana_source=args.variable_kana_source,
         ),
         latin_family=args.latin_family,
@@ -222,7 +215,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         sources.source,
         sources.latin_source,
         sources.punctuation_source,
-        sources.sans_source,
         output_path,
         identity,
         latin_profile,
