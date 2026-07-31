@@ -737,7 +737,7 @@ def _append_symbols(
         "relaxed_wave",
         wave_base,
         wave_vertical,
-        cmap[0x7E],
+        cmap[0x3030],
         selector_seed,
         relaxed_names,
     )
@@ -1236,7 +1236,6 @@ def build_variable_marks(
         0x3042,
         0x3053,
         0x30B3,
-        0x7E,
         0x2015,
         0x301C,
         0x3030,
@@ -1280,7 +1279,7 @@ def build_variable_marks(
         *(cmap[base] for base, _ in generated if base in cmap),
     }
     names.update(
-        cmap[codepoint] for codepoint in (0x7E, 0x2015, 0x301C, 0x3030, 0x30FC)
+        cmap[codepoint] for codepoint in (0x2015, 0x301C, 0x3030, 0x30FC)
     )
     vertical_sources = {name: vertical_glyph_or_self(font, name) for name in names}
     names.update(vertical_sources.values())

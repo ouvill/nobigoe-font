@@ -190,7 +190,7 @@ class VariableSymbolTests(unittest.TestCase):
             "relaxed",
             "wave",
             "wave.v",
-            "selector",
+            "manga",
             "seed",
             [f"relaxed{i}" for i in range(20)],
         )
@@ -203,7 +203,6 @@ class VariableSymbolTests(unittest.TestCase):
             "dash.v",
             "wave",
             "wave.v",
-            "selector",
             "seed",
             "manga",
             *(name for extension in extensions for name in extension[3]),
@@ -223,9 +222,10 @@ class VariableSymbolTests(unittest.TestCase):
         feature_tags = {
             record.FeatureTag for record in font["GSUB"].table.FeatureList.FeatureRecord
         }
-        self.assertEqual(feature_tags, {"ccmp", "ss04", "calt", "vert", "vrt2"})
+        self.assertEqual(feature_tags, {"liga", "ss04", "calt", "vert", "vrt2"})
+        self.assertEqual(feature_ligatures(font, "ccmp"), {})
         self.assertEqual(
-            feature_ligatures(font, "ccmp"), {("selector", "wave"): "seed"}
+            feature_ligatures(font, "liga"), {("manga", "wave"): "seed"}
         )
         expected_vertical = {
             "choon0": "choon3",
