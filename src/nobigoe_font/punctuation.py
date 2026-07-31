@@ -54,7 +54,7 @@ PUNCTUATION_VARIANT_SEQUENCES = (
     "?",
     *MANGA_PUNCTUATION_SEQUENCES,
 )
-PUNCTUATION_ALTERNATE_COUNT = 3 * len(PUNCTUATION_VARIANT_SEQUENCES)
+PUNCTUATION_ITALIC_COUNT = len(PUNCTUATION_VARIANT_SEQUENCES)
 PUNCTUATION_SLANT_ANGLE = 12
 
 
@@ -102,35 +102,6 @@ def make_punctuation_ligature(
     for outline, x_min, width in components:
         transform = Transform(scale, 0, 0, 1, cursor - scale * x_min, 0)
         outline.draw(TransformPen(combined.getPen(), transform))
-        cursor += (width + gap) * scale
-    return combined
-
-
-def make_sans_punctuation_ligature(
-    font: TTFont, sequence: str, advance: int = 1000
-) -> pathops.Path:
-    gap = 40
-    cmap = font.getBestCmap()
-    components = [
-        geometry.glyph_path(font, cmap[0xFF01 if mark == "!" else 0xFF1F])
-        for mark in sequence
-    ]
-    component_metrics = [
-        (outline, outline.bounds[0], outline.bounds[2] - outline.bounds[0])
-        for outline in components
-    ]
-    total_width = sum(width for _, _, width in component_metrics)
-    total_width += gap * (len(sequence) - 1)
-    scale = min(1.0, (advance - 40) / total_width)
-    combined = pathops.Path()
-    cursor = (advance - total_width * scale) / 2
-    for outline, x_min, width in component_metrics:
-        combined.addPath(
-            geometry.transform_path(
-                outline,
-                Transform(scale, 0, 0, 1, cursor - scale * x_min, 0),
-            )
-        )
         cursor += (width + gap) * scale
     return combined
 

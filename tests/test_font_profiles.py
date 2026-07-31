@@ -23,7 +23,6 @@ from nobigoe_font.profiles import (
     latin_build_profile,
     latin_font_source,
     libertinus_serif_source,
-    noto_sans_source,
     noto_serif_source,
     shippori_source,
     source_serif_source,
@@ -99,12 +98,6 @@ class FontProfileTests(unittest.TestCase):
                 self.assertIn(weight, serif.filename)
                 self.assertTrue(serif.url.endswith(serif.filename))
                 self.assertEqual(len(serif.sha256), 64)
-
-                sans = noto_sans_source(weight)
-                self.assertIsInstance(sans, DirectSource)
-                self.assertTrue(sans.url.endswith(sans.filename))
-                self.assertEqual(len(sans.sha256), 64)
-
                 shippori = shippori_source(weight)
                 self.assertIsInstance(shippori, ZipMemberSource)
                 self.assertTrue(shippori.member.startswith("ShipporiMincho-OTF-"))
@@ -237,10 +230,6 @@ class FontProfileTests(unittest.TestCase):
     def test_release_version_uses_font_revision_format(self) -> None:
         self.assertRegex(VERSION_NUMBER, r"^[0-9]+\.[0-9]{3}$")
         self.assertEqual(VERSION, f"Version {VERSION_NUMBER}")
-
-    def test_missing_sans_weights_use_nearest_static_sources(self) -> None:
-        self.assertEqual(noto_sans_source("ExtraLight").filename, "NotoSansJP-Thin.otf")
-        self.assertEqual(noto_sans_source("SemiBold").filename, "NotoSansJP-Bold.otf")
 
     def test_shippori_ligatures_follow_available_weights(self) -> None:
         self.assertEqual(

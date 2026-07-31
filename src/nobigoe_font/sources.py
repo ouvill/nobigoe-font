@@ -20,7 +20,6 @@ from .profiles import (
     ZipMemberSource,
     koburi_source,
     latin_font_source,
-    noto_sans_source,
     noto_serif_source,
     noto_serif_variable_source,
     shippori_source,
@@ -37,7 +36,6 @@ class SourceOverrides:
     source: Path | None = None
     latin_source: Path | None = None
     punctuation_source: Path | None = None
-    sans_source: Path | None = None
     variable_kana_source: Path | None = None
 
 
@@ -48,7 +46,6 @@ class ResolvedSources:
     source: Path
     latin_source: Path | None
     punctuation_source: Path
-    sans_source: Path
     variable_kana_source: Path | None = None
 
 
@@ -113,14 +110,10 @@ class SourceCache:
         punctuation_source = overrides.punctuation_source or self._fetch_zip_member(
             shippori_source(secondary_weight)
         )
-        sans_source = overrides.sans_source or self._fetch_direct(
-            noto_sans_source(secondary_weight)
-        )
         return ResolvedSources(
             source=source,
             latin_source=latin_source,
             punctuation_source=punctuation_source,
-            sans_source=sans_source,
             variable_kana_source=resolved_variable_kana_source,
         )
 

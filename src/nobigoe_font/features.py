@@ -354,13 +354,10 @@ def feature_source(
         f"  sub {names[0]} from [{' '.join(names[1:])}];\n"
         for _, names in punctuation_variants
     )
-    stylistic_set_rules = [
-        "".join(
-            f"  sub {names[0]} by {names[index]};\n"
-            for _, names in punctuation_variants
-        )
-        for index in range(1, 4)
-    ]
+    ss01_rules = "".join(
+        f"  sub {names[0]} by {names[1]};\n"
+        for _, names in punctuation_variants
+    )
 
     return (
         "languagesystem DFLT dflt;\n\n"
@@ -369,9 +366,7 @@ def feature_source(
         f"feature ss04 {{\n{ss04_rules}}} ss04;\n\n"
         f"feature calt {{\n{calt_rules}}} calt;\n\n"
         f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
-        f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"
-        f"feature ss02 {{\n{stylistic_set_rules[1]}}} ss02;\n\n"
-        f"feature ss03 {{\n{stylistic_set_rules[2]}}} ss03;\n\n"
+        f"feature ss01 {{\n{ss01_rules}}} ss01;\n\n"
         f"feature vert {{\n{vert_rules}}} vert;\n\n"
         f"feature vrt2 {{\n{vrt2_rules}}} vrt2;\n"
     )

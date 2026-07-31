@@ -138,23 +138,6 @@ NOTO_SERIF_SHA256 = {
     "Bold": "1e03488a0d5e819f07fcd74f54703a7961ba466d3ae900f8a2a730541e6d4543",
     "Black": "b7197366b775ccb6cd3473b7b09f2c5759a2fdfdbfedf975029203828d0ad386",
 }
-NOTO_SANS_WEIGHTS = {
-    "ExtraLight": "Thin",
-    "Light": "Light",
-    "Regular": "Regular",
-    "Medium": "Medium",
-    "SemiBold": "Bold",
-    "Bold": "Bold",
-    "Black": "Black",
-}
-NOTO_SANS_SHA256 = {
-    "Thin": "1d8462eb0050bf6f8ee8dc0a34f11185839e155b0fce8ec2f14427b28d4d134f",
-    "Light": "e358dcfa7970805300a953bb71209c3efcbcc17a00a5e4101f8cf94a3870ad93",
-    "Regular": "dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073",
-    "Medium": "f396a3b57256e4515be9cb41f7aac54766d654890082a9f1b5c2451b5c093d8a",
-    "Bold": "1b0edfb500b73a4fa8a4fcaae1bbbd403994e08e73e3e0da37e70d3853f42c5f",
-    "Black": "3aa30b0956510f4205f759ab3079a5b658310ebcda2577f290466ea51c948819",
-}
 LIBERTINUS_VERSION = "7.051"
 LIBERTINUS_ARCHIVE_URL = (
     "https://github.com/alerque/libertinus/releases/download/"
@@ -384,17 +367,6 @@ def noto_serif_cff2_variable_source() -> DirectSource:
         f"{NOTO_COMMIT}/Serif/Variable/OTF/Subset/{filename}"
     )
     return DirectSource(filename, url, NOTO_SERIF_CFF2_VARIABLE_SHA256)
-
-
-def noto_sans_source(weight: str) -> DirectSource:
-    sans_weight = NOTO_SANS_WEIGHTS[weight]
-    filename = f"NotoSansJP-{sans_weight}.otf"
-    url = (
-        "https://raw.githubusercontent.com/notofonts/noto-cjk/"
-        f"{NOTO_COMMIT}/Sans/SubsetOTF/JP/{filename}"
-    )
-    return DirectSource(filename, url, NOTO_SANS_SHA256[sans_weight])
-
 
 def koburi_source() -> ZipMemberSource:
     return ZipMemberSource(

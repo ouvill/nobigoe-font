@@ -110,28 +110,6 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 
 `Nobigoe Koburi Mincho Regular`のベースとして使用し、既存のTrueType字形・メトリクス・OpenTypeテーブルを保持して、Noto版と同じ追加機能をTrueType輪郭で収録します。元フォントの`ruby`機能とルビ専用字形は同ファミリー内で保持し、Nobigoe MinchoとNobigoe Novel Minchoには移植しません。派生フォント名にはReserved Font Nameの「源暎」を使用せず、英語ファミリー名を`Nobigoe Koburi Mincho`、日本語ファミリー名を`のびごえこぶり明朝`としています。
 
-## Noto Sans JP
-
-- Project: [Noto CJK](https://github.com/notofonts/noto-cjk)
-- Version: `2.004`
-- Commit: [`9b0f1436e455d902de067a2501422e5dc71ad16b`](https://github.com/notofonts/noto-cjk/commit/9b0f1436e455d902de067a2501422e5dc71ad16b)
-- Source directory: `Sans/SubsetOTF/JP/`
-- Copyright: `Copyright 2017-2024 Adobe (http://www.adobe.com/). Noto is a trademark of Google Inc.`
-- License: SIL Open Font License 1.1
-
-| Source file | Used for | SHA-256 |
-|---|---|---|
-| `NotoSansJP-Thin.otf` | ExtraLight | `1d8462eb0050bf6f8ee8dc0a34f11185839e155b0fce8ec2f14427b28d4d134f` |
-| `NotoSansJP-Light.otf` | Light | `e358dcfa7970805300a953bb71209c3efcbcc17a00a5e4101f8cf94a3870ad93` |
-| `NotoSansJP-Regular.otf` | Regular / Koburi | `dff723ba59d57d136764a04b9b2d03205544f7cd785a711442d6d2d085ac5073` |
-| `NotoSansJP-Medium.otf` | Medium | `f396a3b57256e4515be9cb41f7aac54766d654890082a9f1b5c2451b5c093d8a` |
-| `NotoSansJP-Bold.otf` | SemiBold / Bold | `1b0edfb500b73a4fa8a4fcaae1bbbd403994e08e73e3e0da37e70d3853f42c5f` |
-| `NotoSansJP-Black.otf` | Black | `3aa30b0956510f4205f759ab3079a5b658310ebcda2577f290466ea51c948819` |
-
-### 使用箇所と改変
-
-対応ウェイトの全角感嘆符`！`（U+FF01）と全角疑問符`？`（U+FF1F）の輪郭を使用しています。単独字形とManga1方式の16シーケンスを全角1文字幅へ再配置してゴシック異体字を生成し、さらに右へ12度傾けた異体字を生成します。Noto Sans JPの本文字形、フォント名、OpenTypeテーブルは生成フォントへ取り込みません。
-
 ## Shippori Mincho（しっぽり明朝）
 
 - Project: [Shippori Mincho](https://github.com/fontdasu/ShipporiMincho)
@@ -164,4 +142,4 @@ Adobe-Manga1-0は、伸長記号、感嘆符・疑問符シーケンス、濁点
 
 ## License Distribution
 
-Noto Serif JP、Libertinus Serif、STIX Two Text、Source Serif 4、源暎こぶり明朝、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。
+Noto Serif JP、Libertinus Serif、STIX Two Text、Source Serif 4、源暎こぶり明朝、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。

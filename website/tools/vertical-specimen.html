@@ -320,7 +320,7 @@
 
       .variant-row {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         border-top: 0.2mm solid var(--line);
         border-left: 0.2mm solid var(--line);
       }
@@ -352,19 +352,6 @@
           "ss01" 1;
       }
 
-      .ss02 {
-        font-feature-settings:
-          "ccmp" 1,
-          "calt" 1,
-          "ss02" 1;
-      }
-
-      .ss03 {
-        font-feature-settings:
-          "ccmp" 1,
-          "calt" 1,
-          "ss03" 1;
-      }
 
       @media print {
         html,
@@ -501,8 +488,6 @@
         <div class="variant-row">
           <div class="variant"><strong>！？</strong><span>明朝<br>default</span></div>
           <div class="variant ss01"><strong>！？</strong><span>斜体明朝<br>ss01</span></div>
-          <div class="variant ss02"><strong>！？</strong><span>ゴシック<br>ss02</span></div>
-          <div class="variant ss03"><strong>！？</strong><span>斜体ゴシック<br>ss03</span></div>
         </div>
       </div>
       <footer class="folio"><span>のびごえ明朝 縦組み見本</span><span>04</span></footer>

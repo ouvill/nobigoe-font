@@ -439,11 +439,8 @@ class TrueTypeBuildTests(unittest.TestCase):
         relaxed_wave_seed = "wave-relaxed.seed"
         manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
         punctuation_variants = [
-            (
-                "!",
-                ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3"),
-            ),
-            ("?", ("question", "question.a1", "question.a2", "question.a3")),
+            ("!", ("exclamation", "exclamation.a1")),
+            ("?", ("question", "question.a1")),
         ]
         glyph_order = list(
             dict.fromkeys(
@@ -501,6 +498,10 @@ class TrueTypeBuildTests(unittest.TestCase):
             ),
             [(output, vertical_output)],
         )
+
+        self.assertIn("feature ss01", source)
+        self.assertNotIn("feature ss02", source)
+        self.assertNotIn("feature ss03", source)
 
         addOpenTypeFeaturesFromString(font, source, tables={"GSUB"})
 
@@ -572,11 +573,8 @@ class TrueTypeBuildTests(unittest.TestCase):
 
     def test_feature_source_builds_punctuation_mark_substitutions(self) -> None:
         punctuation_variants = [
-            (
-                "!",
-                ("exclamation", "exclamation.a1", "exclamation.a2", "exclamation.a3"),
-            ),
-            ("?", ("question", "question.a1", "question.a2", "question.a3")),
+            ("!", ("exclamation", "exclamation.a1")),
+            ("?", ("question", "question.a1")),
         ]
         marks = ("dakuten", "handakuten")
         outputs = [
@@ -1402,7 +1400,6 @@ class NovelKatakanaPipelineTests(unittest.TestCase):
                     Path("source.otf"),
                     None,
                     Path("punctuation.otf"),
-                    Path("sans.otf"),
                     Path("output.otf"),
                     Mock(),
                     Mock(),
