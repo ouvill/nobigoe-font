@@ -31,6 +31,7 @@
 
 Novel版のカタカナも源暎こぶり明朝の輪郭をコピーせず、対応する同ウェイトのNoto Serif JP輪郭から派生します。U+30A1–U+30FA、U+30FD–U+30FF、U+31F0–U+31FFの109字、追加するU+1B155、カタカナ`ccmp`出力、全縦組対応字形を、直線主体・曲線主体・小書き・反復記号の4群と3光学マスターで変形します。結合濁点・半濁点は合成後の一体輪郭へ一度だけ適用し、源暎こぶり明朝は寸法と黒みの比較基準としてだけ使用します。
 `--variable-kana`経路は同コミットの`Serif/Variable/TTF/Subset/NotoSerifJP-VF.ttf`を制作正本として使用します。wght 200・400・900から互換輪郭を作り、残る4固定ウェイトを補間します。符号化済みひらがな89字・カタカナ109字と対応する縦組・合成字形の輪郭およびメトリクスはNoto由来です。字別の筆端深度データと局所変形を追加しますが、第三者輪郭を新たに混合しません。`Nobigoe Novel Kana Design` VFはこのNotoソースから生成する編集・比較用中間成果物です。
+紹介サイトの欧文候補比較では、同じ`NotoSerifJP-VF.ttf`を欧文Unicode範囲へサブセットし、Noto Serif JP内蔵欧文の参考基準としてWOFF2で表示します。輪郭や可変軸を変更せず、通常の配布ZIPには収録しません。
 
 現行Noto cmapではCJK Radicals Supplement／Kangxi Radicalsの293コードポイントが上記Han対象中の290 glyphを共有します。cmapを変更せず共有glyphを一度だけ変換するため、これらのradical aliasも同じ縮小輪郭を表示します。仮名・カタカナ・約物・Latin・追加記号・PUAとの共有glyphは許可せず、変換前にビルドを失敗させます。
 
@@ -61,20 +62,17 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 - Project: [STIX Fonts](https://github.com/stipub/stixfonts)
 - Version: `2.13 b171`
 - Tag: [`v2.13b171`](https://github.com/stipub/stixfonts/releases/tag/v2.13b171)
-- Source directory: `fonts/static_otf/`
+- Source directory: `fonts/variable_ttf/`
 - Copyright: `Copyright 2001-2021 The STIX Fonts Project Authors (https://github.com/stipub/stixfonts)`
 - License: SIL Open Font License 1.1
 
 | Source file | Used for | SHA-256 |
 |---|---|---|
-| `STIXTwoText-Regular.otf` | Regular | `c4864ca6ec071c2d31d0d8309001faa1ee3517fffb53a31a405a697b71f52ca1` |
-| `STIXTwoText-Medium.otf` | Medium | `9cc9f870852a46d708907b96ed024b8d0067a05276d939bfe0b7e89752afc8d9` |
-| `STIXTwoText-SemiBold.otf` | SemiBold | `896d80fbfd67e86ead7e2d593d631eab9bb142ee96dcd8e7aa8dff95ddda0f2a` |
-| `STIXTwoText-Bold.otf` | Bold | `7ef76c666a6704f76ed3fa27bcdda55b36e558b5c2c93b49b03d854db96bdeb5` |
+| `STIXTwoText[wght].ttf` | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Black | `7962b8b7811e6a896c9a91a0bccbb5241047770eb24d4997c5cb5fe21d5c0df2` |
 
 ### 使用箇所と改変
 
-`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。輪郭と水平メトリクスを1.110倍し、Regular、Medium、SemiBold、Boldの順に縦画を中心とする水平輪郭を-10、-12、-14、-15 units補正してから、Noto Serif JP側のグリフへ移植します。補正値は1.110倍後の`A–Z`・`a–z`・`0–9`について、各字の輪郭面積を送り幅で割り、同ウェイトのNoto Serif JP欧文との差の平均絶対誤差を-40〜0 unitsの整数候補中で最小にする値です。STIX Two Textにネイティブソースがある4ウェイトだけを対象とし、源暎こぶり明朝版には取り込みません。
+`--latin-family stix-two-text`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。公式可変TTFの互換輪郭を`wght=400`と`700`で実体化し、輪郭と水平メトリクスを1.110倍してNoto Serif JP側のグリフへ移植します。混植時の黒みを揃えるため、Noto Serif JP和文の`口`・`日`・`田`・`中`・`山`と、NotoおよびSTIX欧文の`H`・`I`・`E`・`F`・`L`・`n`・`i`・`l`・`h`・`m`・`u`の直線部を複数の水平scanlineで測ります。公式STIXにないExtraLightとLightは、Noto和文とNoto欧文の主縦線幅中央値の中間値へSTIXの主縦線を合わせます。RegularからBlackまでは、Noto和文の主縦線幅中央値へ合わせます。同じウェイトではすべての通常字形へ一つの補間位置を共通適用し、文字ごとの輪郭面積や送り幅には合わせないため、STIX Two Text本来の字間差、コントラスト、字形間の太さの関係を保持します。例外は、固有の細い形状が周囲から浮く`ƒ`（U+0192）だけで、輪郭面積÷輪郭周長をストローク太さの補助指標として個別位置を設定します。求めた補間位置が公式軸の400–700範囲外にある場合も、同じ互換輪郭と水平メトリクスだけを外挿し、別フォントを混ぜません。調整済み制作VFは`--build-variable-stix`で明示的に生成でき、固定版は公式可変TTFまたはこの制作VFから実体化できます。源暎こぶり明朝版には取り込みません。
 
 ## Source Serif 4
 
@@ -93,6 +91,32 @@ Noto版のBasic Latin、Latin-1 Supplement、Latin Extended-A/B、Latin Extended
 ### 使用箇所と改変
 
 `--latin-family source-serif-4`を指定したNoto版で、Libertinus Serifと同じ欧文Unicode範囲と対応するOpenType異体字・標準合字を使用します。可変フォントを`opsz=20`、Nobigoeの各ウェイトに対応する`wght=200–900`で静的に実体化し、輪郭と水平メトリクスを1.088倍してNoto Serif JP側のグリフへ移植します。TrueType複合字形は構成要素を分解してOpenType/CFF輪郭へ変換します。源暎こぶり明朝版には取り込みません。
+
+## 紹介サイト欧文比較用Webfont
+
+- Google Fonts repository commit: [`7ff85c87f93ea6cca5f41c69f2e4edcb90240f26`](https://github.com/google/fonts/commit/7ff85c87f93ea6cca5f41c69f2e4edcb90240f26)
+- STIX Fonts tag: [`v2.13b171`](https://github.com/stipub/stixfonts/releases/tag/v2.13b171)
+- License: SIL Open Font License 1.1
+
+| Project | Copyright | Source file | SHA-256 |
+|---|---|---|---|
+| STIX Two Text | `Copyright 2001-2021 The STIX Fonts Project Authors (https://github.com/stipub/stixfonts)` | `STIXTwoText[wght].ttf` | `7962b8b7811e6a896c9a91a0bccbb5241047770eb24d4997c5cb5fe21d5c0df2` |
+| Source Serif 4 | `© 2014 - 2021 Adobe Systems Incorporated (http://www.adobe.com/), with Reserved Font Name ‘Source’.` | `SourceSerif4[opsz,wght].ttf` | `97b2d4da6e3cb494b5a1e66ae176914d852ccabef49e0c02c0df25f3e39aca0b` |
+| Literata | `Copyright 2017 The Literata Project Authors (https://github.com/googlefonts/literata)` | `Literata[opsz,wght].ttf` | `b41138c9373112f32abb589cc22e8674b06ed4048b0c513be922bdd26f274440` |
+| Roboto Serif | `Copyright 2020 The Roboto Serif Project Authors (https://github.com/googlefonts/RobotoSerif)` | `RobotoSerif[GRAD,opsz,wdth,wght].ttf` | `351ced75f3851806aa6d846b669361521eb1925cfc530396df9c1a1b77061ddb` |
+| Newsreader | `Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader)` | `Newsreader[opsz,wght].ttf` | `8a08d13f8a6c0d51be379a60af84f945f65369a67e509ee3c3bdcc421254d7c1` |
+| Petrona | `Copyright 2019 The Petrona Project Authors (https://github.com/RingoSeeber/Petrona)` | `Petrona[wght].ttf` | `0ede77fbf726541cf93ece7b721a7b069f004cb413ab205f74963560015ab075` |
+| Spectral | `Copyright 2017 The Spectral Project Authors (https://github.com/productiontype/Spectral)` | `Spectral-ExtraLight.ttf` | `5d852db897fd7ad5ce640a6e88f1cd70eac75777c541d02d86749af8d4797ff1` |
+| Spectral | 同上 | `Spectral-Light.ttf` | `a2a530303d326473b69ab7863b879e9203ec747e51d5fa7c7b19e0e975e00740` |
+| Spectral | 同上 | `Spectral-Regular.ttf` | `c89021dc20720c8d0dcf40b0b2f6e00c13665fa8041717f581396f51b8c78f5d` |
+| Spectral | 同上 | `Spectral-Medium.ttf` | `f385bc588599c879112272711d4acecc126674009d747a27284f59e93a240e83` |
+| Spectral | 同上 | `Spectral-SemiBold.ttf` | `5f86915a744832ecf6e4a17ab04bea091b9fa992ef5164ff65ae34c1da2fe94b` |
+| Spectral | 同上 | `Spectral-Bold.ttf` | `70ddb1ec6ae3b0b8d0c79231f670de786978f19baeba2130757526e407aebf9b` |
+| Spectral | 同上 | `Spectral-ExtraBold.ttf` | `af3f8513db8d047ebecb1682b5e04dfc12ec7e6b51b71654d4d348f12a5e6b5a` |
+
+### 使用箇所と改変
+
+紹介サイトの`/compare/`で、のびごえ明朝の和文と混植する欧文候補としてのみ使用します。`U+0020–024F`、`U+0300–036F`、`U+1E00–1EFF`、`U+2000–206F`、`U+20A0–20CF`と対応するOpenTypeレイアウト字形へサブセットし、WOFF2へ圧縮します。可変軸は保持し、Spectralは公式固定7ウェイトを使用します。輪郭自体は変更せず、比較画面の「補正後」表示だけにCSS `size-adjust`を適用します。これらの比較用WebfontをNobigoeの配布フォントへ取り込まず、通常の配布ZIPにも収録しません。
 
 ## 源暎こぶり明朝
 
@@ -142,4 +166,4 @@ Adobe-Manga1-0は、伸長記号、感嘆符・疑問符シーケンス、濁点
 
 ## License Distribution
 
-Noto Serif JP、Libertinus Serif、STIX Two Text、Source Serif 4、源暎こぶり明朝、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。
+Noto Serif JP、Libertinus Serif、STIX Two Text、Source Serif 4、Literata、Roboto Serif、Newsreader、Petrona、Spectral、源暎こぶり明朝、Noto Sans JP、しっぽり明朝はいずれもSIL Open Font License 1.1です。OFL 1.1の全文はリポジトリの [`OFL.txt`](OFL.txt) に収録しています。生成フォントと紹介サイト同梱のWebfontを再配布する場合は、この著作権表示、第三者通知、およびOFL 1.1ライセンスをフォントとともに配布してください。

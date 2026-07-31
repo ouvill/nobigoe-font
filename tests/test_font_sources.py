@@ -95,7 +95,10 @@ class SourceCacheTests(unittest.TestCase):
                 )
             )
             stack.enter_context(
-                patch("nobigoe_font.sources.shippori_source", return_value=self.punctuation)
+                patch(
+                    "nobigoe_font.sources.shippori_source",
+                    return_value=self.punctuation,
+                )
             )
             stack.enter_context(
                 patch("nobigoe_font.sources.koburi_source", return_value=self.koburi)
@@ -108,10 +111,13 @@ class SourceCacheTests(unittest.TestCase):
 
     def test_initial_resolution_downloads_and_caches_all_noto_sources(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ) as retrieve,
+        ):
             resolved = cache.resolve("noto", "Regular", SourceOverrides())
 
         self.assertEqual(
@@ -131,10 +137,13 @@ class SourceCacheTests(unittest.TestCase):
 
     def test_noto_latin_profile_keeps_the_base_latin_glyphs(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ) as retrieve,
+        ):
             resolved = cache.resolve(
                 "noto",
                 "Regular",
@@ -149,10 +158,13 @@ class SourceCacheTests(unittest.TestCase):
         self,
     ) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ) as retrieve,
+        ):
             first = cache.resolve("noto", "Regular", SourceOverrides())
             first_call_count = retrieve.call_count
             second = cache.resolve("noto", "Regular", SourceOverrides())
@@ -163,9 +175,12 @@ class SourceCacheTests(unittest.TestCase):
 
     def test_zip_members_are_not_reextracted_after_they_are_cached(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ),
         ):
             cache.resolve("noto", "Regular", SourceOverrides())
             with patch(
@@ -177,17 +192,21 @@ class SourceCacheTests(unittest.TestCase):
 
     def test_cached_zip_members_do_not_require_the_archives(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ),
         ):
             first = cache.resolve("noto", "Regular", SourceOverrides())
 
         (self.cache_directory / self.latin.archive_filename).unlink()
         (self.cache_directory / self.punctuation.archive_filename).unlink()
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve"
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch("nobigoe_font.sources.urllib.request.urlretrieve") as retrieve,
+        ):
             second = cache.resolve("noto", "Regular", SourceOverrides())
 
         self.assertEqual(second, first)
@@ -202,9 +221,10 @@ class SourceCacheTests(unittest.TestCase):
             punctuation_source=source_directory / "punctuation.otf",
         )
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve"
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch("nobigoe_font.sources.urllib.request.urlretrieve") as retrieve,
+        ):
             resolved = cache.resolve("noto", "Regular", overrides)
 
         self.assertEqual(
@@ -219,10 +239,13 @@ class SourceCacheTests(unittest.TestCase):
 
     def test_corrupt_cached_source_is_downloaded_again(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ) as retrieve,
+        ):
             first = cache.resolve("noto", "Regular", SourceOverrides())
             first.source.write_bytes(b"corrupt")
             second = cache.resolve("noto", "Regular", SourceOverrides())
@@ -233,15 +256,16 @@ class SourceCacheTests(unittest.TestCase):
 
     def test_corrupt_cached_archive_is_downloaded_again(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=self._urlretrieve,
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ) as retrieve,
+        ):
             cache.resolve("noto", "Regular", SourceOverrides())
             (self.cache_directory / self.latin.filename).unlink()
-            (self.cache_directory / self.latin.archive_filename).write_bytes(
-                b"corrupt"
-            )
+            (self.cache_directory / self.latin.archive_filename).write_bytes(b"corrupt")
             cache.resolve("noto", "Regular", SourceOverrides())
 
         self.assertEqual(retrieve.call_count, 4)
@@ -253,9 +277,10 @@ class SourceCacheTests(unittest.TestCase):
             source=source_directory / "base.ttf",
             punctuation_source=source_directory / "punctuation.otf",
         )
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve"
-        ) as retrieve:
+        with (
+            self._pinned_sources(),
+            patch("nobigoe_font.sources.urllib.request.urlretrieve") as retrieve,
+        ):
             resolved = SourceCache(self.cache_directory).resolve(
                 "koburi", "Regular", overrides
             )
@@ -263,11 +288,37 @@ class SourceCacheTests(unittest.TestCase):
         self.assertEqual(resolved.latin_source, None)
         retrieve.assert_not_called()
 
+    def test_variable_stix_resolves_pinned_source_or_explicit_override(self) -> None:
+        cache = SourceCache(self.cache_directory)
+        with (
+            patch(
+                "nobigoe_font.sources.stix_two_text_variable_source",
+                return_value=self.noto,
+            ),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=self._urlretrieve,
+            ) as retrieve,
+        ):
+            resolved = cache.resolve_variable_stix()
+
+        self.assertEqual(resolved, self.cache_directory / self.noto.filename)
+        self.assertEqual(resolved.read_bytes(), self.noto_content)
+        retrieve.assert_called_once()
+
+        override = Path(self.temporary_directory.name) / "raw-stix.ttf"
+        with patch("nobigoe_font.sources.urllib.request.urlretrieve") as retrieve:
+            self.assertEqual(cache.resolve_variable_stix(override), override)
+        retrieve.assert_not_called()
+
     def test_failed_download_removes_its_temporary_file(self) -> None:
         cache = SourceCache(self.cache_directory)
-        with self._pinned_sources(), patch(
-            "nobigoe_font.sources.urllib.request.urlretrieve",
-            side_effect=urllib.error.URLError("offline"),
+        with (
+            self._pinned_sources(),
+            patch(
+                "nobigoe_font.sources.urllib.request.urlretrieve",
+                side_effect=urllib.error.URLError("offline"),
+            ),
         ):
             with self.assertRaises(urllib.error.URLError):
                 cache.resolve("noto", "Regular", SourceOverrides())

@@ -126,6 +126,15 @@ NOTO_WEIGHT_CLASSES = {
     "Bold": 700,
     "Black": 900,
 }
+NOTO_WEIGHT_DESIGN_LOCATIONS = {
+    200: 200.0,
+    300: 266.5,
+    400: 347.0,
+    500: 452.0,
+    600: 557.0,
+    700: 711.0,
+    900: 900.0,
+}
 NOTO_SERIF_VARIABLE_SHA256 = (
     "99999f906b3793c7c97661a05ef9d53488d488604683b308c756d084b71df7d1"
 )
@@ -182,27 +191,11 @@ LIBERTINUS_COPYRIGHT = "Copyright © 2012-2024 The Libertinus Project Authors."
 
 STIX_TWO_VERSION = "2.13b171"
 STIX_TWO_TAG = f"v{STIX_TWO_VERSION}"
-STIX_TWO_WEIGHTS = {
-    "Regular": "Regular",
-    "Medium": "Medium",
-    "SemiBold": "SemiBold",
-    "Bold": "Bold",
-}
-STIX_TWO_OTF_SHA256 = {
-    "Regular": "c4864ca6ec071c2d31d0d8309001faa1ee3517fffb53a31a405a697b71f52ca1",
-    "Medium": "9cc9f870852a46d708907b96ed024b8d0067a05276d939bfe0b7e89752afc8d9",
-    "SemiBold": "896d80fbfd67e86ead7e2d593d631eab9bb142ee96dcd8e7aa8dff95ddda0f2a",
-    "Bold": "7ef76c666a6704f76ed3fa27bcdda55b36e558b5c2c93b49b03d854db96bdeb5",
-}
+STIX_TWO_VARIABLE_FILENAME = "STIXTwoText[wght].ttf"
+STIX_TWO_VARIABLE_SHA256 = (
+    "7962b8b7811e6a896c9a91a0bccbb5241047770eb24d4997c5cb5fe21d5c0df2"
+)
 STIX_TWO_SCALE_FACTOR = 1.110
-# Minimize the mean absolute per-glyph area/advance error against Noto Serif JP
-# over A-Z, a-z, and 0-9 after applying the shared STIX Two scale factor.
-STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS = {
-    "Regular": -10,
-    "Medium": -12,
-    "SemiBold": -14,
-    "Bold": -15,
-}
 STIX_TWO_COPYRIGHT = (
     "Copyright 2001-2021 The STIX Fonts Project Authors "
     "(https://github.com/stipub/stixfonts)"
@@ -303,7 +296,18 @@ def font_identity(
     base: BaseType,
     weight: str,
     kana_style: KanaStyle = "noto",
+    latin_family: LatinFamily = "libertinus",
 ) -> FontIdentity:
+    if latin_family == "stix-two-text":
+        if base != "noto":
+            raise ValueError("--latin-family is available for the Noto base only")
+        return FontIdentity(
+            "Nobigoe Mincho STIX",
+            "のびごえ明朝 STIX",
+            weight,
+            NOTO_WEIGHT_CLASSES[weight],
+            f"NobigoeMinchoSTIX-{weight}",
+        )
     if kana_style == "novel":
         if base != "noto":
             raise ValueError("--kana-style novel requires --base noto")
@@ -393,19 +397,20 @@ def libertinus_serif_source(weight: str) -> ZipMemberSource:
     )
 
 
-def stix_two_text_source(weight: str) -> DirectSource:
-    if weight not in STIX_TWO_WEIGHTS:
-        supported = ", ".join(STIX_TWO_WEIGHTS)
-        raise ValueError(
-            f"STIX Two Text has no native {weight} source; choose one of {supported}"
-        )
-    stix_weight = STIX_TWO_WEIGHTS[weight]
-    filename = f"STIXTwoText-{stix_weight}.otf"
+def stix_two_text_variable_source() -> DirectSource:
     url = (
         "https://raw.githubusercontent.com/stipub/stixfonts/"
-        f"{STIX_TWO_TAG}/fonts/static_otf/{filename}"
+        f"{STIX_TWO_TAG}/fonts/variable_ttf/STIXTwoText%5Bwght%5D.ttf"
     )
-    return DirectSource(filename, url, STIX_TWO_OTF_SHA256[stix_weight])
+    return DirectSource(
+        STIX_TWO_VARIABLE_FILENAME,
+        url,
+        STIX_TWO_VARIABLE_SHA256,
+    )
+
+
+def stix_two_text_source(weight: str) -> DirectSource:
+    return stix_two_text_variable_source()
 
 
 def source_serif_source() -> ZipMemberSource:
@@ -441,11 +446,10 @@ def latin_build_profile(family: LatinFamily, weight: str) -> LatinBuildProfile:
             copyright=LIBERTINUS_COPYRIGHT,
         )
     if family == "stix-two-text":
-        stix_two_text_source(weight)
         return LatinBuildProfile(
             family,
             STIX_TWO_SCALE_FACTOR,
-            STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS[weight],
+            0,
             copyright=STIX_TWO_COPYRIGHT,
         )
     if family == "source-serif-4":

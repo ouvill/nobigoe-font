@@ -51,7 +51,10 @@ jobs:
           from zipfile import ZipFile
 
           wheel, = Path("dist").glob("*.whl")
-          expected = {"nobigoe_font/version.json"}
+          expected = {
+              "nobigoe_font/stix_latin_tuning.json",
+              "nobigoe_font/version.json",
+          }
           expected.update(
               path.relative_to("src").as_posix()
               for path in Path("src/nobigoe_font/mark_positions").rglob("*.json")

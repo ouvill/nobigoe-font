@@ -22,6 +22,7 @@ from .profiles import (
     latin_font_source,
     noto_serif_source,
     noto_serif_variable_source,
+    stix_two_text_variable_source,
     shippori_source,
 )
 
@@ -121,6 +122,11 @@ class SourceCache:
         """Resolve the pinned development VF, unless a local source is explicit."""
 
         return override or self._fetch_direct(noto_serif_variable_source())
+
+    def resolve_variable_stix(self, override: Path | None = None) -> Path:
+        """Resolve the pinned raw STIX Two Text VF, unless locally overridden."""
+
+        return override or self._fetch_direct(stix_two_text_variable_source())
 
     def fetch(self, source: FontSource) -> Path:
         """Return a pinned source from the verified persistent cache."""

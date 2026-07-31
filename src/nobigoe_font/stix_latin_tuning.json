@@ -1,0 +1,59 @@
+{
+  "version": 6,
+  "stix_version": "2.13b171",
+  "noto_commit": "9b0f1436e455d902de067a2501422e5dc71ad16b",
+  "scale_factor": 1.11,
+  "metric": {
+    "name": "japanese-latin-main-vertical-stem",
+    "description": "ExtraLight and Light use the midpoint between representative Noto Serif JP Japanese and Latin main vertical stems; Regular through Black match the Japanese stem median.",
+    "latin_probes": {
+      "H": [0.3, 0.7],
+      "I": [0.5],
+      "E": [0.65],
+      "F": [0.7],
+      "L": [0.55],
+      "n": [0.35],
+      "i": [0.45],
+      "l": [0.45],
+      "h": [0.35],
+      "m": [0.35],
+      "u": [0.55]
+    },
+    "japanese_probes": {
+      "口": [0.25, 0.5, 0.75],
+      "日": [0.2, 0.8],
+      "田": [0.2, 0.8],
+      "中": [0.2, 0.8],
+      "山": [0.3, 0.6]
+    }
+  },
+  "weights": [
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    900
+  ],
+  "global_locations": [
+    -0.6,
+    -0.44,
+    -0.38,
+    -0.12,
+    0.12,
+    0.49,
+    0.92
+  ],
+  "glyph_locations": {
+    "uni0192": [
+      -0.57,
+      -0.46,
+      -0.32,
+      -0.14,
+      0.03,
+      0.3,
+      0.63
+    ]
+  }
+}

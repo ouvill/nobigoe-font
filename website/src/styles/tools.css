@@ -1551,3 +1551,342 @@
   margin: 0;
   white-space: nowrap;
 }
+
+.latin-candidate-comparison {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) var(--section-space);
+}
+
+.comparison-section-heading--latin {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.25fr) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 68px);
+  border: 1px solid var(--line-strong);
+  background: var(--paper-bright);
+}
+
+.comparison-section-heading--latin div > p {
+  max-width: 58em;
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.latin-candidate-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) repeat(4, minmax(130px, 1fr));
+  border-right: 1px solid var(--line-strong);
+  border-left: 1px solid var(--line-strong);
+  background: var(--moss-light);
+  font-family: var(--sans);
+}
+
+.latin-candidate-controls > label,
+.latin-candidate-mode {
+  min-width: 0;
+  margin: 0;
+  padding: 16px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.latin-candidate-controls > label,
+.latin-candidate-mode {
+  border-right: 1px solid var(--line);
+}
+
+.latin-candidate-controls > label:last-of-type {
+  border-right: 0;
+}
+
+.latin-candidate-controls label > span,
+.latin-candidate-mode legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 0;
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.latin-candidate-controls output {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.latin-candidate-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.latin-candidate-controls label > small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.latin-candidate-mode > div {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border: 1px solid var(--line-strong);
+}
+
+.latin-candidate-mode button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  color: var(--ink-soft);
+  background: var(--paper-bright);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.latin-candidate-mode button + button {
+  border-left: 1px solid var(--line-strong);
+}
+
+.latin-candidate-mode button[aria-pressed="true"] {
+  color: var(--paper-bright);
+  background: var(--ink);
+}
+
+.latin-candidate-controls .latin-candidate-text-control {
+  grid-column: 1 / -1;
+  border-right: 0;
+}
+
+.latin-candidate-text-control textarea {
+  display: block;
+  width: 100%;
+  min-height: 78px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  outline: 0;
+  color: var(--ink);
+  background: var(--paper-bright);
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.latin-candidate-text-control textarea:focus {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.latin-candidate-status {
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-top: 0;
+  color: var(--ink-soft);
+  background: var(--paper-bright);
+  font-family: var(--sans);
+  font-size: 10px;
+}
+
+.latin-candidate-comparison.latin-candidates-ready .latin-candidate-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.latin-candidate-comparison.latin-candidates-failed .latin-candidate-status {
+  color: var(--paper-bright);
+  background: var(--accent);
+}
+
+.latin-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--line-strong);
+  border-left: 1px solid var(--line-strong);
+}
+
+.latin-candidate-card {
+  min-width: 0;
+  border-right: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--paper-bright);
+}
+
+.latin-candidate-card > header {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-height: 74px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--sans);
+}
+
+.latin-candidate-card > header p {
+  margin: 0;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.latin-candidate-card > header h4 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.latin-candidate-card > header span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.latin-candidate-card > header a {
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.latin-candidate-facts {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.7fr) repeat(3, minmax(66px, 0.6fr));
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--sans);
+}
+
+.latin-candidate-facts > div {
+  min-width: 0;
+  padding: 9px 12px;
+}
+
+.latin-candidate-facts > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.latin-candidate-facts dt {
+  color: var(--muted);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.latin-candidate-facts dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latin-candidate-source {
+  margin: 0;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 9px;
+}
+
+.latin-candidate-mixed,
+.latin-candidate-display,
+.latin-candidate-size-steps b {
+  font-family: var(--candidate-family-tuned), "Nobigoe Weight", var(--serif);
+  font-weight: var(--latin-candidate-weight);
+  font-optical-sizing: none;
+  font-variation-settings:
+    "opsz" var(--latin-candidate-opsz),
+    "GRAD" var(--latin-candidate-grade);
+  font-synthesis: none;
+}
+
+.latin-candidate-comparison[data-size-mode="raw"] .latin-candidate-mixed,
+.latin-candidate-comparison[data-size-mode="raw"] .latin-candidate-display,
+.latin-candidate-comparison[data-size-mode="raw"]
+  .latin-candidate-size-steps
+  b {
+  font-family: var(--candidate-family-raw), "Nobigoe Weight", var(--serif);
+}
+
+.latin-candidate-mixed {
+  min-height: 9em;
+  margin: 0;
+  padding: clamp(22px, 3vw, 38px);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--latin-candidate-size);
+  line-height: 1.85;
+}
+
+.latin-candidate-display {
+  margin: 0;
+  padding: 20px 24px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(29px, 3vw, 44px);
+  line-height: 1.22;
+}
+
+.latin-candidate-size-steps p {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+  padding: 7px 18px;
+  overflow: hidden;
+}
+
+.latin-candidate-size-steps p + p {
+  border-top: 1px solid var(--line);
+}
+
+.latin-candidate-size-steps span {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 8px;
+}
+
+.latin-candidate-size-steps b {
+  min-width: 0;
+  overflow: hidden;
+  font-size: inherit;
+  font-weight: var(--latin-candidate-weight);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latin-candidate-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--line-strong);
+  border-top: 0;
+  color: var(--ink-soft);
+  background: var(--moss-light);
+  font-family: var(--sans);
+  font-size: 9px;
+  line-height: 1.8;
+}
+
+.latin-candidate-notes p {
+  margin: 0;
+  padding: 14px 18px;
+}
+
+.latin-candidate-notes p + p {
+  border-left: 1px solid var(--line);
+}

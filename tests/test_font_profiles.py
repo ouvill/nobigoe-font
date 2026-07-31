@@ -15,8 +15,8 @@ from nobigoe_font.profiles import (
     SHIPPORI_ARCHIVE_SHA256,
     SHIPPORI_STROKE_ADJUSTMENTS,
     SOURCE_SERIF_ARCHIVE_SHA256,
-    STIX_TWO_OTF_SHA256,
-    STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS,
+    STIX_TWO_SCALE_FACTOR,
+    STIX_TWO_VARIABLE_SHA256,
     ZipMemberSource,
     default_output_path,
     font_identity,
@@ -170,38 +170,13 @@ class FontProfileTests(unittest.TestCase):
 
         stix = stix_two_text_source("Regular")
         self.assertIsInstance(stix, DirectSource)
-        self.assertEqual(stix.sha256, STIX_TWO_OTF_SHA256["Regular"])
-        self.assertEqual(
-            latin_build_profile("stix-two-text", "Regular").scale_factor,
-            1.110,
-        )
-        self.assertEqual(
-            STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS,
-            {
-                "Regular": -10,
-                "Medium": -12,
-                "SemiBold": -14,
-                "Bold": -15,
-            },
-        )
-        self.assertEqual(
-            set(STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS),
-            set(STIX_TWO_OTF_SHA256),
-        )
-        for weight, adjustment in STIX_TWO_HORIZONTAL_STROKE_ADJUSTMENTS.items():
+        self.assertEqual(stix.sha256, STIX_TWO_VARIABLE_SHA256)
+        for weight in NOTO_WEIGHT_CLASSES:
             with self.subTest(stix_weight=weight):
-                self.assertEqual(
-                    latin_build_profile(
-                        "stix-two-text", weight
-                    ).horizontal_stroke_adjustment,
-                    adjustment,
-                )
-        for unsupported_weight in ("ExtraLight", "Light", "Black"):
-            with self.subTest(unsupported_stix_weight=unsupported_weight):
-                with self.assertRaisesRegex(
-                    ValueError, f"no native {unsupported_weight}"
-                ):
-                    stix_two_text_source(unsupported_weight)
+                self.assertEqual(stix_two_text_source(weight), stix)
+                profile = latin_build_profile("stix-two-text", weight)
+                self.assertEqual(profile.scale_factor, STIX_TWO_SCALE_FACTOR)
+                self.assertEqual(profile.horizontal_stroke_adjustment, 0)
 
         source_serif = source_serif_source()
         self.assertIsInstance(source_serif, ZipMemberSource)
