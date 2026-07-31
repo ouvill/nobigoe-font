@@ -64,13 +64,9 @@ def _source_paths(
         growth = (weight - 200) / 14
         paths[weight] = {
             cmap[0xFF01]: _rectangle(450 - growth, 0, 550 + growth, 760),
-            vertical[cmap[0xFF01]]: _rectangle(
-                120, 450 - growth, 880, 550 + growth
-            ),
+            vertical[cmap[0xFF01]]: _rectangle(120, 450 - growth, 880, 550 + growth),
             cmap[0xFF1F]: _rectangle(350 - growth, 0, 650 + growth, 760),
-            vertical[cmap[0xFF1F]]: _rectangle(
-                120, 350 - growth, 880, 650 + growth
-            ),
+            vertical[cmap[0xFF1F]]: _rectangle(120, 350 - growth, 880, 650 + growth),
             cmap[0x3099]: _rectangle(100, 100, 190 + growth, 190 + growth),
             cmap[0x309A]: _rectangle(100, 100, 210 + growth, 210 + growth),
         }
@@ -184,10 +180,7 @@ class VariablePunctuationMarkTests(unittest.TestCase):
 
         self.assertEqual(
             load_positions.call_args_list,
-            [
-                call(base="noto", weight=style)
-                for style in NOTO_WEIGHT_CLASSES
-            ],
+            [call(base="noto", weight=style) for style in NOTO_WEIGHT_CLASSES],
         )
         self.assertEqual(font.getGlyphOrder()[: len(original_order)], original_order)
         self.assertEqual(
@@ -235,9 +228,7 @@ class VariablePunctuationMarkTests(unittest.TestCase):
             )
 
         for name in added:
-            signatures = {
-                _outline_signature(font, name, weight) for weight in _WEIGHTS
-            }
+            signatures = {_outline_signature(font, name, weight) for weight in _WEIGHTS}
             self.assertEqual(len(signatures), 1)
             charstring = top.CharStrings[name]
             charstring.decompile()

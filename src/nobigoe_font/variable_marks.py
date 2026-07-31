@@ -1025,9 +1025,7 @@ def _append_heart_mark_composites(
                 (segment.start[0] + 2 * segment.end[0]) / 3,
                 (segment.start[1] + 2 * segment.end[1]) / 3,
             )
-            result.append(
-                _ContourSegment(segment.start, (first, second), segment.end)
-            )
+            result.append(_ContourSegment(segment.start, (first, second), segment.end))
         return result
 
     def align_segments(
@@ -1055,12 +1053,9 @@ def _append_heart_mark_composites(
             scores[reference_index][0] = 0
             for source_index in range(1, min(reference_index, len(source)) + 1):
                 gap_score = scores[reference_index - 1][source_index]
-                match_score = (
-                    scores[reference_index - 1][source_index - 1]
-                    + cost(
-                        reference[reference_index - 1],
-                        source[source_index - 1],
-                    )
+                match_score = scores[reference_index - 1][source_index - 1] + cost(
+                    reference[reference_index - 1],
+                    source[source_index - 1],
                 )
                 if match_score <= gap_score:
                     scores[reference_index][source_index] = match_score

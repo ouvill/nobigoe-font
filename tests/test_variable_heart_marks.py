@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 import unittest
-from unittest.mock import Mock, patch
 from typing import cast
+from unittest.mock import Mock, patch
 
 import pathops
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -161,7 +161,7 @@ class VariableHeartMarkTests(unittest.TestCase):
             signatures = [_operations(master) for master in masters]
             self.assertTrue(all(item == signatures[0] for item in signatures[1:]))
             self.assertEqual(
-                _operations(list(masters[0].contours)[0]),
+                _operations(next(iter(masters[0].contours))),
                 ("moveTo", *("curveTo",) * segment_count, "closePath"),
             )
             for master in masters:
