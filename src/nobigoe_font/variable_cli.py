@@ -7,7 +7,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import variable_marks
-from .profiles import noto_serif_cff2_variable_source
+from .profiles import (
+    NOTO_WEIGHT_CLASSES,
+    noto_serif_cff2_variable_source,
+    shippori_source,
+)
 from .sources import DEFAULT_CACHE_DIR, SourceCache
 
 DEFAULT_OUTPUT_PATH = Path("dist") / "NobigoeVariableMarks-VF.otf"
@@ -16,8 +20,8 @@ DEFAULT_OUTPUT_PATH = Path("dist") / "NobigoeVariableMarks-VF.otf"
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Build the CFF2 Nobigoe variable font with kana marks and "
-            "automatically joining ー, ―, 〜, and 〰."
+            "Build the CFF2 Nobigoe variable font with Nobigoe Mincho Manga "
+            "punctuation, kana marks, and automatically joining ー, ―, 〜, and 〰."
         )
     )
     parser.add_argument(
@@ -51,9 +55,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
+    cache = SourceCache(args.cache_dir)
     source_path = args.source
     if source_path is None:
-        source_path = SourceCache(args.cache_dir).fetch(
-            noto_serif_cff2_variable_source()
-        )
-    variable_marks.build_variable_marks(source_path, args.output, args.face)
+        source_path = cache.fetch(noto_serif_cff2_variable_source())
+    punctuation_sources = {
+        weight: cache.fetch(shippori_source(style))
+        for style, weight in NOTO_WEIGHT_CLASSES.items()
+    }
+    variable_marks.build_variable_marks(
+        source_path,
+        args.output,
+        args.face,
+        punctuation_sources,
+    )
