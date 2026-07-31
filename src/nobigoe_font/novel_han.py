@@ -44,8 +44,8 @@ HAN_CODEPOINT_RANGES: tuple[tuple[int, int], ...] = (
 )
 
 # Shape alternates that retain Han semantics, followed by vertical forms.
-# Discretionary ligatures and ruby forms are intentionally excluded: their
-# output glyphs encode presentation or sizing behavior rather than Han forms.
+# Discretionary ligatures and ruby forms are presentation or sizing behavior
+# rather than Han forms, so this transform leaves their existing shapes alone.
 HAN_GSUB_FEATURES: tuple[str, ...] = (
     "aalt",
     "expt",

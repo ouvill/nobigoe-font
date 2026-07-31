@@ -12,7 +12,7 @@
 | Noto版の既定欧文 | [Libertinus Serif](https://github.com/alerque/libertinus) | 7.051 |
 | 比較用欧文候補 | [STIX Two Text](https://github.com/stipub/stixfonts) | 2.13 b171 |
 | 比較用欧文候補 | [Source Serif 4](https://github.com/adobe-fonts/source-serif) | 4.005 |
-| 源暎こぶり明朝版の本文、長音、ダッシュ、波線、および両版のルビ専用字形 | [源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html) | 6.1 |
+| 源暎こぶり明朝版の本文、長音、ダッシュ、波線、および同版のルビ専用字形 | [源暎こぶり明朝](https://okoneya.jp/font/genei-koburimin.html) | 6.1 |
 | Manga1感嘆符・疑問符合字の記号輪郭 | [Shippori Mincho OTF 5ウェイト（しっぽり明朝）](https://fontdasu.com/shippori-mincho/) | 3.300 |
 | Manga1感嘆符・疑問符合字のゴシック異体字 | [Noto Sans JP](https://github.com/notofonts/noto-cjk) | 2.004 |
 

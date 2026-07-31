@@ -64,11 +64,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="local font overriding the selected Noto-based Latin source",
     )
     parser.add_argument(
-        "--ruby-source",
-        type=Path,
-        help="GenEi Koburi Mincho TTF used for Noto-based ruby glyphs",
-    )
-    parser.add_argument(
         "--punctuation-source",
         type=Path,
         help=(
@@ -130,7 +125,6 @@ def _build_variable_kana(args: argparse.Namespace) -> None:
             ("--output", args.output is not None),
             ("--source", args.source is not None),
             ("--latin-source", args.latin_source is not None),
-            ("--ruby-source", args.ruby_source is not None),
             ("--punctuation-source", args.punctuation_source is not None),
             ("--sans-source", args.sans_source is not None),
             ("--autohint", args.autohint),
@@ -186,8 +180,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise ValueError("GenEi Koburi Mincho is available in Regular only")
     if args.base == "koburi" and args.latin_source is not None:
         raise ValueError("--latin-source is available for the Noto base only")
-    if args.base == "koburi" and args.ruby_source is not None:
-        raise ValueError("--ruby-source is available for the Noto base only")
     if args.base == "koburi" and args.latin_family != "libertinus":
         raise ValueError("--latin-family is available for the Noto base only")
     if (
@@ -219,7 +211,6 @@ def main(argv: Sequence[str] | None = None) -> None:
         SourceOverrides(
             source=args.source,
             latin_source=args.latin_source,
-            ruby_source=args.ruby_source,
             punctuation_source=args.punctuation_source,
             sans_source=args.sans_source,
             variable_kana_source=args.variable_kana_source,
@@ -230,7 +221,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     build(
         sources.source,
         sources.latin_source,
-        sources.ruby_source,
         sources.punctuation_source,
         sources.sans_source,
         output_path,

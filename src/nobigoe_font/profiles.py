@@ -190,16 +190,6 @@ LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS = {
     "Bold": -5,
     "Black": 6,
 }
-# Normalize Koburi's 97.7%-sized hiragana before comparing kana ink area.
-KOBURI_RUBY_STROKE_ADJUSTMENTS = {
-    "ExtraLight": -4,
-    "Light": -1,
-    "Regular": 2,
-    "Medium": 7,
-    "SemiBold": 11,
-    "Bold": 17,
-    "Black": 25,
-}
 LIBERTINUS_OTF_SHA256 = {
     "Regular": "fcf06307a77367394fcb0ccb241e59eea70dba3d732be309647611224679c733",
     "Semibold": "a4b3f28e85881db34695c1f005e4c79233a6caf3a2bd286c9b418c025fb99308",

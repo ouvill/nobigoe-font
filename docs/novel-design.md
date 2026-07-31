@@ -13,7 +13,7 @@
 
 対象カタカナはU+30A1–U+30FA、U+30FD–U+30FF、U+31F0–U+31FFの符号化済み109字と、ビルド時に追加するU+1B155小書きコです。標準78字、小書き29字、反復記号等3字を漏れなく扱い、カタカナを基字とする`ccmp`出力と全縦組字形も変換します。U+30FB中点、U+30FC長音記号、半角カタカナは仮名字面変換の対象外です。変換対象は横組203 glyph・縦組202 glyphで、符号化済み字形、既存一体字形、生成した濁点・半濁点付き字形を重複なく含みます。ひらがな・カタカナともcmap、既存GSUB/GPOS、1000 units/emの全角送り、各縦字形の縦原点を維持します。
 
-漢字はUnicode 15.1で固定したCJK Unified Ideographs全拡張とCJK Compatibility Ideographsを対象にします。範囲はU+3400–U+4DBF、U+4E00–U+9FFF、U+F900–U+FAFF、U+20000–U+2A6DF、U+2A700–U+2B73F、U+2B740–U+2B81F、U+2B820–U+2CEAF、U+2CEB0–U+2EBEF、U+2EBF0–U+2EE5F、U+2F800–U+2FA1F、U+30000–U+3134F、U+31350–U+323AFです。Noto cmapにある13,736コードポイントが参照する13,477 glyphをseedとし、`aalt`、`jp78`、`jp83`、`jp90`、`locl`、`nlck`、`salt`、`ss01`–`ss20`、`vert`、`vrt2`等をseedからグラフ追跡して、未符号化の異体字492 glyphを加えた重複なし13,969 glyphを変換します。現行ソースの到達出力数／新規追加数は`aalt` 769／492、`jp78` 569／0、`jp83` 380／0、`jp90` 160／0、`nlck` 210／0で、`locl`・`salt`・`ss01`–`ss07`・`vert`・`vrt2`からの追加は0です。`dlig`と`ruby`は漢字異体字ではなく表示・寸法機能なので追跡しません。
+漢字はUnicode 15.1で固定したCJK Unified Ideographs全拡張とCJK Compatibility Ideographsを対象にします。範囲はU+3400–U+4DBF、U+4E00–U+9FFF、U+F900–U+FAFF、U+20000–U+2A6DF、U+2A700–U+2B73F、U+2B740–U+2B81F、U+2B820–U+2CEAF、U+2CEB0–U+2EBEF、U+2EBF0–U+2EE5F、U+2F800–U+2FA1F、U+30000–U+3134F、U+31350–U+323AFです。Noto cmapにある13,736コードポイントが参照する13,477 glyphをseedとし、`aalt`、`jp78`、`jp83`、`jp90`、`locl`、`nlck`、`salt`、`ss01`–`ss20`、`vert`、`vrt2`等をseedからグラフ追跡して、未符号化の異体字492 glyphを加えた重複なし13,969 glyphを変換します。現行ソースの到達出力数／新規追加数は`aalt` 769／492、`jp78` 569／0、`jp83` 380／0、`jp90` 160／0、`nlck` 210／0で、`locl`・`salt`・`ss01`–`ss07`・`vert`・`vrt2`からの追加は0です。`dlig`と`ruby`は漢字異体字ではなく表示・寸法機能なので追跡せず、既存機能を変更しません。
 
 ## 漢字の変換
 

@@ -7,7 +7,6 @@ from nobigoe_font.profiles import (
     DirectSource,
     KOBURI_ARCHIVE_SHA256,
     KANA_STYLES,
-    KOBURI_RUBY_STROKE_ADJUSTMENTS,
     LATIN_FAMILIES,
     LIBERTINUS_ARCHIVE_SHA256,
     LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
@@ -232,20 +231,6 @@ class FontProfileTests(unittest.TestCase):
                 "SemiBold": -1,
                 "Bold": 4,
                 "Black": 11,
-            },
-        )
-
-    def test_koburi_ruby_weight_adjustments_cover_every_noto_weight(self) -> None:
-        self.assertEqual(
-            KOBURI_RUBY_STROKE_ADJUSTMENTS,
-            {
-                "ExtraLight": -4,
-                "Light": -1,
-                "Regular": 2,
-                "Medium": 7,
-                "SemiBold": 11,
-                "Bold": 17,
-                "Black": 25,
             },
         )
 
