@@ -33,7 +33,6 @@ from nobigoe_font.pipeline import (
     _novel_katakana_mappings,
     _native_novel_ccmp_outputs,
     build,
-    import_koburi_ruby,
     SPACING_MARK_INPUTS,
     mark_ligature_rules,
     make_manga_wave_parts,
@@ -50,9 +49,6 @@ from nobigoe_font.punctuation import (
 from nobigoe_font.marks import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
-    KOBURI_PUA_MARK_PAIRS,
-    KOBURI_PUA_START,
-    MANGA_MISSING_SMALL_KANA,
     MANGA_MARK_PAIRS,
     MarkPlacement,
 )
@@ -390,140 +386,6 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(upright["!"].bounds, exclamation.bounds)
         self.assertEqual(upright["?"].bounds, question.bounds)
 
-    def test_koburi_ruby_import_maps_every_source_input_class(self) -> None:
-        direct_codepoints = [0x2022, 0x3042, *range(0x3400, 0x3400 + 226)]
-        source_direct = {
-            codepoint: f"source.direct.{index}"
-            for index, codepoint in enumerate(direct_codepoints)
-        }
-        target_direct = {
-            codepoint: f"target.direct.{index}"
-            for index, codepoint in enumerate(direct_codepoints)
-        }
-        source_marks = {
-            KOBURI_PUA_START + index: f"source.mark.{index}" for index in range(14)
-        }
-        source_small_ko = ["source.small.hira", "source.small.kata"]
-        source_vertical = {
-            **{
-                source_direct[codepoint]: f"source.vertical.{index}"
-                for index, codepoint in enumerate(direct_codepoints[:42])
-            },
-            source_small_ko[0]: "source.small.hira.vert",
-            source_small_ko[1]: "source.small.kata.vert",
-        }
-        source_bullet = "source.bullet.fullwidth"
-        source_inputs = [
-            *source_direct.values(),
-            *source_marks.values(),
-            *source_small_ko,
-            *source_vertical.values(),
-            source_bullet,
-        ]
-        self.assertEqual(len(source_inputs), 289)
-        source_substitutions = {
-            source_name: f"source.ruby.{index}"
-            for index, source_name in enumerate(source_inputs)
-        }
-        source_substitutions[source_bullet] = source_substitutions[
-            source_direct[0x2022]
-        ]
-        source_outputs = list(dict.fromkeys(source_substitutions.values()))
-        self.assertEqual(len(source_outputs), 288)
-
-        source_cmap = source_direct | source_marks
-        ruby_font = Mock()
-        ruby_font.getBestCmap.return_value = source_cmap
-        glyph_ids = {
-            source_small_ko[0]: 100,
-            source_small_ko[1]: 101,
-        }
-        ruby_font.getGlyphID.side_effect = glyph_ids.__getitem__
-        target_font = Mock()
-        target_cmap = target_direct
-        target_vertical = {
-            target_direct[codepoint]: f"target.vertical.{index}"
-            for index, codepoint in enumerate(direct_codepoints[:42])
-        }
-        missing_small_glyphs = {
-            codepoint: (f"target.small.{index}", f"target.small.{index}.vert")
-            for index, codepoint in enumerate(MANGA_MISSING_SMALL_KANA)
-        }
-        mark_outputs = {
-            pair: f"target.mark.{index}"
-            for index, pair in enumerate(KOBURI_PUA_MARK_PAIRS)
-        }
-        allocated_names = [f"target.ruby.{index}" for index in range(288)]
-
-        def feature_substitutions(font, feature_tag):
-            if font is target_font:
-                return {}
-            return {
-                "ruby": source_substitutions,
-                "vert": source_vertical,
-                "vrt2": {},
-                "fwid": {source_direct[0x2022]: source_bullet},
-            }[feature_tag]
-
-        with (
-            patch(
-                "nobigoe_font.pipeline._font_operations.feature_single_substitutions",
-                side_effect=feature_substitutions,
-            ),
-            patch(
-                "nobigoe_font.pipeline._font_operations.find_vertical_glyph",
-                side_effect=lambda _, target_name: target_vertical[target_name],
-            ),
-            patch(
-                "nobigoe_font.pipeline._font_geometry.glyph_path",
-                side_effect=lambda _, source_name: f"path:{source_name}",
-            ),
-            patch(
-                "nobigoe_font.pipeline._font_geometry.adjust_outline_weight",
-                side_effect=lambda outline, amount: f"{outline}@{amount}",
-            ),
-            patch("nobigoe_font.pipeline._font_operations.append_glyphs") as append,
-        ):
-            substitutions, vertical_maps = import_koburi_ruby(
-                target_font,
-                ruby_font,
-                target_cmap,
-                mark_outputs,
-                missing_small_glyphs,
-                allocated_names,
-                weight_adjustment=7,
-            )
-
-        imported = dict(substitutions)
-        output_names = dict(zip(source_outputs, allocated_names, strict=True))
-        self.assertEqual(len(imported), 288)
-        self.assertEqual(
-            imported[target_direct[0x3400]],
-            output_names[source_substitutions[source_direct[0x3400]]],
-        )
-        self.assertEqual(
-            imported[mark_outputs[KOBURI_PUA_MARK_PAIRS[0]]],
-            output_names[source_substitutions[source_marks[KOBURI_PUA_START]]],
-        )
-        self.assertEqual(
-            imported[missing_small_glyphs[MANGA_MISSING_SMALL_KANA[0]][0]],
-            output_names[source_substitutions[source_small_ko[0]]],
-        )
-        self.assertEqual(
-            imported[missing_small_glyphs[MANGA_MISSING_SMALL_KANA[0]][1]],
-            output_names[source_substitutions[source_vertical[source_small_ko[0]]]],
-        )
-        self.assertEqual(len(vertical_maps), 44)
-        append.assert_called_once_with(
-            target_font,
-            [f"path:{source_name}@7" for source_name in source_outputs],
-            allocated_names,
-            target_direct[0x3042],
-            880,
-            add_stem_hints=False,
-            advance_override=1000,
-        )
-
     def test_zero_mark_rotation_matches_the_original_transform(self) -> None:
         transform = mark_placement_transform(
             rectangle_path(),
@@ -638,7 +500,6 @@ class TrueTypeBuildTests(unittest.TestCase):
                 SPACING_MARK_INPUTS,
             ),
             [(output, vertical_output)],
-            [],
         )
 
         addOpenTypeFeaturesFromString(font, source, tables={"GSUB"})
@@ -775,7 +636,6 @@ class TrueTypeBuildTests(unittest.TestCase):
             [],
             [],
             vertical_maps,
-            [],
             punctuation_marks,
         )
 
@@ -848,6 +708,40 @@ class TrueTypeBuildTests(unittest.TestCase):
                 feature_records[index].FeatureTag
                 for index in kana.DefaultLangSys.FeatureIndex
             },
+        )
+
+    def test_merge_features_preserves_existing_ruby(self) -> None:
+        font = named_true_type_font(
+            [".notdef", "kana", "kana.ruby", "kana.alt"],
+            {0x3042: "kana"},
+        )
+        addOpenTypeFeaturesFromString(
+            font,
+            """
+            languagesystem DFLT dflt;
+            feature ruby { sub kana by kana.ruby; } ruby;
+            """,
+            tables={"GSUB"},
+        )
+
+        merge_features(
+            font,
+            """
+            languagesystem DFLT dflt;
+            feature ss01 { sub kana by kana.alt; } ss01;
+            """,
+        )
+
+        output = BytesIO()
+        font.save(output)
+        rebuilt = TTFont(BytesIO(output.getvalue()))
+        self.assertEqual(
+            feature_single_substitutions(rebuilt, "ruby"),
+            {"kana": "kana.ruby"},
+        )
+        self.assertEqual(
+            feature_single_substitutions(rebuilt, "ss01"),
+            {"kana": "kana.alt"},
         )
 
     @unittest.skipUnless(shutil.which("hb-shape"), "hb-shape is not installed")
@@ -1507,7 +1401,6 @@ class NovelKatakanaPipelineTests(unittest.TestCase):
                 build(
                     Path("source.otf"),
                     None,
-                    Path("ruby.otf"),
                     Path("punctuation.otf"),
                     Path("sans.otf"),
                     Path("output.otf"),

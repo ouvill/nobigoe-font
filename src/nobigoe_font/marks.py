@@ -39,27 +39,6 @@ JsonObject: TypeAlias = dict[str, object]
 
 ORIENTATIONS: tuple[Orientation, ...] = ("horizontal", "vertical")
 
-MANGA_RUBY_HANDAKUTEN_BASES = (
-    0x31F7,
-    0x304B,
-    0x304D,
-    0x304F,
-    0x3051,
-    0x3053,
-    0x30AB,
-    0x30AD,
-    0x30AF,
-    0x30B1,
-    0x30B3,
-    0x30BB,
-    0x30C4,
-    0x30C8,
-)
-MANGA_RUBY_HANDAKUTEN_PAIRS: tuple[MarkPair, ...] = tuple(
-    (base, 0x309A) for base in MANGA_RUBY_HANDAKUTEN_BASES
-)
-RUBY_SCALE = 0.5
-RUBY_GLYPH_COUNT = len(MANGA_RUBY_HANDAKUTEN_PAIRS) + 1
 
 MANGA_DAKUTEN_BASES = tuple(
     int(value, 16)

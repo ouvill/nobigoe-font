@@ -15,7 +15,6 @@ from typing import Literal
 from .profiles import (
     BaseType,
     FontIdentity,
-    KOBURI_RUBY_STROKE_ADJUSTMENTS,
     KanaStyle,
     LatinBuildProfile,
     SHIPPORI_COPYRIGHT,
@@ -75,9 +74,6 @@ WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 WAVE_STROKE_MODULATION = 0.3
 NEW_GLYPH_COUNT = 6
 OVERLAP = 0
-KOBURI_RUBY_RULE_COUNT = 289
-KOBURI_RUBY_OUTPUT_COUNT = 288
-KOBURI_RUBY_VERTICAL_ORIGIN = 880
 _KanaOrientation = Literal["horizontal", "vertical"]
 _KANA_ORIENTATIONS: tuple[_KanaOrientation, ...] = ("horizontal", "vertical")
 
@@ -856,154 +852,6 @@ def add_linear_extension(
     return vertical, names
 
 
-def import_koburi_ruby(
-    font: TTFont,
-    ruby_font: TTFont,
-    cmap: dict[int, str],
-    mark_outputs: dict[tuple[int, int], str],
-    missing_small_glyphs: dict[int, tuple[str, str]],
-    names: list[str],
-    *,
-    weight_adjustment: float = 0,
-) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
-    source_substitutions = _font_operations.feature_single_substitutions(
-        ruby_font, "ruby"
-    )
-    if len(source_substitutions) != KOBURI_RUBY_RULE_COUNT:
-        raise ValueError(
-            "The ruby source must contain "
-            f"{KOBURI_RUBY_RULE_COUNT} ruby substitutions"
-        )
-    source_outputs = list(dict.fromkeys(source_substitutions.values()))
-    if len(source_outputs) != KOBURI_RUBY_OUTPUT_COUNT:
-        raise ValueError(
-            "The ruby source must contain " f"{KOBURI_RUBY_OUTPUT_COUNT} ruby glyphs"
-        )
-    if len(names) != len(source_outputs):
-        raise ValueError("Ruby glyph allocation does not match the source")
-
-    source_cmap = ruby_font.getBestCmap()
-    source_reverse_cmap: dict[str, list[int]] = {}
-    for codepoint, glyph_name in source_cmap.items():
-        source_reverse_cmap.setdefault(glyph_name, []).append(codepoint)
-
-    source_vertical: dict[str, str] = {}
-    for feature_tag in ("vert", "vrt2"):
-        for horizontal, vertical in _font_operations.feature_single_substitutions(
-            ruby_font, feature_tag
-        ).items():
-            if (
-                horizontal not in source_substitutions
-                or vertical not in source_substitutions
-            ):
-                continue
-            previous = source_vertical.setdefault(horizontal, vertical)
-            if previous != vertical:
-                raise ValueError(f"Ambiguous vertical mapping for {horizontal!r}")
-    vertical_to_horizontal = {
-        vertical: horizontal for horizontal, vertical in source_vertical.items()
-    }
-    if len(vertical_to_horizontal) != len(source_vertical):
-        raise ValueError("Vertical ruby inputs are not one-to-one")
-
-    source_fwid = _font_operations.feature_single_substitutions(ruby_font, "fwid")
-    target_fwid = _font_operations.feature_single_substitutions(font, "fwid")
-    source_bullet = source_fwid[source_cmap[0x2022]]
-    target_bullet = target_fwid.get(cmap[0x2022], cmap[0x2022])
-
-    unencoded_horizontal = [
-        glyph_name
-        for glyph_name in source_substitutions
-        if glyph_name not in source_reverse_cmap
-        and glyph_name not in vertical_to_horizontal
-        and glyph_name != source_bullet
-    ]
-    if len(unencoded_horizontal) != len(_mark_positioning.MANGA_MISSING_SMALL_KANA):
-        raise ValueError(
-            "The ruby source must contain the two unencoded small-ko glyphs"
-        )
-    unencoded_small_ko = dict(
-        zip(
-            sorted(unencoded_horizontal, key=ruby_font.getGlyphID),
-            _mark_positioning.MANGA_MISSING_SMALL_KANA,
-            strict=True,
-        )
-    )
-    pua_mark_pairs = dict(
-        zip(
-            range(
-                _mark_positioning.KOBURI_PUA_START,
-                _mark_positioning.KOBURI_PUA_START
-                + len(_mark_positioning.KOBURI_PUA_MARK_PAIRS),
-            ),
-            _mark_positioning.KOBURI_PUA_MARK_PAIRS,
-            strict=True,
-        )
-    )
-
-    def horizontal_target(source_name: str) -> str:
-        if source_name == source_bullet:
-            return target_bullet
-        small_ko = unencoded_small_ko.get(source_name)
-        if small_ko is not None:
-            return missing_small_glyphs[small_ko][0]
-        for codepoint in source_reverse_cmap.get(source_name, []):
-            pair = pua_mark_pairs.get(codepoint)
-            if pair is not None:
-                return mark_outputs[pair]
-            target_name = cmap.get(codepoint)
-            if target_name is not None:
-                return target_name
-        raise ValueError(f"Could not map ruby input {source_name!r}")
-
-    def target_input(source_name: str) -> str:
-        horizontal = vertical_to_horizontal.get(source_name)
-        if horizontal is None:
-            return horizontal_target(source_name)
-        small_ko = unencoded_small_ko.get(horizontal)
-        if small_ko is not None:
-            return missing_small_glyphs[small_ko][1]
-        target_horizontal = horizontal_target(horizontal)
-        return _font_operations.find_vertical_glyph(font, target_horizontal)
-
-    output_names = dict(zip(source_outputs, names, strict=True))
-    paths = [
-        _font_geometry.adjust_outline_weight(
-            _font_geometry.glyph_path(ruby_font, source_name),
-            weight_adjustment,
-        )
-        for source_name in source_outputs
-    ]
-    _font_operations.append_glyphs(
-        font,
-        paths,
-        names,
-        cmap[0x3042],
-        KOBURI_RUBY_VERTICAL_ORIGIN,
-        add_stem_hints=False,
-        advance_override=1000,
-    )
-
-    substitutions: dict[str, str] = {}
-    for source_input, source_output in source_substitutions.items():
-        target_name = target_input(source_input)
-        output_name = output_names[source_output]
-        previous = substitutions.setdefault(target_name, output_name)
-        if previous != output_name:
-            raise ValueError(f"Conflicting ruby substitutions for {target_name!r}")
-
-    vertical_maps = list(
-        dict.fromkeys(
-            (
-                output_names[source_substitutions[horizontal]],
-                output_names[source_substitutions[vertical]],
-            )
-            for horizontal, vertical in source_vertical.items()
-        )
-    )
-    return list(substitutions.items()), vertical_maps
-
-
 def mark_ligature_rules(
     cmap: Mapping[int, str],
     pairs: Sequence[_mark_positioning.MarkPair],
@@ -1185,7 +1033,6 @@ def autohint_latin_glyphs(
 def build(
     source_path: Path,
     latin_source_path: Path | None,
-    ruby_source_path: Path,
     punctuation_source_path: Path,
     sans_source_path: Path,
     output_path: Path,
@@ -1223,9 +1070,6 @@ def build(
         )
     if latin_font and latin_font["head"].unitsPerEm != 1000:
         scale_upem(latin_font, 1000)
-    ruby_font = TTFont(ruby_source_path) if base_type == "noto" else None
-    if ruby_font and ruby_font["head"].unitsPerEm != 1000:
-        scale_upem(ruby_font, 1000)
     punctuation_font = TTFont(punctuation_source_path)
     sans_font = TTFont(sans_source_path)
     cmap = font.getBestCmap()
@@ -1442,8 +1286,7 @@ def build(
         + len(generated_mark_pairs)
         + len(generated_vertical_mark_pairs)
         + len(generated_heart_pairs)
-        + 2 * len(_mark_positioning.PUNCTUATION_MARK_PAIRS)
-        + (KOBURI_RUBY_OUTPUT_COUNT if ruby_font else 0),
+        + 2 * len(_mark_positioning.PUNCTUATION_MARK_PAIRS),
     )
     extensions: list[tuple[str, str, str, list[str]]] = []
     for index, (prefix, codepoint) in enumerate(linear_codepoints):
@@ -1912,22 +1755,6 @@ def build(
             _font_operations.add_unicode_mapping(font, codepoint, output)
 
     mark_outputs = native_mark_outputs | generated_mark_outputs
-    ruby_start = heart_start + len(generated_heart_pairs)
-    ruby_names = allocated_names[
-        ruby_start : ruby_start + (KOBURI_RUBY_OUTPUT_COUNT if ruby_font else 0)
-    ]
-    ruby_substitutions: list[tuple[str, str]] = []
-    if ruby_font is not None:
-        ruby_substitutions, ruby_vertical_maps = import_koburi_ruby(
-            font,
-            ruby_font,
-            cmap,
-            mark_outputs,
-            missing_small_glyphs,
-            ruby_names,
-            weight_adjustment=KOBURI_RUBY_STROKE_ADJUSTMENTS[identity.style],
-        )
-        kana_vertical_maps.extend(ruby_vertical_maps)
     for offset, pair in enumerate(_mark_positioning.KOBURI_PUA_MARK_PAIRS):
         _font_operations.add_unicode_mapping(
             font,
@@ -2021,15 +1848,12 @@ def build(
         if latin_font
         else None
     )
-    ruby_copyright = ruby_font["name"].getDebugName(0) if ruby_font else None
-    ruby_license = ruby_font["name"].getDebugName(13) if ruby_font else None
     latin_license = latin_font["name"].getDebugName(13) if latin_font else None
     copyright_notices = [
         notice
         for notice in (
             font["name"].getDebugName(0),
             latin_copyright,
-            ruby_copyright,
             SHIPPORI_COPYRIGHT,
         )
         if notice
@@ -2044,7 +1868,6 @@ def build(
         notice
         for notice in (
             source_notice,
-            ruby_license,
             latin_license,
             SHIPPORI_COPYRIGHT,
         )
@@ -2063,7 +1886,6 @@ def build(
             kana_marks,
             spacing_marks,
             kana_vertical_maps,
-            ruby_substitutions,
             punctuation_marks,
         ),
     )

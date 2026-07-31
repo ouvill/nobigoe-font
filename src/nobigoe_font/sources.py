@@ -36,7 +36,6 @@ class SourceOverrides:
 
     source: Path | None = None
     latin_source: Path | None = None
-    ruby_source: Path | None = None
     punctuation_source: Path | None = None
     sans_source: Path | None = None
     variable_kana_source: Path | None = None
@@ -48,7 +47,6 @@ class ResolvedSources:
 
     source: Path
     latin_source: Path | None
-    ruby_source: Path
     punctuation_source: Path
     sans_source: Path
     variable_kana_source: Path | None = None
@@ -96,9 +94,6 @@ class SourceCache:
                     self.fetch(latin_spec) if latin_spec is not None else None
                 )
             secondary_weight = weight
-            ruby_source = overrides.ruby_source or self._fetch_zip_member(
-                koburi_source()
-            )
             resolved_variable_kana_source = (
                 self.resolve_variable_kana(overrides.variable_kana_source)
                 if variable_kana
@@ -112,7 +107,6 @@ class SourceCache:
             source = overrides.source or self._fetch_zip_member(koburi_source())
             latin_source = None
             secondary_weight = "Regular"
-            ruby_source = overrides.ruby_source or source
         else:
             raise ValueError(f"Unknown base type {base!r}")
 
@@ -125,7 +119,6 @@ class SourceCache:
         return ResolvedSources(
             source=source,
             latin_source=latin_source,
-            ruby_source=ruby_source,
             punctuation_source=punctuation_source,
             sans_source=sans_source,
             variable_kana_source=resolved_variable_kana_source,

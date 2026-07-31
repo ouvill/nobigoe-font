@@ -316,7 +316,6 @@ def feature_source(
     kana_marks: list[tuple[str, str, str]],
     spacing_marks: Sequence[tuple[str, str, str]],
     kana_vertical_maps: list[tuple[str, str]],
-    ruby_substitutions: list[tuple[str, str]],
     punctuation_marks: Sequence[tuple[str, str, str]] = (),
 ) -> str:
     (
@@ -362,9 +361,6 @@ def feature_source(
         )
         for index in range(1, 4)
     ]
-    ruby_rules = "".join(
-        f"  sub {normal} by {ruby};\n" for normal, ruby in ruby_substitutions
-    )
 
     return (
         "languagesystem DFLT dflt;\n\n"
@@ -376,7 +372,6 @@ def feature_source(
         f"feature ss01 {{\n{stylistic_set_rules[0]}}} ss01;\n\n"
         f"feature ss02 {{\n{stylistic_set_rules[1]}}} ss02;\n\n"
         f"feature ss03 {{\n{stylistic_set_rules[2]}}} ss03;\n\n"
-        f"feature ruby {{\n{ruby_rules}}} ruby;\n\n"
         f"feature vert {{\n{vert_rules}}} vert;\n\n"
         f"feature vrt2 {{\n{vrt2_rules}}} vrt2;\n"
     )
@@ -407,6 +402,7 @@ def all_langsys(script_list: object) -> Iterator[object]:
             yield script.DefaultLangSys
         for lang_record in script.LangSysRecord:
             yield lang_record.LangSys
+
 
 
 def merge_features(font: TTFont, source: str) -> None:
