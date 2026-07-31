@@ -30,13 +30,19 @@ from .marks import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
     CHOON_DAKUTEN_PUA,
+    HEART_DAKUTEN_MARK_TRANSFORMS,
+    KOBURI_HEART_BASE_PUA,
+    KOBURI_HEART_MARK_PAIRS,
+    KOBURI_HEART_OUTPUT_PUA,
     KOBURI_PUA_MARK_PAIRS,
     KOBURI_PUA_START,
     MANGA_MARK_PAIRS,
     MANGA_MISSING_SMALL_KANA,
+    PUNCTUATION_MARK_PAIRS,
     MarkPair,
     MarkPositionMap,
     load_mark_position_overrides,
+    load_punctuation_mark_positions,
 )
 from .metadata import set_japanese_name, set_name
 from .operations import (
@@ -931,6 +937,244 @@ def _compositions(
     return result
 
 
+def _append_punctuation_mark_composites(
+    font: TTFont,
+    top: TopDict,
+    cmap: Mapping[int, str],
+    model: _DeltaModel,
+    vsindex: int,
+) -> None:
+    positions = {
+        weight: load_punctuation_mark_positions(base="noto", weight=style)
+        for style, weight in _STYLES
+    }
+    bases = {}
+    source_names = {cmap[0x3099], cmap[0x309A]}
+    for base, _ in PUNCTUATION_MARK_PAIRS:
+        horizontal = cmap[base]
+        vertical = vertical_glyph_or_self(font, horizontal)
+        bases[(base, "horizontal")] = horizontal
+        bases[(base, "vertical")] = vertical
+        source_names.update((horizontal, vertical))
+    paths = _paths(font, sorted(source_names))
+
+    names = allocate_cid_names(font, 2 * len(PUNCTUATION_MARK_PAIRS))
+    horizontal_names = names[: len(PUNCTUATION_MARK_PAIRS)]
+    vertical_names = names[len(PUNCTUATION_MARK_PAIRS) :]
+    outputs = dict(zip(PUNCTUATION_MARK_PAIRS, horizontal_names, strict=True))
+    vertical_outputs = dict(zip(PUNCTUATION_MARK_PAIRS, vertical_names, strict=True))
+    glyphs = []
+    for pair in PUNCTUATION_MARK_PAIRS:
+        glyphs.append(
+            (
+                outputs[pair],
+                _compositions(pair, "horizontal", paths, bases, cmap, positions),
+            )
+        )
+        glyphs.append(
+            (
+                vertical_outputs[pair],
+                _compositions(pair, "vertical", paths, bases, cmap, positions),
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        glyphs,
+        model,
+        vsindex,
+        cmap[0xFF01],
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+
+    ccmp = {
+        (cmap[base], cmap[mark]): outputs[(base, mark)]
+        for base, mark in PUNCTUATION_MARK_PAIRS
+    }
+    liga = {
+        (cmap[base], cmap[_SPACING[mark]]): outputs[(base, mark)]
+        for base, mark in PUNCTUATION_MARK_PAIRS
+    }
+    vertical = {
+        outputs[pair]: vertical_outputs[pair] for pair in PUNCTUATION_MARK_PAIRS
+    }
+    _append_lookup(font, {"ccmp"}, buildLigatureSubstSubtable(ccmp))
+    _append_lookup(font, {"liga"}, buildLigatureSubstSubtable(liga))
+    _append_lookup(font, {"vert", "vrt2"}, buildSingleSubstSubtable(vertical))
+
+
+def _append_heart_mark_composites(
+    font: TTFont,
+    top: TopDict,
+    cmap: dict[int, str],
+    paths: Mapping[int, Mapping[str, pathops.Path]],
+    model: _DeltaModel,
+    vsindex: int,
+) -> None:
+    def cubic_segments(contour: pathops.Path) -> list[_ContourSegment]:
+        result = []
+        for segment in _contour_segments(contour):
+            if segment.controls:
+                result.append(segment)
+                continue
+            first = (
+                (2 * segment.start[0] + segment.end[0]) / 3,
+                (2 * segment.start[1] + segment.end[1]) / 3,
+            )
+            second = (
+                (segment.start[0] + 2 * segment.end[0]) / 3,
+                (segment.start[1] + 2 * segment.end[1]) / 3,
+            )
+            result.append(_ContourSegment(segment.start, (first, second), segment.end))
+        return result
+
+    def align_segments(
+        reference: Sequence[_ContourSegment],
+        source: Sequence[_ContourSegment],
+    ) -> list[_ContourSegment | None]:
+        if len(source) > len(reference):
+            raise ValueError("A heart master exceeds the reference contour topology")
+
+        def cost(left: _ContourSegment, right: _ContourSegment) -> float:
+            left_points = (left.start, *left.controls, left.end)
+            right_points = (right.start, *right.controls, right.end)
+            return sum(
+                (left_x - right_x) ** 2 + (left_y - right_y) ** 2
+                for (left_x, left_y), (right_x, right_y) in zip(
+                    left_points, right_points, strict=True
+                )
+            )
+
+        width = len(source) + 1
+        scores = [[math.inf] * width for _ in range(len(reference) + 1)]
+        matched = [[False] * width for _ in range(len(reference) + 1)]
+        scores[0][0] = 0
+        for reference_index in range(1, len(reference) + 1):
+            scores[reference_index][0] = 0
+            for source_index in range(1, min(reference_index, len(source)) + 1):
+                gap_score = scores[reference_index - 1][source_index]
+                match_score = scores[reference_index - 1][source_index - 1] + cost(
+                    reference[reference_index - 1],
+                    source[source_index - 1],
+                )
+                if match_score <= gap_score:
+                    scores[reference_index][source_index] = match_score
+                    matched[reference_index][source_index] = True
+                else:
+                    scores[reference_index][source_index] = gap_score
+
+        aligned: list[_ContourSegment | None] = []
+        reference_index, source_index = len(reference), len(source)
+        while reference_index:
+            if source_index and matched[reference_index][source_index]:
+                aligned.append(source[source_index - 1])
+                source_index -= 1
+            else:
+                aligned.append(None)
+            reference_index -= 1
+        if source_index:
+            raise ValueError("Could not align the heart master contour topology")
+        aligned.reverse()
+        return aligned
+
+    def normalize(masters: Sequence[pathops.Path]) -> list[pathops.Path]:
+        contours = [list(master.contours) for master in masters]
+        expected_count = 1 + len(HEART_DAKUTEN_MARK_TRANSFORMS)
+        if any(len(items) != expected_count for items in contours):
+            raise ValueError(
+                "Heart boolean construction must produce one body and two marks"
+            )
+        body_segments = [cubic_segments(items[0]) for items in contours]
+        reference = max(body_segments, key=len)
+        mark_signatures = [
+            tuple(tuple(contour.verbs) for contour in items[1:]) for items in contours
+        ]
+        if any(signature != mark_signatures[0] for signature in mark_signatures[1:]):
+            raise ValueError("Heart dakuten mark contours are not compatible")
+
+        result = []
+        for items, segments in zip(contours, body_segments, strict=True):
+            aligned = align_segments(reference, segments)
+            normalized = pathops.Path()
+            pen = normalized.getPen()
+            point = segments[0].start
+            pen.moveTo(point)
+            for segment in aligned:
+                if segment is None:
+                    pen.curveTo(point, point, point)
+                else:
+                    segment.draw(pen)
+                    point = segment.end
+            pen.closePath()
+            for contour in items[1:]:
+                normalized.addPath(contour)
+            result.append(normalized)
+
+        signature = tuple(result[0].verbs)
+        if any(tuple(master.verbs) != signature for master in result[1:]):
+            raise ValueError("Heart master normalization did not produce CFF2 topology")
+        return result
+
+    allocated = allocate_cid_names(font, len(KOBURI_HEART_MARK_PAIRS))
+    glyphs = []
+    outputs = {}
+    for pair, name in zip(KOBURI_HEART_MARK_PAIRS, allocated, strict=True):
+        base, mark = pair
+        raw_masters = [
+            geometry.compose_heart_dakuten_glyph(
+                paths[weight][cmap[base]],
+                paths[weight][cmap[mark]],
+            )
+            for weight in _WEIGHTS
+        ]
+        glyphs.append((name, normalize(raw_masters)))
+        outputs[pair] = name
+    _append_glyphs(
+        font,
+        top,
+        glyphs,
+        model,
+        vsindex,
+        cmap[KOBURI_HEART_MARK_PAIRS[0][0]],
+    )
+
+    for codepoint, (base, _) in zip(
+        KOBURI_HEART_BASE_PUA,
+        KOBURI_HEART_MARK_PAIRS,
+        strict=True,
+    ):
+        add_unicode_mapping(font, codepoint, cmap[base])
+        cmap[codepoint] = cmap[base]
+    for codepoint, pair in zip(
+        KOBURI_HEART_OUTPUT_PUA,
+        KOBURI_HEART_MARK_PAIRS,
+        strict=True,
+    ):
+        add_unicode_mapping(font, codepoint, outputs[pair])
+        cmap[codepoint] = outputs[pair]
+
+    _append_lookup(
+        font,
+        {"ccmp"},
+        buildLigatureSubstSubtable(
+            {
+                (cmap[base], cmap[mark]): outputs[(base, mark)]
+                for base, mark in KOBURI_HEART_MARK_PAIRS
+            }
+        ),
+    )
+    _append_lookup(
+        font,
+        {"liga"},
+        buildLigatureSubstSubtable(
+            {
+                (cmap[base], cmap[_SPACING[mark]]): outputs[(base, mark)]
+                for base, mark in KOBURI_HEART_MARK_PAIRS
+            }
+        ),
+    )
+
+
 def _rename_font(font: TTFont) -> None:
     family = "Nobigoe Variable Marks"
     style = "ExtraLight"
@@ -1004,6 +1248,7 @@ def build_variable_marks(
         0x309B,
         0x309C,
         0x30FC,
+        *(base for base, _ in KOBURI_HEART_MARK_PAIRS),
         *(base for base, _ in MANGA_MARK_PAIRS if base not in MANGA_MISSING_SMALL_KANA),
     }
     missing = sorted(required - cmap.keys())
@@ -1039,6 +1284,7 @@ def build_variable_marks(
     )
     vertical_sources = {name: vertical_glyph_or_self(font, name) for name in names}
     names.update(vertical_sources.values())
+    names.update(cmap[base] for base, _ in KOBURI_HEART_MARK_PAIRS)
     paths = _paths(font, sorted(names))
     allocated = allocate_cid_names(font, 4 + 2 * len(generated))
     small = {
@@ -1119,6 +1365,7 @@ def build_variable_marks(
     if ccmp:
         _append_lookup(font, {"ccmp"}, buildLigatureSubstSubtable(ccmp))
     _append_lookup(font, {"liga"}, buildLigatureSubstSubtable(liga))
+    _append_heart_mark_composites(font, top, cmap, paths, model, vsindex)
     _append_lookup(font, {"vert", "vrt2"}, buildSingleSubstSubtable(vertical))
     source_vertical = {
         **feature_single_substitutions(font, "vert"),
@@ -1129,6 +1376,7 @@ def build_variable_marks(
     remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
     _append_symbols(font, top, cmap, paths, vertical_sources, model, vsindex)
     _append_punctuation(font, top, cmap, model, vsindex, punctuation_fonts)
+    _append_punctuation_mark_composites(font, top, cmap, model, vsindex)
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
     _rename_font(font)
