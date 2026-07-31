@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from collections.abc import Mapping, Sequence
 import math
+from io import BytesIO
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable
@@ -60,6 +61,7 @@ from .punctuation import (
 )
 
 import pathops
+from fontTools.cffLib.CFF2ToCFF import convertCFF2ToCFF
 from fontTools.misc.transform import Transform
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.scaleUpem import scale_upem
@@ -1028,6 +1030,140 @@ def autohint_latin_glyphs(
         )
         hinted_path.replace(output_path)
 
+def _rename_release_font(
+    font: TTFont,
+    latin_font: TTFont | None,
+    latin_profile: LatinBuildProfile,
+    identity: FontIdentity,
+) -> None:
+    """Apply release naming and notices after all source outlines are present."""
+
+    latin_copyright = (
+        (latin_font["name"].getDebugName(0) or latin_profile.copyright)
+        if latin_font
+        else None
+    )
+    latin_license = latin_font["name"].getDebugName(13) if latin_font else None
+    copyright_notices = [
+        notice
+        for notice in (
+            font["name"].getDebugName(0),
+            latin_copyright,
+            SHIPPORI_COPYRIGHT,
+        )
+        if notice
+    ]
+    copyright_notice = " / ".join(dict.fromkeys(copyright_notices))
+    source_notice = (
+        getattr(font["CFF "].cff.topDictIndex[0], "Notice", None)
+        if "CFF " in font
+        else font["name"].getDebugName(13)
+    )
+    font_notices = [
+        notice
+        for notice in (
+            source_notice,
+            latin_license,
+            SHIPPORI_COPYRIGHT,
+        )
+        if notice
+    ]
+    font_notice = " / ".join(dict.fromkeys(font_notices))
+    rename_font(font, copyright_notice, font_notice, identity)
+
+
+def _normalize_cff_blue_zones(font: TTFont) -> None:
+    """Keep instantiated CFF hint zones valid when variable pairs cross."""
+
+    top = font["CFF "].cff.topDictIndex[0]
+    for font_dict in top.FDArray:
+        private = font_dict.Private
+        for attribute in (
+            "BlueValues",
+            "OtherBlues",
+            "FamilyBlues",
+            "FamilyOtherBlues",
+        ):
+            values = getattr(private, attribute, None)
+            if values is None:
+                continue
+            if len(values) % 2:
+                raise ValueError(f"CFF {attribute} must contain coordinate pairs")
+            normalized = [
+                coordinate
+                for index in range(0, len(values), 2)
+                for coordinate in sorted(values[index : index + 2])
+            ]
+            setattr(private, attribute, normalized)
+
+
+def build_static_instance(
+    variable_source_path: Path,
+    latin_source_path: Path | None,
+    output_path: Path,
+    identity: FontIdentity,
+    latin_profile: LatinBuildProfile,
+    autohint: bool = False,
+) -> None:
+    """Instance customized CFF2, then apply work that remains static-only."""
+
+    font = TTFont(
+        variable_source_path,
+        recalcTimestamp=True,
+        recalcBBoxes=False,
+    )
+    if "CFF2" not in font or "fvar" not in font:
+        raise ValueError("Static instances require a customized CFF2 variable source")
+    axes = font["fvar"].axes
+    if len(axes) != 1 or axes[0].axisTag != "wght":
+        raise ValueError("Static instances require exactly one wght axis")
+    axis = axes[0]
+    if not axis.minValue <= identity.weight_class <= axis.maxValue:
+        raise ValueError(
+            f"Weight {identity.weight_class} is outside the source wght range "
+            f"{axis.minValue:g}–{axis.maxValue:g}"
+        )
+    if autohint and latin_source_path is None:
+        raise ValueError("--autohint requires an imported Latin source")
+
+    instantiateVariableFont(
+        font,
+        {"wght": identity.weight_class},
+        inplace=True,
+    )
+    convertCFF2ToCFF(font)
+    _normalize_cff_blue_zones(font)
+    static_data = BytesIO()
+    font.save(static_data, reorderTables=True)
+    static_data.seek(0)
+    font = TTFont(static_data, recalcTimestamp=True)
+
+    latin_font = TTFont(latin_source_path) if latin_source_path else None
+    if latin_font and latin_profile.variations:
+        if "fvar" not in latin_font:
+            raise ValueError(
+                f"{latin_profile.family} requires a variable Latin source"
+            )
+        instantiateVariableFont(
+            latin_font,
+            dict(latin_profile.variations),
+            inplace=True,
+        )
+    if latin_font and latin_font["head"].unitsPerEm != font["head"].unitsPerEm:
+        scale_upem(latin_font, font["head"].unitsPerEm)
+    latin_import = (
+        _font_operations.import_latin_font(font, latin_font, latin_profile)
+        if latin_font is not None
+        else None
+    )
+    _rename_release_font(font, latin_font, latin_profile, identity)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    font.save(output_path, reorderTables=True)
+    if autohint and latin_import is not None:
+        autohint_latin_glyphs(output_path, latin_import.glyph_names)
+
+
 
 def build(
     source_path: Path,
@@ -1823,37 +1959,6 @@ def build(
     if base_type == "noto":
         _font_operations.remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
 
-    latin_copyright = (
-        (latin_font["name"].getDebugName(0) or latin_profile.copyright)
-        if latin_font
-        else None
-    )
-    latin_license = latin_font["name"].getDebugName(13) if latin_font else None
-    copyright_notices = [
-        notice
-        for notice in (
-            font["name"].getDebugName(0),
-            latin_copyright,
-            SHIPPORI_COPYRIGHT,
-        )
-        if notice
-    ]
-    copyright_notice = " / ".join(dict.fromkeys(copyright_notices))
-    source_notice = (
-        font["CFF "].cff.topDictIndex[0].Notice
-        if "CFF " in font
-        else font["name"].getDebugName(13)
-    )
-    font_notices = [
-        notice
-        for notice in (
-            source_notice,
-            latin_license,
-            SHIPPORI_COPYRIGHT,
-        )
-        if notice
-    ]
-    font_notice = " / ".join(dict.fromkeys(font_notices))
 
     merge_features(
         font,
@@ -1869,7 +1974,7 @@ def build(
             punctuation_marks,
         ),
     )
-    rename_font(font, copyright_notice, font_notice, identity)
+    _rename_release_font(font, latin_font, latin_profile, identity)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path, reorderTables=True)
