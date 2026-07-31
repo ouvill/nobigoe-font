@@ -657,9 +657,7 @@ class VariableBuildCliTests(unittest.TestCase):
             "39701fd096bc51204a8444c6c2659f007b29674a13eb62ddfa470638fe8179cd",
         )
 
-    def test_local_noto_source_builds_custom_variable_then_all_static_weights(
-        self,
-    ) -> None:
+    def test_local_noto_source_builds_selected_static_weight(self) -> None:
         cached = Path("cache/font.otf")
         with (
             patch(
@@ -681,6 +679,8 @@ class VariableBuildCliTests(unittest.TestCase):
                     "custom.otf",
                     "--static-output-dir",
                     "static",
+                    "--static-weight",
+                    "Regular",
                     "--face",
                     "2",
                     "--autohint",
@@ -691,10 +691,7 @@ class VariableBuildCliTests(unittest.TestCase):
             [item.args[0] for item in fetch.call_args_list],
             [
                 *(shippori_source(style) for style in NOTO_WEIGHT_CLASSES),
-                *(
-                    latin_font_source("libertinus", style)
-                    for style in NOTO_WEIGHT_CLASSES
-                ),
+                latin_font_source("libertinus", "Regular"),
             ],
         )
         build_variable.assert_called_once_with(
@@ -703,6 +700,7 @@ class VariableBuildCliTests(unittest.TestCase):
             2,
             {weight: cached for weight in NOTO_WEIGHT_CLASSES.values()},
         )
+        identity = font_identity("noto", "Regular")
         self.assertEqual(
             build_static.call_args_list,
             [
@@ -711,11 +709,9 @@ class VariableBuildCliTests(unittest.TestCase):
                     cached,
                     Path("static") / default_output_path(identity, "noto").name,
                     identity,
-                    latin_build_profile("libertinus", style),
+                    latin_build_profile("libertinus", "Regular"),
                     True,
                 )
-                for style in NOTO_WEIGHT_CLASSES
-                for identity in (font_identity("noto", style),)
             ],
         )
 

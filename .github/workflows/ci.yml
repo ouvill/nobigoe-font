@@ -104,6 +104,7 @@ jobs:
           uv run nobigoe-build-variable \
             --output /tmp/NobigoeVariableMarks-VF.otf \
             --static-output-dir /tmp \
+            --static-weight Regular \
             --autohint
           uv run nobigoe-build \
             --base koburi \

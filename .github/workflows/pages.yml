@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v6.1.0
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v7-${{ hashFiles('src/nobigoe_font/**/*.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html', 'website/tools/generate-latin-candidate-webfonts.py') }}
+          key: astro-webfonts-v7-${{ hashFiles('src/nobigoe_font/**/*.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/public/marks-data.json', 'website/tools/share-images.html', 'website/tools/generate-latin-candidate-webfonts.py') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
