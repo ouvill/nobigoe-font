@@ -87,7 +87,7 @@ done
 # 源暎こぶり明朝版Regular
 uv run nobigoe-build --base koburi
 
-# Noto CFF2可変フォントへ濁点・半濁点字形と連結記号を追加
+# Noto CFF2可変フォントへ既存のびごえ約物、濁点字形、連結記号を追加
 uv run nobigoe-build-variable
 
 # Regularの欧文候補を比較用ディレクトリへ生成
@@ -100,7 +100,8 @@ done
 
 既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`は制作VFを明示した場所へ生成し、`--variable-kana`はそのVFから対象ウェイトのかなを取り込みます。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
-`nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`を取得し、Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharStringに加えて、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。濁点・半濁点の配置と記号の輪郭は200、300、400、500、600、700、900のレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`の約物、欧文・ルビ置換は含みません。
+`nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`と、固定版でも使用するしっぽり明朝の各ウェイトを取得します。Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharString、全角`！`・`？`およびManga1方式の16合字、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。可変版の明朝感嘆符・疑問符は、ExtraLightだけを18本・6本の少数三次ベジェで再設計し、Light以上はしっぽり明朝Regular、Medium、SemiBold、Bold、ExtraBoldの実輪郭を使用します。しっぽり明朝の14曲線からなる疑問符は、右下内側の1曲線を固定パラメータで5分割し、形を変えず18曲線へ揃えます。直立感嘆符は元から6曲線です。黒みはNotoの全角約物ではなく、Noto Serif JPの`川`・`目`・`田`をY=350、450、550、650で切った縦主線幅の中央値を基準にします。200、300、400、500、600、700、900の基準値は順に44.0、53.6、65.2、80.1、95.0、117.0、144.0 unitsです。疑問符はしっぽり明朝の外周、高さ、筆だまりを保って右太線の内周だけを調整し、感嘆符は下部の細い軸を保って上部テーパーだけを左右から調整します。これによりExtraLightで承認した漢字主線との光学差を全ウェイトへ維持します。下点は元輪郭の上端を保って直径をウェイト別に84〜90%へ縮めた正円とし、5連感嘆符は200-unit間隔で配置して全角セル境界でも間隔を維持します。明朝、斜体明朝、ゴシック、斜体ゴシックを`aalt`と`ss01`–`ss03`で選択できます。濁点・半濁点の配置と連結記号の輪郭も同じ7ウェイトのレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`のその他の約物、欧文・ルビ置換は含みません。
+疑問符の下点は本体全体の外接中心ではなく、下へ伸びる線の終端中心へ揃えます。
 
 公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
 

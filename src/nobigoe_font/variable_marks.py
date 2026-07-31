@@ -1,4 +1,4 @@
-"""CFF2 variable-font kana-mark and joining-symbol generation."""
+"""CFF2 variable-font punctuation, kana-mark, and joining-symbol generation."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from fontTools.varLib.cff import CFF2CharStringMergePen
 from fontTools.varLib.models import normalizeValue, piecewiseLinearMap
 
 from . import geometry
-from .features import merge_features, symbol_feature_source
+from .features import merge_features, punctuation_feature_source, symbol_feature_source
 from .marks import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
@@ -60,7 +60,14 @@ from .pipeline import (
     make_vertical_parts,
     make_wave_parts,
 )
-from .profiles import NOTO_WEIGHT_CLASSES
+from .profiles import NOTO_WEIGHT_CLASSES, SHIPPORI_STROKE_ADJUSTMENTS
+from .punctuation import (
+    MANGA_PUNCTUATION_SEQUENCES,
+    PUNCTUATION_VARIANT_SEQUENCES,
+    make_original_punctuation_ligature,
+    make_variable_shippori_punctuation_ligature,
+    slant_punctuation_outline,
+)
 from .version import VERSION, VERSION_NUMBER
 
 _STYLES = tuple(NOTO_WEIGHT_CLASSES.items())
@@ -764,6 +771,110 @@ def _append_symbols(
     )
 
 
+def _append_punctuation(
+    font: TTFont,
+    top: TopDict,
+    cmap: Mapping[int, str],
+    model: _DeltaModel,
+    vsindex: int,
+    punctuation_fonts: Mapping[int, TTFont],
+) -> None:
+    default_count = len(MANGA_PUNCTUATION_SEQUENCES)
+    variant_count = len(PUNCTUATION_VARIANT_SEQUENCES)
+    allocated = allocate_cid_names(font, default_count + 3 * variant_count)
+    default_names = dict(
+        zip(
+            MANGA_PUNCTUATION_SEQUENCES,
+            allocated[:default_count],
+            strict=True,
+        )
+    )
+    alternate_names = allocated[default_count:]
+    variants = []
+    for index, sequence in enumerate(PUNCTUATION_VARIANT_SEQUENCES):
+        default = (
+            cmap[0xFF01 if sequence == "!" else 0xFF1F]
+            if len(sequence) == 1
+            else default_names[sequence]
+        )
+        variants.append(
+            (
+                sequence,
+                (
+                    default,
+                    alternate_names[index],
+                    alternate_names[variant_count + index],
+                    alternate_names[2 * variant_count + index],
+                ),
+            )
+        )
+
+    serif_masters = {
+        sequence: [
+            make_variable_shippori_punctuation_ligature(
+                punctuation_fonts[weight],
+                sequence,
+                weight,
+                SHIPPORI_STROKE_ADJUSTMENTS[style],
+            )
+            for style, weight in _STYLES
+        ]
+        for sequence in PUNCTUATION_VARIANT_SEQUENCES
+    }
+    sans_masters = {
+        sequence: [
+            make_original_punctuation_ligature(sequence, weight, sans=True)
+            for weight in _WEIGHTS
+        ]
+        for sequence in PUNCTUATION_VARIANT_SEQUENCES
+    }
+    for sequence, codepoint in (("!", 0xFF01), ("?", 0xFF1F)):
+        _replace_var_glyph(
+            font,
+            top,
+            cmap[codepoint],
+            serif_masters[sequence],
+            _SYMBOL_VERTICAL_ORIGIN,
+            model,
+            vsindex,
+        )
+
+    glyphs = []
+    for sequence, names in variants:
+        default, italic, sans, italic_sans = names
+        if len(sequence) > 1:
+            glyphs.append((default, serif_masters[sequence]))
+        glyphs.extend(
+            (
+                (
+                    italic,
+                    [
+                        slant_punctuation_outline(outline)
+                        for outline in serif_masters[sequence]
+                    ],
+                ),
+                (sans, sans_masters[sequence]),
+                (
+                    italic_sans,
+                    [
+                        slant_punctuation_outline(outline)
+                        for outline in sans_masters[sequence]
+                    ],
+                ),
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        glyphs,
+        model,
+        vsindex,
+        cmap[0xFF01],
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+    merge_features(font, punctuation_feature_source(variants))
+
+
 def _append_lookup(font: TTFont, tags: set[str], subtable) -> None:
     table = font["GSUB"].table
     index = len(table.LookupList.Lookup)
@@ -848,8 +959,19 @@ def _rename_font(font: TTFont) -> None:
             )
 
 
-def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) -> None:
-    """Write a Noto Serif JP CFF2 VF with reviewed marks and joining symbols."""
+def build_variable_marks(
+    source_path: Path,
+    output_path: Path,
+    face: int = 0,
+    punctuation_sources: Mapping[int, Path] | None = None,
+) -> None:
+    """Write a Noto Serif JP CFF2 VF with Nobigoe punctuation and marks."""
+
+    if punctuation_sources is None or set(punctuation_sources) != set(_WEIGHTS):
+        raise ValueError("Shippori punctuation sources are required for all weights")
+    punctuation_fonts = {
+        weight: TTFont(punctuation_sources[weight]) for weight in _WEIGHTS
+    }
     font = TTFont(source_path, fontNumber=face)
     top, locations = _validate(font)
     original_order = list(font.getGlyphOrder())
@@ -875,6 +997,8 @@ def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) ->
         0x301C,
         0x3030,
         0xFF5E,
+        0xFF01,
+        0xFF1F,
         0x3099,
         0x309A,
         0x309B,
@@ -1004,6 +1128,7 @@ def build_variable_marks(source_path: Path, output_path: Path, face: int = 0) ->
         raise ValueError("Native ccmp mark outputs lack source vertical forms")
     remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
     _append_symbols(font, top, cmap, paths, vertical_sources, model, vsindex)
+    _append_punctuation(font, top, cmap, model, vsindex, punctuation_fonts)
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
     _rename_font(font)
