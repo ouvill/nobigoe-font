@@ -4,7 +4,7 @@ import math
 import unittest
 from itertools import pairwise
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pathops
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -16,6 +16,10 @@ from nobigoe_font.features import punctuation_feature_source, symbol_feature_sou
 from nobigoe_font.operations import feature_ligatures, feature_single_substitutions
 from nobigoe_font.profiles import (
     NOTO_WEIGHT_CLASSES,
+    default_output_path,
+    font_identity,
+    latin_build_profile,
+    latin_font_source,
     noto_serif_cff2_variable_source,
     shippori_source,
 )
@@ -653,8 +657,10 @@ class VariableBuildCliTests(unittest.TestCase):
             "39701fd096bc51204a8444c6c2659f007b29674a13eb62ddfa470638fe8179cd",
         )
 
-    def test_local_noto_source_still_fetches_shippori_punctuation(self) -> None:
-        cached = Path("cache/Shippori.otf")
+    def test_local_noto_source_builds_custom_variable_then_all_static_weights(
+        self,
+    ) -> None:
+        cached = Path("cache/font.otf")
         with (
             patch(
                 "nobigoe_font.variable_cli.SourceCache.fetch",
@@ -662,28 +668,55 @@ class VariableBuildCliTests(unittest.TestCase):
             ) as fetch,
             patch(
                 "nobigoe_font.variable_cli.variable_marks.build_variable_marks"
-            ) as build,
+            ) as build_variable,
+            patch(
+                "nobigoe_font.variable_cli.pipeline.build_static_instance"
+            ) as build_static,
         ):
             main(
                 [
                     "--source",
                     "source.otf",
                     "--output",
-                    "result.otf",
+                    "custom.otf",
+                    "--static-output-dir",
+                    "static",
                     "--face",
                     "2",
+                    "--autohint",
                 ]
             )
 
         self.assertEqual(
             [item.args[0] for item in fetch.call_args_list],
-            [shippori_source(style) for style in NOTO_WEIGHT_CLASSES],
+            [
+                *(shippori_source(style) for style in NOTO_WEIGHT_CLASSES),
+                *(
+                    latin_font_source("libertinus", style)
+                    for style in NOTO_WEIGHT_CLASSES
+                ),
+            ],
         )
-        build.assert_called_once_with(
+        build_variable.assert_called_once_with(
             Path("source.otf"),
-            Path("result.otf"),
+            Path("custom.otf"),
             2,
             {weight: cached for weight in NOTO_WEIGHT_CLASSES.values()},
+        )
+        self.assertEqual(
+            build_static.call_args_list,
+            [
+                call(
+                    Path("custom.otf"),
+                    cached,
+                    Path("static") / default_output_path(identity, "noto").name,
+                    identity,
+                    latin_build_profile("libertinus", style),
+                    True,
+                )
+                for style in NOTO_WEIGHT_CLASSES
+                for identity in (font_identity("noto", style),)
+            ],
         )
 
     def test_default_build_fetches_all_pinned_sources(self) -> None:
@@ -694,7 +727,10 @@ class VariableBuildCliTests(unittest.TestCase):
             ) as fetch,
             patch(
                 "nobigoe_font.variable_cli.variable_marks.build_variable_marks"
-            ) as build,
+            ) as build_variable,
+            patch(
+                "nobigoe_font.variable_cli.pipeline.build_static_instance"
+            ) as build_static,
         ):
             main([])
 
@@ -703,14 +739,19 @@ class VariableBuildCliTests(unittest.TestCase):
             [
                 noto_serif_cff2_variable_source(),
                 *(shippori_source(style) for style in NOTO_WEIGHT_CLASSES),
+                *(
+                    latin_font_source("libertinus", style)
+                    for style in NOTO_WEIGHT_CLASSES
+                ),
             ],
         )
-        build.assert_called_once_with(
+        build_variable.assert_called_once_with(
             cached,
             DEFAULT_OUTPUT_PATH,
             0,
             {weight: cached for weight in NOTO_WEIGHT_CLASSES.values()},
         )
+        self.assertEqual(len(build_static.call_args_list), len(NOTO_WEIGHT_CLASSES))
 
 
 if __name__ == "__main__":

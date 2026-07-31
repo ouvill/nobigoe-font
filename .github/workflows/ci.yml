@@ -101,12 +101,10 @@ jobs:
 
       - name: Build representative fonts
         run: |
-          uv run nobigoe-build \
-            --weight Regular \
-            --autohint \
-            --output /tmp/NobigoeMincho-Regular.otf
           uv run nobigoe-build-variable \
-            --output /tmp/NobigoeVariableMarks-VF.otf
+            --output /tmp/NobigoeVariableMarks-VF.otf \
+            --static-output-dir /tmp \
+            --autohint
           uv run nobigoe-build \
             --base koburi \
             --output /tmp/NobigoeKoburiMincho-Regular.ttf

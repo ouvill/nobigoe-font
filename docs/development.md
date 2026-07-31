@@ -40,9 +40,9 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 
 | モジュール | 責務 |
 |---|---|
-| `cli.py` | `nobigoe-build`の引数検証と入出力の解決 |
-| `variable_cli.py` / `variable_marks.py` | `nobigoe-build-variable`とNoto CFF2可変フォントへの濁点・半濁点字形、連結記号追加 |
-| `pipeline.py` | フォント生成手順のオーケストレーション |
+| `cli.py` | 固定ソースを直接加工するこぶり版・Novel版・比較ビルドの引数検証と入出力の解決 |
+| `variable_cli.py` / `variable_marks.py` | `nobigoe-build-variable`によるNoto CFF2可変ソースのカスタマイズと固定7ウェイト出力 |
+| `pipeline.py` | 固定ソースの生成手順、および可変版を実体化した後の欧文取り込み・命名・ヒント処理 |
 | `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
 | `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
 | `geometry.py` / `operations.py` | 輪郭変換、cmap、CFF／TrueType、欧文レイアウトの操作 |
@@ -72,16 +72,11 @@ uv run python tools/measure_stix_stems.py
 uv run python tools/measure_stix_stems.py --thin-target japanese
 uv run python tools/measure_stix_stems.py --thin-target noto-latin
 
-# Noto版Regular
-uv run nobigoe-build
+# Noto Variableを一度カスタマイズし、Noto版の固定7ウェイトを生成
+uv run nobigoe-build-variable
 
-# 取り込んだ欧文字形だけをAFDKOで再ヒント
-uv run nobigoe-build --autohint
-
-# Noto版の全7ウェイト
-for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-  uv run nobigoe-build --weight "$weight" --autohint
-done
+# 固定7ウェイトへLibertinus Serifを取り込んだ後、欧文字形だけを再ヒント
+uv run nobigoe-build-variable --autohint
 
 # STIX欧文の調整済み制作VFを一度生成し、そこから固定7ウェイトを作る
 uv run nobigoe-build \
@@ -105,9 +100,6 @@ done
 # 源暎こぶり明朝版Regular
 uv run nobigoe-build --base koburi
 
-# Noto CFF2可変フォントへ既存のびごえ約物、濁点字形、連結記号を追加
-uv run nobigoe-build-variable
-
 # Regularの欧文候補を比較用ディレクトリへ生成
 for latin in noto libertinus stix-two-text source-serif-4; do
   uv run nobigoe-build \
@@ -116,7 +108,9 @@ for latin in noto libertinus stix-two-text source-serif-4; do
 done
 ```
 
-既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`と`--build-variable-stix OUTPUT`は、それぞれの調整済み制作VFを明示した場所へ生成します。`--variable-kana`は前者から対象ウェイトのかなを取り込み、`--latin-family stix-two-text`は公式STIX可変TTFまたは後者から対象ウェイトの欧文を実体化します。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定の`nobigoe-build-variable`は、カスタマイズ済みCFF2可変フォントを`dist/NobigoeVariableMarks-VF.otf`へ作り、そこから`dist/NobigoeMincho-<Weight>.otf`の固定7ウェイトを実体化します。固定化の後にだけ、可変化されていないLibertinus Serif欧文の取り込み、リリース用の命名と著作権表示、任意の欧文再ヒントを適用します。可変フォントの出力先は`--output`、固定ウェイトの出力ディレクトリは`--static-output-dir`で変更できます。`nobigoe-build`の既定出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`と`--build-variable-stix OUTPUT`は、それぞれの調整済み制作VFを明示した場所へ生成します。`--variable-kana`は前者から対象ウェイトのかなを取り込み、`--latin-family stix-two-text`は公式STIX可変TTFまたは後者から対象ウェイトの欧文を実体化します。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+
+Noto版の生成順序は、固定コミットの`NotoSerifJP-VF.otf`、のびごえ字形・OpenType機能の可変化、固定7ウェイトの実体化、固定ウェイト専用処理の順です。濁点・半濁点、感嘆符・疑問符合字、連結記号は可変フォントへ一度だけ追加され、固定版は同じ輪郭とレイアウトを各ウェイト位置から受け取ります。
 
 `nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`と、固定版でも使用するしっぽり明朝の各ウェイトを取得します。Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharString、全角`！`・`？`およびManga1方式の16合字、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。可変版の明朝感嘆符・疑問符は、ExtraLightだけを18本・6本の少数三次ベジェで再設計し、Light以上はしっぽり明朝Regular、Medium、SemiBold、Bold、ExtraBoldの実輪郭を使用します。しっぽり明朝の14曲線からなる疑問符は、右下内側の1曲線を固定パラメータで5分割し、形を変えず18曲線へ揃えます。直立感嘆符は元から6曲線です。黒みはNotoの全角約物ではなく、Noto Serif JPの`川`・`目`・`田`をY=350、450、550、650で切った縦主線幅の中央値を基準にします。200、300、400、500、600、700、900の基準値は順に44.0、53.6、65.2、80.1、95.0、117.0、144.0 unitsです。疑問符はしっぽり明朝の外周、高さ、筆だまりを保って右太線の内周だけを調整し、感嘆符は下部の細い軸を保って上部テーパーだけを左右から調整します。これによりExtraLightで承認した漢字主線との光学差を全ウェイトへ維持します。下点は元輪郭の上端を保って直径をウェイト別に84〜90%へ縮めた正円とし、5連感嘆符は200-unit間隔で配置して全角セル境界でも間隔を維持します。明朝、斜体明朝、ゴシック、斜体ゴシックを`aalt`と`ss01`–`ss03`で選択できます。濁点・半濁点の配置と連結記号の輪郭も同じ7ウェイトのレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`のその他の約物、欧文・ルビ置換は含みません。
 疑問符の下点は本体全体の外接中心ではなく、下へ伸びる線の終端中心へ揃えます。

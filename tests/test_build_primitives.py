@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
+from types import SimpleNamespace
 
 import pathops
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -32,6 +33,7 @@ from nobigoe_font.pipeline import (
     _novel_hiragana_mappings,
     _novel_katakana_mappings,
     _native_novel_ccmp_outputs,
+    _normalize_cff_blue_zones,
     build,
     SPACING_MARK_INPUTS,
     mark_ligature_rules,
@@ -186,6 +188,34 @@ class FontMetadataTests(unittest.TestCase):
             float(VERSION_NUMBER),
             places=4,
         )
+
+
+class StaticInstanceTests(unittest.TestCase):
+    def test_crossed_variable_blue_zone_pairs_are_normalized_for_cff(self) -> None:
+        private = SimpleNamespace(
+            BlueValues=[-18, 0, 545, 527],
+            OtherBlues=[-268, -278],
+            FamilyBlues=[-20, 0, 550, 530],
+            FamilyOtherBlues=[-260, -280],
+        )
+        font = {
+            "CFF ": SimpleNamespace(
+                cff=SimpleNamespace(
+                    topDictIndex=[
+                        SimpleNamespace(
+                            FDArray=[SimpleNamespace(Private=private)]
+                        )
+                    ]
+                )
+            )
+        }
+
+        _normalize_cff_blue_zones(font)  # type: ignore[arg-type]
+
+        self.assertEqual(private.BlueValues, [-18, 0, 527, 545])
+        self.assertEqual(private.OtherBlues, [-278, -268])
+        self.assertEqual(private.FamilyBlues, [-20, 0, 530, 550])
+        self.assertEqual(private.FamilyOtherBlues, [-280, -260])
 
 
 class FontGeometryTests(unittest.TestCase):

@@ -73,10 +73,10 @@ jobs:
 
       - name: Build stable families and experimental Novel validation fonts
         run: |
+          uv run nobigoe-build-variable --autohint
           uv run nobigoe-build \
             --build-variable-kana /tmp/NobigoeNovelKanaDesign-VF.ttf
           for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            uv run nobigoe-build --weight "$weight" --autohint
             uv run nobigoe-build --kana-style novel --variable-kana \
               --variable-kana-source /tmp/NobigoeNovelKanaDesign-VF.ttf \
               --weight "$weight" --autohint
