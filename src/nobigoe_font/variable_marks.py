@@ -34,9 +34,11 @@ from .marks import (
     KOBURI_PUA_START,
     MANGA_MARK_PAIRS,
     MANGA_MISSING_SMALL_KANA,
+    PUNCTUATION_MARK_PAIRS,
     MarkPair,
     MarkPositionMap,
     load_mark_position_overrides,
+    load_punctuation_mark_positions,
 )
 from .metadata import set_japanese_name, set_name
 from .operations import (
@@ -931,6 +933,72 @@ def _compositions(
     return result
 
 
+def _append_punctuation_mark_composites(
+    font: TTFont,
+    top: TopDict,
+    cmap: Mapping[int, str],
+    model: _DeltaModel,
+    vsindex: int,
+) -> None:
+    positions = {
+        weight: load_punctuation_mark_positions(base="noto", weight=style)
+        for style, weight in _STYLES
+    }
+    bases = {}
+    source_names = {cmap[0x3099], cmap[0x309A]}
+    for base, _ in PUNCTUATION_MARK_PAIRS:
+        horizontal = cmap[base]
+        vertical = vertical_glyph_or_self(font, horizontal)
+        bases[(base, "horizontal")] = horizontal
+        bases[(base, "vertical")] = vertical
+        source_names.update((horizontal, vertical))
+    paths = _paths(font, sorted(source_names))
+
+    names = allocate_cid_names(font, 2 * len(PUNCTUATION_MARK_PAIRS))
+    horizontal_names = names[: len(PUNCTUATION_MARK_PAIRS)]
+    vertical_names = names[len(PUNCTUATION_MARK_PAIRS) :]
+    outputs = dict(zip(PUNCTUATION_MARK_PAIRS, horizontal_names, strict=True))
+    vertical_outputs = dict(zip(PUNCTUATION_MARK_PAIRS, vertical_names, strict=True))
+    glyphs = []
+    for pair in PUNCTUATION_MARK_PAIRS:
+        glyphs.append(
+            (
+                outputs[pair],
+                _compositions(pair, "horizontal", paths, bases, cmap, positions),
+            )
+        )
+        glyphs.append(
+            (
+                vertical_outputs[pair],
+                _compositions(pair, "vertical", paths, bases, cmap, positions),
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        glyphs,
+        model,
+        vsindex,
+        cmap[0xFF01],
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+
+    ccmp = {
+        (cmap[base], cmap[mark]): outputs[(base, mark)]
+        for base, mark in PUNCTUATION_MARK_PAIRS
+    }
+    liga = {
+        (cmap[base], cmap[_SPACING[mark]]): outputs[(base, mark)]
+        for base, mark in PUNCTUATION_MARK_PAIRS
+    }
+    vertical = {
+        outputs[pair]: vertical_outputs[pair] for pair in PUNCTUATION_MARK_PAIRS
+    }
+    _append_lookup(font, {"ccmp"}, buildLigatureSubstSubtable(ccmp))
+    _append_lookup(font, {"liga"}, buildLigatureSubstSubtable(liga))
+    _append_lookup(font, {"vert", "vrt2"}, buildSingleSubstSubtable(vertical))
+
+
 def _rename_font(font: TTFont) -> None:
     family = "Nobigoe Variable Marks"
     style = "ExtraLight"
@@ -1129,6 +1197,7 @@ def build_variable_marks(
     remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
     _append_symbols(font, top, cmap, paths, vertical_sources, model, vsindex)
     _append_punctuation(font, top, cmap, model, vsindex, punctuation_fonts)
+    _append_punctuation_mark_composites(font, top, cmap, model, vsindex)
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
     _rename_font(font)
