@@ -31,6 +31,7 @@ from .variable_kana import (
     export_variable_kana_instance,
     is_variable_kana_design_source,
 )
+from .variable_stix import instantiate_stix_latin_font
 from .novel import (
     HIRAGANA_CODEPOINTS,
     NOVEL_SMALL_KO_CODEPOINT,
@@ -63,7 +64,6 @@ from fontTools.misc.transform import Transform
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.scaleUpem import scale_upem
 from fontTools.varLib.instancer import instantiateVariableFont
-
 
 WAVE_GLYPH_COUNT = 10
 RELAXED_WAVE_GLYPH_COUNT = 20
@@ -1056,7 +1056,25 @@ def build(
     if font["head"].unitsPerEm != 1000:
         scale_upem(font, 1000)
     latin_font = TTFont(latin_source_path) if latin_source_path else None
-    if latin_font and latin_profile.variations:
+    if latin_font and latin_profile.family == "stix-two-text":
+        stix_source = latin_font
+        try:
+            latin_font = instantiate_stix_latin_font(
+                stix_source,
+                identity.weight_class,
+            )
+        finally:
+            stix_source.close()
+        if "fvar" in latin_font or any(
+            getattr(latin_font[tag].table, "FeatureVariations", None) is not None
+            for tag in ("GSUB", "GPOS")
+            if tag in latin_font
+        ):
+            raise ValueError(
+                "STIX Latin instantiation must produce a static font without "
+                "fvar or FeatureVariations"
+            )
+    elif latin_font and latin_profile.variations:
         if "fvar" not in latin_font:
             raise ValueError(
                 f"{latin_profile.family} requires a variable --latin-source"

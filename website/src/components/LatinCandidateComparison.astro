@@ -1,0 +1,486 @@
+---
+import notoSerifUrl from "../assets/fonts/LatinCandidate-NotoSerifJP.woff2?url";
+import literataUrl from "../assets/fonts/LatinCandidate-Literata.woff2?url";
+import newsreaderUrl from "../assets/fonts/LatinCandidate-Newsreader.woff2?url";
+import petronaUrl from "../assets/fonts/LatinCandidate-Petrona.woff2?url";
+import robotoSerifUrl from "../assets/fonts/LatinCandidate-RobotoSerif.woff2?url";
+import sourceSerifUrl from "../assets/fonts/LatinCandidate-SourceSerif4.woff2?url";
+import spectral200Url from "../assets/fonts/LatinCandidate-Spectral-200.woff2?url";
+import spectral300Url from "../assets/fonts/LatinCandidate-Spectral-300.woff2?url";
+import spectral400Url from "../assets/fonts/LatinCandidate-Spectral-400.woff2?url";
+import spectral500Url from "../assets/fonts/LatinCandidate-Spectral-500.woff2?url";
+import spectral600Url from "../assets/fonts/LatinCandidate-Spectral-600.woff2?url";
+import spectral700Url from "../assets/fonts/LatinCandidate-Spectral-700.woff2?url";
+import spectral800Url from "../assets/fonts/LatinCandidate-Spectral-800.woff2?url";
+import stixUrl from "../assets/fonts/LatinCandidate-STIXTwoText.woff2?url";
+
+interface Candidate {
+  key: string;
+  name: string;
+  role: string;
+  axes: string;
+  source: string;
+  sourceUrl: string;
+  familyRaw: string;
+  familyTuned: string;
+  sizeAdjust: number;
+  widthRatio: number;
+  inkRatio: number;
+  url?: string;
+  weightRange?: string;
+}
+
+const candidates: Candidate[] = [
+  {
+    key: "current",
+    name: "Nobigoe / Libertinus",
+    role: "現行基準",
+    axes: "固定7ウェイト",
+    source: "現在ののびごえ明朝に収録している欧文",
+    sourceUrl: "https://github.com/alerque/libertinus",
+    familyRaw: "Nobigoe Weight",
+    familyTuned: "Nobigoe Weight",
+    sizeAdjust: 1,
+    widthRatio: 100,
+    inkRatio: 100,
+  },
+  {
+    key: "noto-serif-jp",
+    name: "Noto Serif JP",
+    role: "参考基準",
+    axes: "wght 200–900",
+    source: "Noto Serif JPに収録された欧文原字",
+    sourceUrl: "https://github.com/notofonts/noto-cjk",
+    familyRaw: "Latin Candidate Noto Serif JP Raw",
+    familyTuned: "Latin Candidate Noto Serif JP Tuned",
+    sizeAdjust: 1,
+    widthRatio: 100,
+    inkRatio: 100,
+    url: notoSerifUrl,
+    weightRange: "200 900",
+  },
+  {
+    key: "stix",
+    name: "STIX Two Text",
+    role: "端正・コンパクト",
+    axes: "wght 400–700",
+    source: "科学・技術出版向けの本文書体",
+    sourceUrl: "https://github.com/stipub/stixfonts",
+    familyRaw: "Latin Candidate STIX Raw",
+    familyTuned: "Latin Candidate STIX Tuned",
+    sizeAdjust: 1.099,
+    widthRatio: 99.4,
+    inkRatio: 120,
+    url: stixUrl,
+    weightRange: "400 700",
+  },
+  {
+    key: "spectral",
+    name: "Spectral",
+    role: "柔らかい本文",
+    axes: "固定200–800",
+    source: "Production Typeによる画面・文書向け書体",
+    sourceUrl: "https://github.com/productiontype/Spectral",
+    familyRaw: "Latin Candidate Spectral Raw",
+    familyTuned: "Latin Candidate Spectral Tuned",
+    sizeAdjust: 1.125,
+    widthRatio: 106.9,
+    inkRatio: 112.8,
+  },
+  {
+    key: "source-serif",
+    name: "Source Serif 4",
+    role: "保守的な本文",
+    axes: "wght 200–900 · opsz 8–60",
+    source: "Adobeによるデジタル・印刷用本文書体",
+    sourceUrl: "https://github.com/adobe-fonts/source-serif",
+    familyRaw: "Latin Candidate Source Serif Raw",
+    familyTuned: "Latin Candidate Source Serif Tuned",
+    sizeAdjust: 1.086,
+    widthRatio: 99.6,
+    inkRatio: 123.3,
+    url: sourceSerifUrl,
+    weightRange: "200 900",
+  },
+  {
+    key: "literata",
+    name: "Literata",
+    role: "長文・小説",
+    axes: "wght 200–900 · opsz 7–72",
+    source: "Google Play Books由来の読書用書体",
+    sourceUrl: "https://github.com/googlefonts/literata",
+    familyRaw: "Latin Candidate Literata Raw",
+    familyTuned: "Latin Candidate Literata Tuned",
+    sizeAdjust: 1.029,
+    widthRatio: 103.2,
+    inkRatio: 130.3,
+    url: literataUrl,
+    weightRange: "200 900",
+  },
+  {
+    key: "roboto-serif",
+    name: "Roboto Serif",
+    role: "精密調整",
+    axes: "wght 100–900 · opsz · wdth · GRAD",
+    source: "画面と印刷の両方を想定した多軸書体",
+    sourceUrl: "https://github.com/googlefonts/roboto-serif",
+    familyRaw: "Latin Candidate Roboto Serif Raw",
+    familyTuned: "Latin Candidate Roboto Serif Tuned",
+    sizeAdjust: 1.021,
+    widthRatio: 102.7,
+    inkRatio: 120,
+    url: robotoSerifUrl,
+    weightRange: "100 900",
+  },
+  {
+    key: "newsreader",
+    name: "Newsreader",
+    role: "画面・編集本文",
+    axes: "wght 200–800 · opsz 6–72",
+    source: "連続した画面読書のための本文書体",
+    sourceUrl: "https://github.com/productiontype/Newsreader",
+    familyRaw: "Latin Candidate Newsreader Raw",
+    familyTuned: "Latin Candidate Newsreader Tuned",
+    sizeAdjust: 1.147,
+    widthRatio: 104.6,
+    inkRatio: 110,
+    url: newsreaderUrl,
+    weightRange: "200 800",
+  },
+  {
+    key: "petrona",
+    name: "Petrona",
+    role: "個性・Manga",
+    axes: "wght 100–900",
+    source: "本文可読性と強いディテールを両立する書体",
+    sourceUrl: "https://github.com/RingoSeeber/Petrona",
+    familyRaw: "Latin Candidate Petrona Raw",
+    familyTuned: "Latin Candidate Petrona Tuned",
+    sizeAdjust: 1.15,
+    widthRatio: 104.7,
+    inkRatio: 114.2,
+    url: petronaUrl,
+    weightRange: "100 900",
+  },
+];
+
+const spectralSources = [
+  [200, spectral200Url],
+  [300, spectral300Url],
+  [400, spectral400Url],
+  [500, spectral500Url],
+  [600, spectral600Url],
+  [700, spectral700Url],
+  [800, spectral800Url],
+] as const;
+const faceRule = (
+  family: string,
+  url: string,
+  weight: string | number,
+  sizeAdjust: number,
+) => `
+@font-face {
+  font-family: "${family}";
+  src: url("${url}") format("woff2");
+  font-weight: ${weight};
+  font-style: normal;
+  font-display: swap;
+  size-adjust: ${sizeAdjust * 100}%;
+}`;
+const latinCandidateCss = [
+  ...candidates.flatMap((candidate) =>
+    candidate.url && candidate.weightRange
+      ? [
+          faceRule(
+            candidate.familyRaw,
+            candidate.url,
+            candidate.weightRange,
+            1,
+          ),
+          faceRule(
+            candidate.familyTuned,
+            candidate.url,
+            candidate.weightRange,
+            candidate.sizeAdjust,
+          ),
+        ]
+      : [],
+  ),
+  ...spectralSources.flatMap(([weight, url]) => [
+    faceRule("Latin Candidate Spectral Raw", url, weight, 1),
+    faceRule("Latin Candidate Spectral Tuned", url, weight, 1.125),
+  ]),
+].join("\n");
+const specimen =
+  "春の雨が窓を細く叩いていた。At half past ten, the last train crossed the river. Voice, ever onward. 0123456789";
+const scaleSizes = [14, 18, 24] as const;
+---
+
+<style is:inline set:html={latinCandidateCss}></style>
+
+<section
+  class="latin-candidate-comparison"
+  aria-labelledby="latin-candidate-title"
+  aria-busy="true"
+  data-latin-candidates
+  data-size-mode="tuned"
+  style="--latin-candidate-size: 24px; --latin-candidate-weight: 400; --latin-candidate-opsz: 20; --latin-candidate-grade: 0"
+>
+  <header class="comparison-section-heading comparison-section-heading--latin">
+    <p>05 / LATIN CANDIDATES</p>
+    <div>
+      <h3 id="latin-candidate-title">欧文候補と和文の混植見本</h3>
+      <p>
+        和文はのびごえ明朝、欧文だけを候補書体へ置換しています。補正後はcap
+        heightとx-heightから求めた初期倍率を適用しています。スライダーで同じ文章、サイズ、ウェイト、光学サイズを比較できます。
+      </p>
+    </div>
+  </header>
+
+  <div class="latin-candidate-controls" aria-label="欧文候補の表示設定">
+    <fieldset class="latin-candidate-mode">
+      <legend>欧文サイズ</legend>
+      <div>
+        <button type="button" data-latin-size-mode="raw" aria-pressed="false">
+          補正前
+        </button>
+        <button type="button" data-latin-size-mode="tuned" aria-pressed="true">
+          補正後
+        </button>
+      </div>
+    </fieldset>
+    <label>
+      <span>表示サイズ <output data-latin-size-output>24px</output></span>
+      <input
+        type="range"
+        aria-label="表示サイズ"
+        min="14"
+        max="48"
+        value="24"
+        step="1"
+        data-latin-size
+      />
+    </label>
+    <label>
+      <span>ウェイト <output data-latin-weight-output>400</output></span>
+      <input
+        type="range"
+        aria-label="ウェイト"
+        min="200"
+        max="900"
+        value="400"
+        step="10"
+        data-latin-weight
+      />
+    </label>
+    <label>
+      <span>光学サイズ <output data-latin-opsz-output>20</output></span>
+      <input
+        type="range"
+        aria-label="光学サイズ"
+        min="8"
+        max="72"
+        value="20"
+        step="1"
+        data-latin-opsz
+      />
+    </label>
+    <label>
+      <span>Grade <output data-latin-grade-output>0</output></span>
+      <input
+        type="range"
+        aria-label="Grade"
+        min="-50"
+        max="100"
+        value="0"
+        step="5"
+        data-latin-grade
+      />
+      <small>Roboto Serifだけに適用</small>
+    </label>
+    <label class="latin-candidate-text-control">
+      <span>共通見本文</span>
+      <textarea rows="3" spellcheck="false" data-latin-text>{specimen}</textarea
+      >
+    </label>
+  </div>
+
+  <p class="latin-candidate-status" role="status" data-latin-font-status>
+    欧文候補の比較用Webフォントを読み込んでいます。
+  </p>
+
+  <div class="latin-candidate-grid" role="list">
+    {
+      candidates.map((candidate, index) => (
+        <article
+          class="latin-candidate-card"
+          data-latin-candidate={candidate.key}
+          data-family-raw={candidate.familyRaw}
+          data-family-tuned={candidate.familyTuned}
+          role="listitem"
+          style={`--candidate-family-raw: "${candidate.familyRaw}"; --candidate-family-tuned: "${candidate.familyTuned}"`}
+        >
+          <header>
+            <p>{String(index + 1).padStart(2, "0")}</p>
+            <div>
+              <h4>{candidate.name}</h4>
+              <span>{candidate.role}</span>
+            </div>
+            <a href={candidate.sourceUrl} target="_blank" rel="noreferrer">
+              SOURCE ↗
+            </a>
+          </header>
+          <dl class="latin-candidate-facts">
+            <div>
+              <dt>AXES</dt>
+              <dd>{candidate.axes}</dd>
+            </div>
+            <div>
+              <dt>SIZE</dt>
+              <dd>{(candidate.sizeAdjust * 100).toFixed(1)}%</dd>
+            </div>
+            <div>
+              <dt>WIDTH</dt>
+              <dd>{candidate.widthRatio.toFixed(1)}%</dd>
+            </div>
+            <div>
+              <dt>INK</dt>
+              <dd>{candidate.inkRatio.toFixed(1)}%</dd>
+            </div>
+          </dl>
+          <p class="latin-candidate-source">{candidate.source}</p>
+          <p class="latin-candidate-mixed" lang="ja" data-latin-candidate-text>
+            {specimen}
+          </p>
+          <p class="latin-candidate-display" lang="en">
+            Hamburgefontsiv
+            <br />
+            Reading &amp; Voice 0123456789
+          </p>
+          <div class="latin-candidate-size-steps" aria-label="小サイズの見本">
+            {scaleSizes.map((size) => (
+              <p style={`font-size: ${size}px`}>
+                <span>{size}px</span>
+                <b lang="en">A quiet voice travels onward. 0123456789</b>
+              </p>
+            ))}
+          </div>
+        </article>
+      ))
+    }
+  </div>
+
+  <footer class="latin-candidate-notes">
+    <p>
+      WIDTHとINKは、補正後RegularのA–Z・a–z・0–9をNoto Serif
+      JP内蔵欧文Regularと比較した値です。INKは輪郭面積÷送り幅の平均で、見た目の優劣ではありません。
+    </p>
+    <p>
+      軸範囲外のウェイトはブラウザが利用可能な端点へ寄せます。Spectralは公式固定7ウェイト、STIX
+      Two Textは400–700です。
+    </p>
+  </footer>
+</section>
+
+<script>
+  const latinComparison = document.querySelector<HTMLElement>(
+    "[data-latin-candidates]",
+  );
+
+  if (latinComparison) {
+    const setProperty = (name: string, value: string) =>
+      latinComparison.style.setProperty(name, value);
+    const bindRange = (
+      selector: string,
+      outputSelector: string,
+      property: string,
+      format: (value: string) => string = (value) => value,
+    ) => {
+      const input = latinComparison.querySelector<HTMLInputElement>(selector);
+      const output =
+        latinComparison.querySelector<HTMLOutputElement>(outputSelector);
+      input?.addEventListener("input", () => {
+        setProperty(property, format(input.value));
+        if (output) output.value = format(input.value);
+      });
+    };
+
+    bindRange(
+      "[data-latin-size]",
+      "[data-latin-size-output]",
+      "--latin-candidate-size",
+      (value) => `${value}px`,
+    );
+    bindRange(
+      "[data-latin-weight]",
+      "[data-latin-weight-output]",
+      "--latin-candidate-weight",
+    );
+    bindRange(
+      "[data-latin-opsz]",
+      "[data-latin-opsz-output]",
+      "--latin-candidate-opsz",
+    );
+    bindRange(
+      "[data-latin-grade]",
+      "[data-latin-grade-output]",
+      "--latin-candidate-grade",
+    );
+
+    const modeButtons = Array.from(
+      latinComparison.querySelectorAll<HTMLButtonElement>(
+        "[data-latin-size-mode]",
+      ),
+    );
+    for (const button of modeButtons) {
+      button.addEventListener("click", () => {
+        const mode = button.dataset.latinSizeMode ?? "tuned";
+        latinComparison.dataset.sizeMode = mode;
+        for (const candidate of modeButtons) {
+          candidate.setAttribute("aria-pressed", String(candidate === button));
+        }
+      });
+    }
+
+    const textInput =
+      latinComparison.querySelector<HTMLTextAreaElement>("[data-latin-text]");
+    textInput?.addEventListener("input", () => {
+      for (const sample of latinComparison.querySelectorAll<HTMLElement>(
+        "[data-latin-candidate-text]",
+      )) {
+        sample.textContent = textInput.value;
+      }
+    });
+
+    const status = latinComparison.querySelector<HTMLElement>(
+      "[data-latin-font-status]",
+    );
+    const cards = Array.from(
+      latinComparison.querySelectorAll<HTMLElement>("[data-latin-candidate]"),
+    );
+    const sample = "Hamburgefontsiv Reading Voice 0123456789";
+    Promise.all(
+      cards.flatMap((card) =>
+        [card.dataset.familyRaw, card.dataset.familyTuned]
+          .filter((family): family is string => Boolean(family))
+          .map((family) => document.fonts.load(`400 32px "${family}"`, sample)),
+      ),
+    )
+      .then((loadedFaces) => {
+        if (loadedFaces.some((faces) => faces.length === 0)) {
+          throw new Error("A Latin candidate webfont did not load.");
+        }
+        latinComparison.classList.add("latin-candidates-ready");
+        if (status)
+          status.textContent = "欧文候補の比較用Webフォントを読み込みました。";
+      })
+      .catch(() => {
+        latinComparison.classList.add("latin-candidates-failed");
+        if (status) {
+          status.textContent =
+            "欧文候補を読み込めなかったため、一部見本は代替書体で表示しています。";
+        }
+      })
+      .finally(() => latinComparison.setAttribute("aria-busy", "false"));
+  }
+</script>

@@ -115,7 +115,7 @@ jobs:
         uses: actions/cache@v6.1.0
         with:
           path: website/src/assets/fonts/*.woff2
-          key: astro-webfonts-v6-${{ hashFiles('src/nobigoe_font/**/*.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html') }}
+          key: astro-webfonts-v7-${{ hashFiles('src/nobigoe_font/**/*.py', 'src/nobigoe_font/version.json', '.github/workflows/pages.yml', 'website/src/**/*.astro', 'website/src/data/site.ts', 'website/public/marks-data.json', 'website/tools/share-images.html', 'website/tools/generate-latin-candidate-webfonts.py') }}
 
       - name: Set up uv
         if: steps.webfont-cache.outputs.cache-hit != 'true'
@@ -289,6 +289,7 @@ jobs:
               --notdef-outline \
               --recommended-glyphs
           done
+          uv run python website/tools/generate-latin-candidate-webfonts.py
 
       - name: Build vertical specimen PDF
         working-directory: website
@@ -309,6 +310,7 @@ jobs:
           test -f website/site-dist/compare/index.html
           test "$(find website/site-dist/_assets -name '*NobigoeNovelMincho*' | wc -l)" -eq 7
           test "$(find website/site-dist/_assets -name '*NobigoeNovelKanaDesign*' | wc -l)" -eq 1
+          test "$(find website/site-dist/_assets -name '*LatinCandidate*' | wc -l)" -eq 14
           test -f website/site-dist/marks-data.json
           test -f website/site-dist/nobigoe-mincho-vertical-specimen.pdf
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"

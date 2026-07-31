@@ -17,6 +17,7 @@ from .profiles import (
 )
 from .sources import DEFAULT_CACHE_DIR, SourceCache, SourceOverrides
 from .variable_kana import build_variable_kana_source
+from .variable_stix import build_variable_stix_source
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -61,7 +62,10 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--latin-source",
         type=Path,
-        help="local font overriding the selected Noto-based Latin source",
+        help=(
+            "local font overriding the selected Noto-based Latin source; "
+            "with --build-variable-stix, the raw STIX VF"
+        ),
     )
     parser.add_argument(
         "--punctuation-source",
@@ -94,6 +98,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--build-variable-stix",
+        type=Path,
+        metavar="OUTPUT",
+        help=(
+            "build the tuned STIX Two Text Latin design VF at OUTPUT; "
+            "this is not a release artifact"
+        ),
+    )
+    parser.add_argument(
         "--cache-dir",
         type=Path,
         default=DEFAULT_CACHE_DIR,
@@ -117,6 +130,7 @@ def _build_variable_kana(args: argparse.Namespace) -> None:
         option
         for option, used in (
             ("--variable-kana", args.variable_kana),
+            ("--build-variable-stix", args.build_variable_stix is not None),
             ("--output", args.output is not None),
             ("--source", args.source is not None),
             ("--latin-source", args.latin_source is not None),
@@ -159,8 +173,44 @@ def _build_variable_kana(args: argparse.Namespace) -> None:
                 )
 
 
+def _build_variable_stix(args: argparse.Namespace) -> None:
+    incompatible = [
+        option
+        for option, used in (
+            ("--build-variable-kana", args.build_variable_kana is not None),
+            ("--variable-kana", args.variable_kana),
+            ("--variable-kana-source", args.variable_kana_source is not None),
+            ("--output", args.output is not None),
+            ("--source", args.source is not None),
+            ("--ruby-source", args.ruby_source is not None),
+            ("--punctuation-source", args.punctuation_source is not None),
+            ("--sans-source", args.sans_source is not None),
+            ("--autohint", args.autohint),
+            ("--face", args.face != 0),
+            ("--base koburi", args.base != "noto"),
+            ("--kana-style novel", args.kana_style != "noto"),
+            ("--weight", args.weight != "Regular"),
+            ("--latin-family", args.latin_family != "libertinus"),
+        )
+        if used
+    ]
+    if incompatible:
+        raise ValueError(
+            "--build-variable-stix cannot be combined with " + ", ".join(incompatible)
+        )
+    source = SourceCache(args.cache_dir).resolve_variable_stix(args.latin_source)
+    build_variable_stix_source(source, args.build_variable_stix)
+    print(
+        f"Built tuned STIX Two Text Latin design VF at {args.build_variable_stix}; "
+        "this output is not release-ready."
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.build_variable_stix is not None:
+        _build_variable_stix(args)
+        return
     if args.build_variable_kana is not None:
         _build_variable_kana(args)
         return
@@ -183,14 +233,22 @@ def main(argv: Sequence[str] | None = None) -> None:
     ):
         raise ValueError("--latin-source cannot be combined with --latin-family noto")
 
-    identity = font_identity(args.base, args.weight, args.kana_style)
+    identity = font_identity(
+        args.base,
+        args.weight,
+        args.kana_style,
+        latin_family=args.latin_family,
+    )
     latin_profile = latin_build_profile(
         args.latin_family if args.base == "noto" else "noto",
         args.weight,
     )
     if args.output is not None:
         output_path = args.output
-    elif args.base == "noto" and args.latin_family != "libertinus":
+    elif args.base == "noto" and args.latin_family not in {
+        "libertinus",
+        "stix-two-text",
+    }:
         output_path = (
             Path("dist")
             / "comparison"

@@ -40,7 +40,7 @@ from .novel_katakana import (
 )
 from .operations import feature_single_substitutions
 from .metadata import set_japanese_name, set_name
-from .profiles import NOTO_WEIGHT_CLASSES
+from .profiles import NOTO_WEIGHT_CLASSES, NOTO_WEIGHT_DESIGN_LOCATIONS
 from .terminal_plans import terminal_depth_ratio
 
 VARIABLE_KANA_MASTER_WEIGHTS = (200, 400, 900)
@@ -48,15 +48,6 @@ _SUPPORTED_WEIGHTS = tuple(NOTO_WEIGHT_CLASSES.values())
 _WEIGHT_NAMES = {value: name for name, value in NOTO_WEIGHT_CLASSES.items()}
 VARIABLE_KANA_DESIGN_FAMILY = "Nobigoe Novel Kana Design"
 _VARIABLE_KANA_DESIGN_POSTSCRIPT = "NobigoeNovelKanaDesignVF"
-_WEIGHT_DESIGN_LOCATIONS = {
-    200: 200.0,
-    300: 266.5,
-    400: 347.0,
-    500: 452.0,
-    600: 557.0,
-    700: 711.0,
-    900: 900.0,
-}
 KanaScript: TypeAlias = Literal["hiragana", "katakana"]
 KanaOrientation: TypeAlias = Literal["horizontal", "vertical"]
 
@@ -444,13 +435,13 @@ def _designspace(masters: tuple[TTFont, ...]) -> DesignSpaceDocument:
     axis = AxisDescriptor(
         tag="wght", name="Weight", minimum=200, default=400, maximum=900
     )
-    axis.map = list(_WEIGHT_DESIGN_LOCATIONS.items())
+    axis.map = list(NOTO_WEIGHT_DESIGN_LOCATIONS.items())
     document.addAxis(axis)
     for weight, font in zip(VARIABLE_KANA_MASTER_WEIGHTS, masters):
         source = SourceDescriptor(
             name=f"NovelKana-{weight}",
             styleName=_WEIGHT_NAMES[weight],
-            designLocation={axis.name: _WEIGHT_DESIGN_LOCATIONS[weight]},
+            designLocation={axis.name: NOTO_WEIGHT_DESIGN_LOCATIONS[weight]},
             font=font,
         )
         if weight == 400:
@@ -461,7 +452,7 @@ def _designspace(masters: tuple[TTFont, ...]) -> DesignSpaceDocument:
             InstanceDescriptor(
                 name=f"NovelKana-{weight}",
                 styleName=_WEIGHT_NAMES[weight],
-                designLocation={axis.name: _WEIGHT_DESIGN_LOCATIONS[weight]},
+                designLocation={axis.name: NOTO_WEIGHT_DESIGN_LOCATIONS[weight]},
             )
         )
     return document

@@ -50,6 +50,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
 | `novel.py` / `novel_katakana.py` / `novel_han.py` / `novel_metrics.py` | Novelひらがな・カタカナの3マスター設計、Unicode 15.1 Han集合と等方縮小、字面・ink・カウンター計測 |
 | `kana_terminals.py` / `terminal_plans/` / `variable_kana.py` | 互換トポロジーの筆端変形、字別・横縦・3マスター台帳、可変制作正本の生成と固定ウェイト実体化 |
+| `variable_stix.py` / `stix_latin_tuning.json` | STIX Two Textの主線基準ウェイト補間、制作VFの生成、固定7ウェイト実体化 |
 
 ## 自動取得して生成
 
@@ -61,9 +62,16 @@ Libertinus Serifの直立体はRegular・Semibold・Boldの3ウェイトです�
 
 `--autohint`を指定すると、生成後にAFDKO `otfautohint`を実行します。処理対象は今回取り込んだ欧文字形だけに限定し、Noto Serif JP由来の和文字形の既存ヒントには触れません。`otfautohint`が見つからない場合はエラーにして、未ヒントの成果物を正常終了として扱いません。
 
-`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two TextはネイティブソースがあるRegular、Medium、SemiBold、Boldを対象とし、1.110倍したうえで縦画を中心に-10、-12、-14、-15 units補正します。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。STIX Two Textの補正値は、1.110倍後の`A–Z`・`a–z`・`0–9`について、各字の輪郭面積を送り幅で割り、同ウェイトのNoto Serif JP欧文との差の平均絶対誤差を-40〜0 unitsの整数候補中で最小にする値です。
+`--latin-family`では`noto`、`libertinus`、`stix-two-text`、`source-serif-4`を選択できます。既定の`libertinus`は従来の全7ウェイト設定を保持します。`noto`はNoto Serif JPの欧文字形を置換しません。STIX Two Textは公式`STIXTwoText[wght].ttf`の400・700間にある互換輪郭から全7ウェイトを生成し、1.110倍して取り込みます。Noto Serif JP和文の`口`・`日`・`田`・`中`・`山`と、NotoおよびSTIX欧文の`H`・`I`・`E`・`F`・`L`・`n`・`i`・`l`・`h`・`m`・`u`を基準にします。公式STIXにないExtraLightとLightは、Noto和文とNoto欧文の主縦線幅中央値の中間値へSTIXの主縦線を合わせます。RegularからBlackまではNoto和文の主縦線へ合わせます。ウェイトごとに一つの補間位置を全通常字形とGSUB出力へ共通適用し、字別の輪郭面積や送り幅には合わせないため、STIX本来のコントラストと字形間の関係を維持します。個別位置を持つ外れ値は`ƒ`（U+0192）だけです。求めた補間位置が公式軸の400–700範囲外にある場合も同じ互換輪郭と水平メトリクスだけを外挿し、別フォントを混ぜません。計測ツールの`--thin-target japanese`または`--thin-target noto-latin`で、細字を各端へ合わせた比較位置も生成できます。Source Serif 4は可変フォントを`opsz=20`と各Nobigoeウェイトの`wght=200–900`で実体化し、1.088倍で取り込みます。比較候補の倍率はRegularの大文字高をNoto Serif JPへ揃えた初期値です。
 
 ```sh
+# STIX細字を和文・欧文主縦線の中間、Regular以降を和文基準で再計測
+uv run python tools/measure_stix_stems.py
+
+# 細字を和文側・欧文側の各端で比較
+uv run python tools/measure_stix_stems.py --thin-target japanese
+uv run python tools/measure_stix_stems.py --thin-target noto-latin
+
 # Noto版Regular
 uv run nobigoe-build
 
@@ -73,6 +81,16 @@ uv run nobigoe-build --autohint
 # Noto版の全7ウェイト
 for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
   uv run nobigoe-build --weight "$weight" --autohint
+done
+
+# STIX欧文の調整済み制作VFを一度生成し、そこから固定7ウェイトを作る
+uv run nobigoe-build \
+  --build-variable-stix dist/NobigoeSTIXLatinDesign-VF.ttf
+for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
+  uv run nobigoe-build --latin-family stix-two-text \
+    --latin-source dist/NobigoeSTIXLatinDesign-VF.ttf \
+    --weight "$weight" \
+    --output "dist/comparison/NobigoeMinchoSTIX-$weight.otf"
 done
 
 # Novel可変かな制作正本を一度生成し、そこから固定7ウェイトを作る
@@ -98,7 +116,7 @@ for latin in noto libertinus stix-two-text source-serif-4; do
 done
 ```
 
-既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`は制作VFを明示した場所へ生成し、`--variable-kana`はそのVFから対象ウェイトのかなを取り込みます。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定ビルドの出力は`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeKoburiMincho-Regular.ttf`です。`--kana-style novel`の出力は`dist/NobigoeNovelMincho-<Weight>.otf`で、既存配布名を上書きしません。`--build-variable-kana OUTPUT`と`--build-variable-stix OUTPUT`は、それぞれの調整済み制作VFを明示した場所へ生成します。`--variable-kana`は前者から対象ウェイトのかなを取り込み、`--latin-family stix-two-text`は公式STIX可変TTFまたは後者から対象ウェイトの欧文を実体化します。`--output`を省略して既定以外の欧文候補を指定した場合は、`dist/comparison/<PostScript名>-<Latin family>.otf`へ出力します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
 `nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`と、固定版でも使用するしっぽり明朝の各ウェイトを取得します。Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharString、全角`！`・`？`およびManga1方式の16合字、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。可変版の明朝感嘆符・疑問符は、ExtraLightだけを18本・6本の少数三次ベジェで再設計し、Light以上はしっぽり明朝Regular、Medium、SemiBold、Bold、ExtraBoldの実輪郭を使用します。しっぽり明朝の14曲線からなる疑問符は、右下内側の1曲線を固定パラメータで5分割し、形を変えず18曲線へ揃えます。直立感嘆符は元から6曲線です。黒みはNotoの全角約物ではなく、Noto Serif JPの`川`・`目`・`田`をY=350、450、550、650で切った縦主線幅の中央値を基準にします。200、300、400、500、600、700、900の基準値は順に44.0、53.6、65.2、80.1、95.0、117.0、144.0 unitsです。疑問符はしっぽり明朝の外周、高さ、筆だまりを保って右太線の内周だけを調整し、感嘆符は下部の細い軸を保って上部テーパーだけを左右から調整します。これによりExtraLightで承認した漢字主線との光学差を全ウェイトへ維持します。下点は元輪郭の上端を保って直径をウェイト別に84〜90%へ縮めた正円とし、5連感嘆符は200-unit間隔で配置して全角セル境界でも間隔を維持します。明朝、斜体明朝、ゴシック、斜体ゴシックを`aalt`と`ss01`–`ss03`で選択できます。濁点・半濁点の配置と連結記号の輪郭も同じ7ウェイトのレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`のその他の約物、欧文・ルビ置換は含みません。
 疑問符の下点は本体全体の外接中心ではなく、下へ伸びる線の終端中心へ揃えます。
@@ -220,7 +238,7 @@ npm run dev
 
 リポジトリ直下からOMPを起動すると、`.omp/lsp.json`に従ってPython、Astro、TypeScript／JavaScript、CSS、HTML、JSONのLanguage Serverが有効になります。`uv sync`でbasedpyrightを、`website/`で`npm ci`を実行してWeb用Language Serverをインストールしてください。`npm ci`後の`astro sync`は自動実行され、Astroの型定義も生成されます。
 
-かな比較`/compare/`は、小説本文用のNovel仮名を制作途中から確認できる公開制作プレビューです。Noto／Koburi／Novelの比較、固定7ウェイト、横組・縦組本文、開発用可変かなソースを掲載し、Pagesワークフローで必要な比較用Webfontを生成します。Novel版は通常の配布ZIPとタグリリースには含めません。
+かな比較`/compare/`は、小説本文用のNovel仮名と欧文候補を制作途中から確認できる公開制作プレビューです。Noto／Koburi／Novelの比較、固定7ウェイト、横組・縦組本文、開発用可変かなソースに加え、Noto Serif JP内蔵欧文、STIX Two Text、Spectral、Source Serif 4、Literata、Roboto Serif、Newsreader、Petronaを同じ和欧混植文・サイズ・ウェイト・光学サイズで比較できます。Pagesワークフローで必要な比較用Webfontを生成します。Novel版と欧文比較用Webfontは通常の配布ZIPとタグリリースには含めません。
 
 公開サイトは<https://nobigoe.ouvill.net/>です。`.github/workflows/pages.yml`が`main`へのpushごとに最新GitHub Releaseのフォントを取得し、Webfontを生成してAstroの成果物をGitHub Pagesへ配信します。
 
@@ -237,4 +255,10 @@ uv run pyftsubset dist/NobigoeMincho-Regular.otf \
   --notdef-glyph \
   --notdef-outline \
   --recommended-glyphs
+```
+
+欧文比較用Webfontだけを生成する場合は、リポジトリ直下で次を実行します。入力は固定コミットまたはタグとSHA-256で検証し、欧文Unicode範囲へサブセットしたWOFF2を`website/src/assets/fonts/`へ出力します。
+
+```sh
+uv run python website/tools/generate-latin-candidate-webfonts.py
 ```
