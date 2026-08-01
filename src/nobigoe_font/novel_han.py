@@ -373,7 +373,8 @@ def apply_novel_han(font: TTFont) -> HanGlyphPlan:
         scaled_fd = copy(source_fd)
         scaled_fd.rawDict = dict(source_fd.rawDict)
         scaled_fd.Private = scaled_private
-        scaled_fd.FontName = f"{source_fd.FontName}{HAN_FD_NAME_SUFFIX}"
+        source_font_name = getattr(source_fd, "FontName", f"FD{source_index}")
+        scaled_fd.FontName = f"{source_font_name}{HAN_FD_NAME_SUFFIX}"
         scaled_fd.FontMatrix = list(HAN_FD_FONT_MATRIX)
         scaled_index = len(top.FDArray)
         top.FDArray.append(scaled_fd)

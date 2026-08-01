@@ -1220,10 +1220,15 @@ def _append_heart_mark_composites(
     )
 
 
-def _rename_font(font: TTFont) -> None:
-    family = "Nobigoe Variable Marks"
+def rename_variable_font(
+    font: TTFont,
+    family: str = "Nobigoe Variable Marks",
+    japanese_family: str = "Nobigoe Variable Marks",
+    postscript_prefix: str = "NobigoeVariableMarks",
+) -> None:
+    """Apply consistent variable-family names and named-instance PostScript names."""
+
     style = "ExtraLight"
-    postscript_prefix = "NobigoeVariableMarks"
     postscript_name = f"{postscript_prefix}-{style}"
     full_name = f"{family} {style}"
     set_name(font, 1, family)
@@ -1235,7 +1240,13 @@ def _rename_font(font: TTFont) -> None:
     set_name(font, 16, family)
     set_name(font, 17, style)
     set_name(font, 25, postscript_prefix)
-    for name_id, value in ((1, family), (4, full_name), (16, family), (17, style)):
+    japanese_full_name = f"{japanese_family} {style}"
+    for name_id, value in (
+        (1, japanese_family),
+        (4, japanese_full_name),
+        (16, japanese_family),
+        (17, style),
+    ):
         set_japanese_name(font, name_id, value)
     styles = {weight: name for name, weight in _STYLES}
     for instance in font["fvar"].instances:
@@ -1423,6 +1434,6 @@ def build_variable_marks(
     _append_punctuation_mark_composites(font, top, cmap, model, vsindex)
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
-    _rename_font(font)
+    rename_variable_font(font)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path)

@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
@@ -35,7 +36,7 @@ def _ka_terminal_glyph():
 
 def _variable_ka_test_font():
     builder = FontBuilder(1000, isTTF=True)
-    glyph_order = [".notdef", "ka", "ga", "ki"]
+    glyph_order = [".notdef", "ka", "ga", "ki", "handakuten", "ka.handakuten"]
     builder.setupGlyphOrder(glyph_order)
     builder.setupGlyf(
         {
@@ -43,6 +44,8 @@ def _variable_ka_test_font():
             "ka": _ka_terminal_glyph(),
             "ga": _ka_terminal_glyph(),
             "ki": _ka_terminal_glyph(),
+            "handakuten": TTGlyphPen(None).glyph(),
+            "ka.handakuten": _ka_terminal_glyph(),
         }
     )
     builder.setupHorizontalMetrics({name: (1000, 100) for name in glyph_order})
@@ -52,11 +55,16 @@ def _variable_ka_test_font():
             ord("か"): "ka",
             ord("が"): "ga",
             ord("き"): "ki",
+            0x309A: "handakuten",
         }
     )
     builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
     builder.setupOS2()
     builder.setupPost()
+    addOpenTypeFeaturesFromString(
+        builder.font,
+        "feature ccmp { sub ka handakuten by ka.handakuten; } ccmp;",
+    )
     return builder.font
 
 
@@ -142,7 +150,7 @@ class VariableKanaContractTests(unittest.TestCase):
     ) -> None:
         for weight, expected_raise in ((200, 32), (400, 36), (900, 44)):
             font = _variable_ka_test_font()
-            names = ("ka", "ga", "ki")
+            names = ("ka", "ga", "ki", "ka.handakuten")
             topology = {name: _topology(font["glyf"][name]) for name in names}
             metrics = dict(font["hmtx"].metrics)
 
@@ -154,6 +162,10 @@ class VariableKanaContractTests(unittest.TestCase):
             )
             self.assertEqual(
                 font["glyf"]["ga"].yMin - font["glyf"]["ki"].yMin,
+                expected_raise,
+            )
+            self.assertEqual(
+                font["glyf"]["ka.handakuten"].yMin - font["glyf"]["ki"].yMin,
                 expected_raise,
             )
             self.assertEqual(

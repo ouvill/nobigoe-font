@@ -5,8 +5,14 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from . import pipeline, variable_marks
+from .variable_kana import (
+    build_variable_kana_source,
+    is_variable_kana_design_source,
+)
+from .variable_novel import build_variable_novel
 from .profiles import (
     NOTO_WEIGHT_CLASSES,
     default_output_path,
@@ -20,14 +26,15 @@ from .sources import DEFAULT_CACHE_DIR, SourceCache
 
 DEFAULT_OUTPUT_PATH = Path("dist") / "NobigoeVariableMarks-VF.otf"
 DEFAULT_STATIC_OUTPUT_DIR = Path("dist")
+DEFAULT_NOVEL_OUTPUT_PATH = Path("dist") / "NobigoeNovelMincho-VF.otf"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Customize the pinned Noto Serif JP CFF2 variable font with Nobigoe "
-            "glyphs and features, then instance release-ready static weights "
-            "with imported Latin outlines and metadata."
+            "glyphs and features, then instance Nobigoe and downstream Novel "
+            "static weights before applying static-only Latin outlines and metadata."
         )
     )
     parser.add_argument(
@@ -57,18 +64,32 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help=f"output CFF2 variable OTF (default: {DEFAULT_OUTPUT_PATH})",
     )
     parser.add_argument(
+        "--novel-output",
+        type=Path,
+        default=DEFAULT_NOVEL_OUTPUT_PATH,
+        help=f"output Novel CFF2 variable OTF (default: {DEFAULT_NOVEL_OUTPUT_PATH})",
+    )
+    parser.add_argument(
         "--static-output-dir",
         type=Path,
         default=DEFAULT_STATIC_OUTPUT_DIR,
         help=(
-            "directory for generated release-ready static OTFs "
+            "directory for generated Nobigoe and Novel static OTFs "
             f"(default: {DEFAULT_STATIC_OUTPUT_DIR})"
         ),
     )
     parser.add_argument(
         "--static-weight",
         choices=tuple(NOTO_WEIGHT_CLASSES),
-        help="build only the selected static weight (default: all seven)",
+        help="build only the selected static weight for both families (default: all seven)",
+    )
+    parser.add_argument(
+        "--novel-kana-source",
+        type=Path,
+        help=(
+            "local raw Noto Serif JP TTF VF or rebuilt Novel kana design VF "
+            "overriding the pinned development source"
+        ),
     )
     parser.add_argument(
         "--autohint",
@@ -108,16 +129,42 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.face,
         punctuation_sources,
     )
-    for style in static_styles:
-        identity = font_identity("noto", style)
-        output_path = args.static_output_dir / default_output_path(
-            identity, "noto"
-        ).name
-        pipeline.build_static_instance(
+    novel_kana_source = cache.resolve_variable_kana(args.novel_kana_source)
+    with TemporaryDirectory(prefix=".nobigoe-novel-design-") as directory:
+        novel_design_source = novel_kana_source
+        if not is_variable_kana_design_source(novel_design_source):
+            novel_design_source = Path(directory) / "NobigoeNovelKanaDesign-VF.ttf"
+            build_variable_kana_source(novel_kana_source, novel_design_source)
+        build_variable_novel(
             args.output,
-            latin_sources[style],
-            output_path,
-            identity,
-            latin_build_profile("libertinus", style),
-            args.autohint,
+            novel_design_source,
+            args.novel_output,
         )
+
+        for style in static_styles:
+            latin_profile = latin_build_profile("libertinus", style)
+            identity = font_identity("noto", style)
+            output_path = args.static_output_dir / default_output_path(
+                identity, "noto"
+            ).name
+            pipeline.build_static_instance(
+                args.output,
+                latin_sources[style],
+                output_path,
+                identity,
+                latin_profile,
+                args.autohint,
+            )
+
+            novel_identity = font_identity("noto", style, "novel")
+            novel_output_path = args.static_output_dir / default_output_path(
+                novel_identity, "noto"
+            ).name
+            pipeline.build_novel_static_instance(
+                args.novel_output,
+                latin_sources[style],
+                novel_output_path,
+                novel_identity,
+                latin_profile,
+                args.autohint,
+            )

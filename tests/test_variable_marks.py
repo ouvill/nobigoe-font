@@ -29,7 +29,11 @@ from nobigoe_font.punctuation import (
     make_original_punctuation_ligature,
     make_variable_shippori_punctuation_ligature,
 )
-from nobigoe_font.variable_cli import DEFAULT_OUTPUT_PATH, main
+from nobigoe_font.variable_cli import (
+    DEFAULT_NOVEL_OUTPUT_PATH,
+    DEFAULT_OUTPUT_PATH,
+    main,
+)
 from nobigoe_font.variable_marks import (
     _cap_cut_span,
     _DeltaModel,
@@ -667,19 +671,36 @@ class VariableBuildCliTests(unittest.TestCase):
             "39701fd096bc51204a8444c6c2659f007b29674a13eb62ddfa470638fe8179cd",
         )
 
-    def test_local_noto_source_builds_selected_static_weight(self) -> None:
+    def test_local_noto_source_builds_selected_nobigoe_and_novel_weight(
+        self,
+    ) -> None:
         cached = Path("cache/font.otf")
+        novel_design = Path("design/NobigoeNovelKanaDesign-VF.ttf")
         with (
             patch(
                 "nobigoe_font.variable_cli.SourceCache.fetch",
                 return_value=cached,
             ) as fetch,
             patch(
+                "nobigoe_font.variable_cli.SourceCache.resolve_variable_kana",
+                return_value=novel_design,
+            ) as resolve_novel,
+            patch(
+                "nobigoe_font.variable_cli.is_variable_kana_design_source",
+                return_value=True,
+            ),
+            patch(
                 "nobigoe_font.variable_cli.variable_marks.build_variable_marks"
             ) as build_variable,
             patch(
+                "nobigoe_font.variable_cli.build_variable_novel"
+            ) as build_novel_variable,
+            patch(
                 "nobigoe_font.variable_cli.pipeline.build_static_instance"
             ) as build_static,
+            patch(
+                "nobigoe_font.variable_cli.pipeline.build_novel_static_instance"
+            ) as build_novel,
         ):
             main(
                 [
@@ -687,10 +708,14 @@ class VariableBuildCliTests(unittest.TestCase):
                     "source.otf",
                     "--output",
                     "custom.otf",
+                    "--novel-output",
+                    "novel.otf",
                     "--static-output-dir",
                     "static",
                     "--static-weight",
                     "Regular",
+                    "--novel-kana-source",
+                    str(novel_design),
                     "--face",
                     "2",
                     "--autohint",
@@ -704,11 +729,17 @@ class VariableBuildCliTests(unittest.TestCase):
                 latin_font_source("libertinus", "Regular"),
             ],
         )
+        resolve_novel.assert_called_once_with(novel_design)
         build_variable.assert_called_once_with(
             Path("source.otf"),
             Path("custom.otf"),
             2,
             {weight: cached for weight in NOTO_WEIGHT_CLASSES.values()},
+        )
+        build_novel_variable.assert_called_once_with(
+            Path("custom.otf"),
+            novel_design,
+            Path("novel.otf"),
         )
         identity = font_identity("noto", "Regular")
         self.assertEqual(
@@ -724,19 +755,52 @@ class VariableBuildCliTests(unittest.TestCase):
                 )
             ],
         )
+        novel_identity = font_identity("noto", "Regular", "novel")
+        self.assertEqual(
+            build_novel.call_args_list,
+            [
+                call(
+                    Path("novel.otf"),
+                    cached,
+                    Path("static")
+                    / default_output_path(novel_identity, "noto").name,
+                    novel_identity,
+                    latin_build_profile("libertinus", "Regular"),
+                    True,
+                )
+            ],
+        )
 
-    def test_default_build_fetches_all_pinned_sources(self) -> None:
+    def test_default_build_fetches_and_rebuilds_all_pinned_sources(self) -> None:
         cached = Path("cache/font.otf")
+        raw_novel = Path("cache/NotoSerifJP-VF.ttf")
         with (
             patch(
                 "nobigoe_font.variable_cli.SourceCache.fetch", return_value=cached
             ) as fetch,
             patch(
+                "nobigoe_font.variable_cli.SourceCache.resolve_variable_kana",
+                return_value=raw_novel,
+            ) as resolve_novel,
+            patch(
+                "nobigoe_font.variable_cli.is_variable_kana_design_source",
+                return_value=False,
+            ),
+            patch(
+                "nobigoe_font.variable_cli.build_variable_kana_source"
+            ) as build_design,
+            patch(
                 "nobigoe_font.variable_cli.variable_marks.build_variable_marks"
             ) as build_variable,
             patch(
+                "nobigoe_font.variable_cli.build_variable_novel"
+            ) as build_novel_variable,
+            patch(
                 "nobigoe_font.variable_cli.pipeline.build_static_instance"
             ) as build_static,
+            patch(
+                "nobigoe_font.variable_cli.pipeline.build_novel_static_instance"
+            ) as build_novel,
         ):
             main([])
 
@@ -751,13 +815,21 @@ class VariableBuildCliTests(unittest.TestCase):
                 ),
             ],
         )
+        resolve_novel.assert_called_once_with(None)
+        build_design.assert_called_once()
         build_variable.assert_called_once_with(
             cached,
             DEFAULT_OUTPUT_PATH,
             0,
             {weight: cached for weight in NOTO_WEIGHT_CLASSES.values()},
         )
+        build_novel_variable.assert_called_once()
+        self.assertEqual(
+            build_novel_variable.call_args.args[2],
+            DEFAULT_NOVEL_OUTPUT_PATH,
+        )
         self.assertEqual(len(build_static.call_args_list), len(NOTO_WEIGHT_CLASSES))
+        self.assertEqual(len(build_novel.call_args_list), len(NOTO_WEIGHT_CLASSES))
 
 
 if __name__ == "__main__":
