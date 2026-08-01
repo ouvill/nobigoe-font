@@ -646,20 +646,27 @@ def make_wave_parts(
     source_x_min, _, source_x_max, _ = source.bounds
     start_margin = max(0.0, source_x_min)
     end_margin = max(0.0, advance - source_x_max)
+    parameters = {
+        "half_waves": 3,
+        "phase_offset_half_waves": -0.5,
+        "terminal_phase_extension_half_waves": 0,
+    }
     horizontal = (
         make_sine_wave_tile(
             source,
             advance,
             taper_start=True,
             start_margin=start_margin,
+            **parameters,
         ),
-        make_sine_wave_tile(source, advance),
-        make_sine_wave_tile(source, advance, inverted=True),
+        make_sine_wave_tile(source, advance, **parameters),
+        make_sine_wave_tile(source, advance, inverted=True, **parameters),
         make_sine_wave_tile(
             source,
             advance,
             taper_end=True,
             end_margin=end_margin,
+            **parameters,
         ),
         make_sine_wave_tile(
             source,
@@ -667,6 +674,7 @@ def make_wave_parts(
             inverted=True,
             taper_end=True,
             end_margin=end_margin,
+            **parameters,
         ),
     )
     tile_center_y = (horizontal[1].bounds[1] + horizontal[1].bounds[3]) / 2
