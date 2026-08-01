@@ -55,11 +55,13 @@ PUNCTUATION_VARIANT_SEQUENCES = (
     "?",
     *MANGA_PUNCTUATION_SEQUENCES,
 )
-PUNCTUATION_ITALIC_COUNT = len(PUNCTUATION_VARIANT_SEQUENCES)
-PUNCTUATION_SLANT_ANGLE = 12
+PUNCTUATION_ROTATED_COUNT = len(PUNCTUATION_VARIANT_SEQUENCES)
+PUNCTUATION_ROTATION_ANGLE = 10
 
 _VARIABLE_SERIF_DOT_SCALE_MASTERS = (0.84, 0.87, 0.90)
 _FIVE_EXCLAMATION_CENTERS = (100, 300, 500, 700, 900)
+_PUNCTUATION_ROTATED_MAX_BODY_SPAN = 960
+_PUNCTUATION_ROTATED_MIN_BODY_GAP = 20
 
 
 def _master_value(
@@ -1006,12 +1008,111 @@ def make_sans_punctuation_ligature(
     return combined
 
 
-def slant_punctuation_outline(outline: pathops.Path) -> pathops.Path:
-    shear = math.tan(math.radians(PUNCTUATION_SLANT_ANGLE))
-    slanted = geometry.transform_path(outline, Transform(1, 0, shear, 1, 0, 0))
-    x_min, _, x_max, _ = slanted.bounds
+def rotate_punctuation_outline(outline: pathops.Path) -> pathops.Path:
+    """Rotate and align marks, then restore their horizontal ink spacing."""
+    bodies = sorted(
+        (contour for contour in outline.contours if contour.bounds[3] >= 140),
+        key=lambda contour: (contour.bounds[0] + contour.bounds[2]) / 2,
+    )
+    dots = sorted(
+        (contour for contour in outline.contours if contour.bounds[3] < 140),
+        key=lambda contour: (contour.bounds[0] + contour.bounds[2]) / 2,
+    )
+    if len(bodies) != len(dots):
+        raise ValueError("Punctuation outline must contain one dot per body")
+
+    target_gaps = [
+        max(0.0, following.bounds[0] - previous.bounds[2])
+        for previous, following in zip(bodies, bodies[1:])
+    ]
+
+    def rotated_components(angle_degrees: float):
+        angle = math.radians(-angle_degrees)
+        cosine = math.cos(angle)
+        sine = math.sin(angle)
+        components = []
+        for body, dot in zip(bodies, dots, strict=True):
+            pivot_x = (dot.bounds[0] + dot.bounds[2]) / 2
+            pivot_y = (dot.bounds[1] + dot.bounds[3]) / 2
+            transform = Transform(
+                cosine,
+                sine,
+                -sine,
+                cosine,
+                pivot_x - cosine * pivot_x + sine * pivot_y,
+                pivot_y - sine * pivot_x - cosine * pivot_y,
+            )
+            rotated_body = geometry.transform_path(body, transform)
+            rotated_dot = geometry.transform_path(dot, transform)
+            rotated_body = geometry.transform_path(
+                rotated_body,
+                Transform(
+                    1,
+                    0,
+                    0,
+                    1,
+                    0,
+                    body.bounds[3] - rotated_body.bounds[3],
+                ),
+            )
+            rotated_dot = geometry.transform_path(
+                rotated_dot,
+                Transform(1, 0, 0, 1, 0, dot.bounds[1] - rotated_dot.bounds[1]),
+            )
+            components.append((rotated_body, rotated_dot))
+        return components
+
+    minimum_gap_total = _PUNCTUATION_ROTATED_MIN_BODY_GAP * len(target_gaps)
+    components = rotated_components(PUNCTUATION_ROTATION_ANGLE)
+    body_width = sum(body.bounds[2] - body.bounds[0] for body, _ in components)
+    if body_width + minimum_gap_total > _PUNCTUATION_ROTATED_MAX_BODY_SPAN:
+        lower_angle = 0.0
+        upper_angle = float(PUNCTUATION_ROTATION_ANGLE)
+        components = rotated_components(lower_angle)
+        for _ in range(16):
+            candidate_angle = (lower_angle + upper_angle) / 2
+            candidate = rotated_components(candidate_angle)
+            candidate_width = sum(
+                body.bounds[2] - body.bounds[0] for body, _ in candidate
+            )
+            if (
+                candidate_width + minimum_gap_total
+                <= _PUNCTUATION_ROTATED_MAX_BODY_SPAN
+            ):
+                lower_angle = candidate_angle
+                components = candidate
+            else:
+                upper_angle = candidate_angle
+        body_width = sum(body.bounds[2] - body.bounds[0] for body, _ in components)
+
+    available_gap = max(0.0, _PUNCTUATION_ROTATED_MAX_BODY_SPAN - body_width)
+    if target_gaps:
+        minimum_gap = min(
+            _PUNCTUATION_ROTATED_MIN_BODY_GAP,
+            available_gap / len(target_gaps),
+        )
+        extra_targets = [max(0.0, gap - minimum_gap) for gap in target_gaps]
+        extra_budget = max(0.0, available_gap - minimum_gap * len(target_gaps))
+        extra_total = sum(extra_targets)
+        extra_scale = min(1.0, extra_budget / extra_total) if extra_total else 0.0
+        target_gaps = [
+            minimum_gap + extra * extra_scale for extra in extra_targets
+        ]
+
+    rotated = pathops.Path()
+    cursor = 0.0
+    for index, (body, dot) in enumerate(components):
+        x_shift = cursor - body.bounds[0]
+        transform = Transform(1, 0, 0, 1, x_shift, 0)
+        rotated.addPath(geometry.transform_path(body, transform))
+        rotated.addPath(geometry.transform_path(dot, transform))
+        cursor = body.bounds[2] + x_shift
+        if index < len(target_gaps):
+            cursor += target_gaps[index]
+
+    x_min, _, x_max, _ = rotated.bounds
     return geometry.transform_path(
-        slanted,
+        rotated,
         Transform(1, 0, 0, 1, 500 - (x_min + x_max) / 2, 0),
     )
 
