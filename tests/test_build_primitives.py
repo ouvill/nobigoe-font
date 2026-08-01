@@ -91,6 +91,22 @@ def rectangle_path() -> pathops.Path:
     pen.closePath()
     return path
 
+def wave_source_path() -> pathops.Path:
+    path = pathops.Path()
+    pen = path.getPen()
+    pen.moveTo((50, 425))
+    pen.lineTo((250, 475))
+    pen.lineTo((500, 410))
+    pen.lineTo((750, 325))
+    pen.lineTo((950, 275))
+    pen.lineTo((950, 225))
+    pen.lineTo((750, 275))
+    pen.lineTo((500, 340))
+    pen.lineTo((250, 425))
+    pen.lineTo((50, 375))
+    pen.closePath()
+    return path
+
 
 def minimal_true_type_font() -> TTFont:
     builder = FontBuilder(1000, isTTF=True)
@@ -285,19 +301,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(adjusted.bounds[0::2], (71.0, 131.0))
 
     def test_wave_stroke_matches_source_phase_weight(self) -> None:
-        source = pathops.Path()
-        pen = source.getPen()
-        pen.moveTo((0, 425))
-        pen.lineTo((250, 475))
-        pen.lineTo((500, 410))
-        pen.lineTo((750, 325))
-        pen.lineTo((1000, 275))
-        pen.lineTo((1000, 225))
-        pen.lineTo((750, 275))
-        pen.lineTo((500, 340))
-        pen.lineTo((250, 425))
-        pen.lineTo((0, 375))
-        pen.closePath()
+        source = wave_source_path()
 
         wave = make_sine_wave_tile(source, 1000, half_waves=2)
         widths = []
@@ -309,6 +313,39 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertAlmostEqual(peak_width, 50, delta=2)
         self.assertAlmostEqual(crossing_width, 56, delta=2)
         self.assertAlmostEqual(trough_width, 50, delta=2)
+
+    def test_joined_waves_use_constant_period_with_half_wave_offset(self) -> None:
+        start, middle, inverted, end, inverted_end = make_wave_parts(
+            wave_source_path(), 1000, 880
+        )[:5]
+
+        def center_at(path: pathops.Path, position: float) -> float:
+            low, high = stroke_band(path, "horizontal", position)
+            return (low + high) / 2
+
+        def terminal_y(path: pathops.Path, position: float) -> list[float]:
+            return [
+                y
+                for _, points in path
+                for x, y in points
+                if abs(x - position) < 1e-6
+            ]
+
+        self.assertAlmostEqual(center_at(middle, 250), 428.0, delta=2)
+        self.assertAlmostEqual(center_at(middle, 750), 322.0, delta=2)
+        self.assertAlmostEqual(
+            center_at(start, 250), center_at(middle, 250), delta=2
+        )
+        self.assertAlmostEqual(
+            center_at(end, 750), center_at(middle, 750), delta=2
+        )
+        self.assertAlmostEqual(center_at(start, 1000), center_at(inverted, 0))
+        start_terminal = terminal_y(start, 50)
+        end_terminal = terminal_y(inverted_end, 950)
+        self.assertTrue(start_terminal)
+        self.assertTrue(end_terminal)
+        for y in start_terminal + end_terminal:
+            self.assertAlmostEqual(y, 308.2, delta=1)
 
     def test_wave_terminals_reuse_source_glyph_margins(self) -> None:
         (
