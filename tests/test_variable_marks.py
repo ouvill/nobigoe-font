@@ -26,6 +26,7 @@ from nobigoe_font.profiles import (
 from nobigoe_font.punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
     PUNCTUATION_VARIANT_SEQUENCES,
+    rotate_punctuation_outline,
     make_original_punctuation_ligature,
     make_variable_shippori_punctuation_ligature,
 )
@@ -361,6 +362,126 @@ class VariablePunctuationTests(unittest.TestCase):
                     width = dot.bounds[2] - dot.bounds[0]
                     height = dot.bounds[3] - dot.bounds[1]
                     self.assertAlmostEqual(width, height, places=4)
+
+    def test_rotated_punctuation_preserves_contours_and_aligns_edges(self) -> None:
+        source = geometry.rectangle(450, 160, 550, 790)
+        source.addPath(geometry.rectangle(450, -30, 550, 80))
+
+        rotated = rotate_punctuation_outline(source)
+        body, dot = list(rotated.contours)
+        cosine = math.cos(math.radians(10))
+        sine = math.sin(math.radians(10))
+
+        self.assertAlmostEqual(body.bounds[3], 790)
+        self.assertAlmostEqual(dot.bounds[1], -30)
+        self.assertAlmostEqual(
+            body.bounds[2] - body.bounds[0],
+            100 * cosine + 630 * sine,
+            places=3,
+        )
+        self.assertAlmostEqual(
+            dot.bounds[3] - dot.bounds[1],
+            100 * sine + 110 * cosine,
+            places=3,
+        )
+        self.assertAlmostEqual(abs(body.area), 100 * 630, places=2)
+        self.assertAlmostEqual(abs(dot.area), 100 * 110, places=2)
+
+    def test_rotated_ligature_edges_share_parallel_guides(self) -> None:
+        source = make_original_punctuation_ligature("!!??", 400)
+
+        rotated = rotate_punctuation_outline(source)
+        body_tops = {
+            round(contour.bounds[3], 3)
+            for contour in rotated.contours
+            if contour.bounds[3] >= 140
+        }
+        dot_bottoms = {
+            round(contour.bounds[1], 3)
+            for contour in rotated.contours
+            if contour.bounds[3] < 140
+        }
+
+        self.assertEqual(body_tops, {790})
+        self.assertEqual(dot_bottoms, {-30})
+
+    def test_rotated_mixed_pairs_restore_source_body_gaps(self) -> None:
+        gaps = []
+        for sequence in ("!?", "?!"):
+            source = make_original_punctuation_ligature(sequence, 400)
+            source_bodies = sorted(
+                (
+                    contour
+                    for contour in source.contours
+                    if contour.bounds[3] >= 140
+                ),
+                key=lambda contour: contour.bounds[0],
+            )
+            expected = source_bodies[1].bounds[0] - source_bodies[0].bounds[2]
+
+            rotated = rotate_punctuation_outline(source)
+            rotated_bodies = sorted(
+                (
+                    contour
+                    for contour in rotated.contours
+                    if contour.bounds[3] >= 140
+                ),
+                key=lambda contour: contour.bounds[0],
+            )
+            actual = rotated_bodies[1].bounds[0] - rotated_bodies[0].bounds[2]
+            self.assertAlmostEqual(actual, expected, places=3)
+            gaps.append(actual)
+
+        self.assertAlmostEqual(gaps[0], gaps[1], delta=4)
+
+    def test_rotated_five_exclamations_fit_with_positive_equal_gaps(self) -> None:
+        for sans in (False, True):
+            for weight in (200, 400, 900):
+                source = make_original_punctuation_ligature(
+                    "!!!!!",
+                    weight,
+                    sans=sans,
+                )
+                rotated = rotate_punctuation_outline(source)
+                bodies = sorted(
+                    (
+                        contour
+                        for contour in rotated.contours
+                        if contour.bounds[3] >= 140
+                    ),
+                    key=lambda contour: contour.bounds[0],
+                )
+                gaps = [
+                    following.bounds[0] - previous.bounds[2]
+                    for previous, following in zip(bodies, bodies[1:])
+                ]
+                span = bodies[-1].bounds[2] - bodies[0].bounds[0]
+
+                with self.subTest(sans=sans, weight=weight):
+                    self.assertLessEqual(span, 960.001)
+                    self.assertGreater(min(gaps), 0)
+                    self.assertAlmostEqual(max(gaps), min(gaps), places=3)
+
+    def test_rotated_punctuation_preserves_variable_master_topology(self) -> None:
+        for sans in (False, True):
+            for sequence in PUNCTUATION_VARIANT_SEQUENCES:
+                signatures = set()
+                for weight in (200, 400, 900):
+                    outline = make_original_punctuation_ligature(
+                        sequence,
+                        weight,
+                        sans=sans,
+                    )
+                    designed = rotate_punctuation_outline(outline)
+                    signatures.add(
+                        (
+                            tuple(designed.verbs),
+                            len(designed.points),
+                            sum(1 for _ in designed.contours),
+                        )
+                    )
+                with self.subTest(sans=sans, sequence=sequence):
+                    self.assertEqual(len(signatures), 1)
 
     def test_five_exclamations_fill_the_optical_cell(self) -> None:
         for weight in (200, 300, 400, 500, 600, 700, 900):

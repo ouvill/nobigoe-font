@@ -276,7 +276,7 @@ const punctuationRows = [
 
     <div
       class="punctuation-comparison"
-      aria-label="感嘆符と疑問符の16通りの合字を明朝と斜体明朝で比較"
+      aria-label="感嘆符と疑問符の16通りの合字を明朝と回転字形で比較"
     >
       {
         [
@@ -287,10 +287,10 @@ const punctuationRows = [
             className: "punctuation-specimen--mincho",
           },
           {
-            id: "punctuation-mincho-italic",
-            name: "斜体明朝",
+            id: "punctuation-mincho-rotated",
+            name: "回転字形",
             feature: "ccmp + ss01",
-            className: "punctuation-specimen--mincho-italic",
+            className: "punctuation-specimen--mincho-rotated",
           },
         ].map((variant) => (
           <section

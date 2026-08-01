@@ -635,7 +635,7 @@
     "ss01" 0;
 }
 
-.punctuation-specimen--mincho-italic ul {
+.punctuation-specimen--mincho-rotated ul {
   font-feature-settings:
     "ccmp" 1,
     "ss01" 1;

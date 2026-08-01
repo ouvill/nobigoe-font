@@ -44,14 +44,14 @@ from .novel_katakana import (
 from .novel_han import apply_novel_han
 from .punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
-    PUNCTUATION_ITALIC_COUNT,
+    PUNCTUATION_ROTATED_COUNT,
     PUNCTUATION_VARIANT_SEQUENCES,
     SHIPPORI_PRECOMPOSED_LIGATURES,
     SHIPPORI_UPRIGHT_EXCLAMATIONS,
     SHIPPORI_UPRIGHT_PUNCTUATION,
     make_punctuation_ligature,
     shippori_upright_punctuation_paths,
-    slant_punctuation_outline,
+    rotate_punctuation_outline,
 )
 
 import pathops
@@ -1392,7 +1392,7 @@ def build(
         + WAVE_SELECTOR_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
-        + PUNCTUATION_ITALIC_COUNT
+        + PUNCTUATION_ROTATED_COUNT
         + 2 * len(_mark_positioning.MANGA_MISSING_SMALL_KANA)
         + len(generated_mark_pairs)
         + len(generated_vertical_mark_pairs)
@@ -1597,38 +1597,38 @@ def build(
             )
         ),
     }
-    punctuation_italic_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
-    punctuation_italic_names = allocated_names[
-        punctuation_italic_start : punctuation_italic_start
-        + PUNCTUATION_ITALIC_COUNT
+    punctuation_rotated_start = punctuation_start + len(MANGA_PUNCTUATION_SEQUENCES)
+    punctuation_rotated_names = allocated_names[
+        punctuation_rotated_start : punctuation_rotated_start
+        + PUNCTUATION_ROTATED_COUNT
     ]
-    punctuation_italic_paths: list[pathops.Path] = []
+    punctuation_rotated_paths: list[pathops.Path] = []
     punctuation_variants: list[tuple[str, tuple[str, str]]] = []
-    for sequence, italic_name in zip(
+    for sequence, rotated_name in zip(
         PUNCTUATION_VARIANT_SEQUENCES,
-        punctuation_italic_names,
+        punctuation_rotated_names,
         strict=True,
     ):
-        punctuation_italic_paths.append(
-            slant_punctuation_outline(mincho_punctuation_paths[sequence])
+        punctuation_rotated_paths.append(
+            rotate_punctuation_outline(mincho_punctuation_paths[sequence])
         )
         punctuation_variants.append(
             (
                 sequence,
-                (default_punctuation_names[sequence], italic_name),
+                (default_punctuation_names[sequence], rotated_name),
             )
         )
     _font_operations.append_glyphs(
         font,
-        punctuation_italic_paths,
-        punctuation_italic_names,
+        punctuation_rotated_paths,
+        punctuation_rotated_names,
         cmap[0xFF01],
         punctuation_vertical_origin,
         add_stem_hints=False,
         advance_override=1000,
     )
 
-    punctuation_mark_start = punctuation_italic_start + PUNCTUATION_ITALIC_COUNT
+    punctuation_mark_start = punctuation_rotated_start + PUNCTUATION_ROTATED_COUNT
     punctuation_mark_count = len(_mark_positioning.PUNCTUATION_MARK_PAIRS)
     punctuation_mark_names = allocated_names[
         punctuation_mark_start : punctuation_mark_start + 2 * punctuation_mark_count

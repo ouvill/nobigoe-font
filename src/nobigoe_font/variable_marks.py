@@ -79,7 +79,7 @@ from .punctuation import (
     PUNCTUATION_VARIANT_SEQUENCES,
     make_original_punctuation_ligature,
     make_variable_shippori_punctuation_ligature,
-    slant_punctuation_outline,
+    rotate_punctuation_outline,
 )
 from .version import VERSION, VERSION_NUMBER
 
@@ -892,23 +892,23 @@ def _append_punctuation(
 
     glyphs = []
     for sequence, names in variants:
-        default, italic, sans, italic_sans = names
+        default, rotated, sans, rotated_sans = names
         if len(sequence) > 1:
             glyphs.append((default, serif_masters[sequence]))
         glyphs.extend(
             (
                 (
-                    italic,
+                    rotated,
                     [
-                        slant_punctuation_outline(outline)
+                        rotate_punctuation_outline(outline)
                         for outline in serif_masters[sequence]
                     ],
                 ),
                 (sans, sans_masters[sequence]),
                 (
-                    italic_sans,
+                    rotated_sans,
                     [
-                        slant_punctuation_outline(outline)
+                        rotate_punctuation_outline(outline)
                         for outline in sans_masters[sequence]
                     ],
                 ),
