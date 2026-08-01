@@ -29,7 +29,7 @@ const translatePath = (commands: PathCommand[], x: number, y: number) =>
         args.map((value, index) => value + (index % 2 === 0 ? x : y)).join(" "),
     )
     .join("");
-const run = font.layout(text, { calt: true, ccmp: true }, "latn");
+const run = font.layout(text, { calt: true, ccmp: true }, "DFLT");
 
 let penX = 0;
 let penY = 0;
