@@ -935,6 +935,8 @@ def mark_ligature_rules(
 def _variable_kana_mappings(
     font: TTFont,
     source_font: TTFont,
+    *,
+    allow_missing_ccmp_outputs: bool = False,
 ) -> dict[_KanaSourceKey, tuple[str, str]]:
     """Map design-VF kana to the static font without relying on CID names."""
 
@@ -1019,6 +1021,8 @@ def _variable_kana_mappings(
                 )
                 source_output = source_ligatures.get((source_base, source_mark))
                 if source_output is None:
+                    if allow_missing_ccmp_outputs:
+                        continue
                     raise ValueError(
                         "The variable kana source cannot provide "
                         f"{orientation} ccmp output for "
@@ -1062,6 +1066,8 @@ def _import_variable_kana(
                 source_font,
                 source_name,
             )
+
+
 
 
 def autohint_latin_glyphs(
@@ -1171,6 +1177,7 @@ def build_static_instance(
     identity: FontIdentity,
     latin_profile: LatinBuildProfile,
     autohint: bool = False,
+    customize: Callable[[TTFont], None] | None = None,
 ) -> None:
     """Instance customized CFF2, then apply work that remains static-only."""
 
@@ -1204,6 +1211,8 @@ def build_static_instance(
     font.save(static_data, reorderTables=True)
     static_data.seek(0)
     font = TTFont(static_data, recalcTimestamp=True)
+    if customize is not None:
+        customize(font)
 
     latin_font = TTFont(latin_source_path) if latin_source_path else None
     if latin_font and latin_profile.variations:
@@ -1229,6 +1238,30 @@ def build_static_instance(
     font.save(output_path, reorderTables=True)
     if autohint and latin_import is not None:
         autohint_latin_glyphs(output_path, latin_import.glyph_names)
+
+
+def build_novel_static_instance(
+    variable_source_path: Path,
+    latin_source_path: Path | None,
+    output_path: Path,
+    identity: FontIdentity,
+    latin_profile: LatinBuildProfile,
+    autohint: bool = False,
+) -> None:
+    """Instance a Novel CFF2 source, then apply its remaining static work."""
+
+    if identity.family != "Nobigoe Novel Mincho":
+        raise ValueError("Novel static instances require a Novel font identity")
+
+    build_static_instance(
+        variable_source_path,
+        latin_source_path,
+        output_path,
+        identity,
+        latin_profile,
+        autohint,
+        apply_novel_han,
+    )
 
 
 

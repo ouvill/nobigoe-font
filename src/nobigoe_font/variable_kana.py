@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 
 from fontTools.designspaceLib import AxisDescriptor, DesignSpaceDocument
 from fontTools.designspaceLib import InstanceDescriptor, SourceDescriptor
@@ -38,7 +38,7 @@ from .novel_katakana import (
     katakana_vertical_transform,
     novel_katakana_group_for_codepoint,
 )
-from .operations import feature_single_substitutions
+from .operations import feature_ligatures, feature_single_substitutions
 from .metadata import set_japanese_name, set_name
 from .profiles import NOTO_WEIGHT_CLASSES, NOTO_WEIGHT_DESIGN_LOCATIONS
 from .terminal_plans import terminal_depth_ratio
@@ -169,11 +169,36 @@ def instantiate_variable_kana_source(source: Path, weight_class: int) -> TTFont:
 def _collect(font: TTFont) -> tuple[int, int, tuple[_OwnedGlyph, ...]]:
     cmap = font.getBestCmap() or {}
     vertical: dict[str, str] = {}
+    ccmp: dict[tuple[str, ...], str] = {}
     if "GSUB" in font:
         vertical.update(feature_single_substitutions(font, "vert"))
         vertical.update(feature_single_substitutions(font, "vrt2"))
+        ccmp.update(feature_ligatures(font, "ccmp"))
     owned: dict[str, _OwnedGlyph] = {}
     counts = [0, 0]
+
+    def add(
+        glyph_name: str,
+        codepoint: int,
+        script: str,
+        orientation: str,
+        group: str,
+    ) -> None:
+        item = _OwnedGlyph(
+            glyph_name,
+            codepoint,
+            cast(KanaScript, script),
+            cast(KanaOrientation, orientation),
+            group,
+        )
+        previous = owned.get(glyph_name)
+        if previous is None:
+            owned[glyph_name] = item
+        elif previous.script != script or previous.group != group:
+            raise ValueError(f"Conflicting Unicode ownership for {glyph_name!r}")
+        elif orientation == "horizontal":
+            owned[glyph_name] = item
+
     scripts = (
         ("hiragana", HIRAGANA_CODEPOINTS, novel_group_for_codepoint),
         ("katakana", KATAKANA_SOURCE_CODEPOINTS, novel_katakana_group_for_codepoint),
@@ -188,17 +213,19 @@ def _collect(font: TTFont) -> tuple[int, int, tuple[_OwnedGlyph, ...]]:
             candidates = [(name, "horizontal")]
             if vertical.get(name) not in {None, name}:
                 candidates.append((vertical[name], "vertical"))
+            marked_candidates = []
             for glyph_name, orientation in candidates:
-                item = _OwnedGlyph(glyph_name, codepoint, script, orientation, group)  # type: ignore[arg-type]
-                previous = owned.get(glyph_name)
-                if previous is None:
-                    owned[glyph_name] = item
-                elif previous.script != script or previous.group != group:
-                    raise ValueError(
-                        f"Conflicting Unicode ownership for {glyph_name!r}"
+                for mark_codepoint in (0x3099, 0x309A):
+                    mark_name = cmap.get(mark_codepoint)
+                    output_name = (
+                        ccmp.get((glyph_name, mark_name))
+                        if mark_name is not None
+                        else None
                     )
-                elif orientation == "horizontal":
-                    owned[glyph_name] = item
+                    if output_name is not None:
+                        marked_candidates.append((output_name, orientation))
+            for glyph_name, orientation in (*candidates, *marked_candidates):
+                add(glyph_name, codepoint, script, orientation, group)
     missing = sorted(set(owned).difference(font.getGlyphOrder()))
     if missing:
         raise ValueError(f"Unicode/layout-owned kana glyphs are missing: {missing!r}")

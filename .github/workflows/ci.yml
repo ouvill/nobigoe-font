@@ -116,6 +116,9 @@ jobs:
             /tmp/NobigoeMincho-Regular.otf \
             /tmp/NobigoeMincho-Regular-sanitized.otf
           ots-sanitize \
+            /tmp/NobigoeNovelMincho-Regular.otf \
+            /tmp/NobigoeNovelMincho-Regular-sanitized.otf
+          ots-sanitize \
             /tmp/NobigoeKoburiMincho-Regular.ttf \
             /tmp/NobigoeKoburiMincho-Regular-sanitized.ttf
           ots-sanitize \
@@ -124,6 +127,10 @@ jobs:
           hb-shape \
             /tmp/NobigoeMincho-Regular.otf \
             "AVATAR あーーー！？" \
+            --features=kern,liga,calt,ccmp >/dev/null
+          hb-shape \
+            /tmp/NobigoeNovelMincho-Regular.otf \
+            "春の雨が静かに続く。あ゙ーーー！？" \
             --features=kern,liga,calt,ccmp >/dev/null
           hb-shape \
             /tmp/NobigoeVariableMarks-VF.otf \
