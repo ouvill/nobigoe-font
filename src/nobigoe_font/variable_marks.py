@@ -56,12 +56,14 @@ from .operations import (
 from .pipeline import (
     MANGA_WAVE_GLYPH_COUNT,
     NEW_GLYPH_COUNT,
+    ONE_CYCLE_WAVE_GLYPH_COUNT,
     RELAXED_WAVE_GLYPH_COUNT,
     WAVE_GLYPH_COUNT,
     WAVE_SELECTOR_GLYPH_COUNT,
     flatten_horizontal_centerline,
     make_horizontal_parts,
     make_manga_wave_parts,
+    make_one_cycle_wave_parts,
     make_relaxed_wave_parts,
     make_vertical_parts,
     make_wave_parts,
@@ -628,6 +630,7 @@ def _append_symbols(
         2 * NEW_GLYPH_COUNT
         + WAVE_GLYPH_COUNT
         + RELAXED_WAVE_GLYPH_COUNT
+        + ONE_CYCLE_WAVE_GLYPH_COUNT
         + WAVE_SELECTOR_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT,
     )
@@ -722,6 +725,33 @@ def _append_symbols(
         _SYMBOL_VERTICAL_ORIGIN,
     )
 
+    one_cycle_names = allocated[offset : offset + ONE_CYCLE_WAVE_GLYPH_COUNT]
+    offset += ONE_CYCLE_WAVE_GLYPH_COUNT
+    one_cycle_masters = []
+    for weight in _WEIGHTS:
+        one_cycle_masters.append(
+            make_one_cycle_wave_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        _named_master_outlines(one_cycle_names, one_cycle_masters),
+        model,
+        vsindex,
+        wave_base,
+        _SYMBOL_VERTICAL_ORIGIN,
+    )
+    one_cycle_wave = (
+        "one_cycle_wave",
+        wave_base,
+        wave_vertical,
+        one_cycle_names,
+    )
+
     selector_seed = allocated[offset]
     offset += WAVE_SELECTOR_GLYPH_COUNT
     _append_glyphs(
@@ -773,7 +803,9 @@ def _append_symbols(
     manga_wave = ("manga_wave", manga_base, manga_names)
     merge_features(
         font,
-        symbol_feature_source(extensions, wave, relaxed_wave, manga_wave),
+        symbol_feature_source(
+            extensions, wave, relaxed_wave, manga_wave, one_cycle_wave
+        ),
     )
 
 

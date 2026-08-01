@@ -106,8 +106,9 @@ def _symbol_feature_rules(
     extensions: list[tuple[str, str, str, list[str]]],
     wave: tuple[str, str, str, list[str]],
     relaxed_wave: tuple[str, str, str, str, str, list[str]],
+    one_cycle_wave: tuple[str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
-) -> tuple[str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str]:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
     vrt2_rules: list[str] = []
@@ -234,6 +235,82 @@ def _symbol_feature_rules(
         f"  sub {relaxed_wave_selector} {relaxed_wave_source} by {relaxed_wave_seed};\n"
     )
 
+    (
+        one_cycle_prefix,
+        one_cycle_source,
+        one_cycle_vertical_source,
+        one_cycle_names,
+    ) = one_cycle_wave
+    one_cycle_horizontal_names = one_cycle_names[:4]
+    one_cycle_vertical_names = one_cycle_names[4:]
+    (
+        one_cycle_horizontal_base,
+        one_cycle_horizontal_start,
+        one_cycle_horizontal_middle,
+        one_cycle_horizontal_end,
+    ) = one_cycle_horizontal_names
+    (
+        one_cycle_vertical_base,
+        one_cycle_vertical_start,
+        one_cycle_vertical_middle,
+        one_cycle_vertical_end,
+    ) = one_cycle_vertical_names
+    calt_rules.append(
+        contextual_extension_rules(
+            f"{one_cycle_prefix}_h",
+            one_cycle_horizontal_base,
+            one_cycle_horizontal_start,
+            one_cycle_horizontal_middle,
+            one_cycle_horizontal_end,
+        )
+    )
+    calt_rules.append(
+        contextual_extension_rules(
+            f"{one_cycle_prefix}_v",
+            one_cycle_vertical_base,
+            one_cycle_vertical_start,
+            one_cycle_vertical_middle,
+            one_cycle_vertical_end,
+        )
+    )
+    one_cycle_vertical_maps = "".join(
+        f"  sub {horizontal} by {vertical};\n"
+        for horizontal, vertical in zip(
+            one_cycle_horizontal_names,
+            one_cycle_vertical_names,
+            strict=True,
+        )
+    )
+    vert_rules.append(
+        contextual_extension_rules(
+            f"{one_cycle_prefix}_vert",
+            one_cycle_horizontal_base,
+            one_cycle_vertical_start,
+            one_cycle_vertical_middle,
+            one_cycle_vertical_end,
+        )
+        + one_cycle_vertical_maps
+    )
+    vrt2_rules.append(
+        contextual_extension_rules(
+            f"{one_cycle_prefix}_vrt2",
+            one_cycle_horizontal_base,
+            one_cycle_vertical_start,
+            one_cycle_vertical_middle,
+            one_cycle_vertical_end,
+        )
+        + one_cycle_vertical_maps
+    )
+    ss05_rules = repeated_glyph_rules(
+        f"{one_cycle_prefix}_h_style",
+        one_cycle_source,
+        one_cycle_horizontal_base,
+    ) + repeated_glyph_rules(
+        f"{one_cycle_prefix}_v_style",
+        one_cycle_vertical_source,
+        one_cycle_vertical_base,
+    )
+
     manga_wave_prefix, manga_wave_base, manga_wave_names = manga_wave
     (
         manga_wave_start,
@@ -282,6 +359,7 @@ def _symbol_feature_rules(
     return (
         ccmp_rules,
         ss04_rules,
+        ss05_rules,
         "".join(calt_rules),
         "".join(vert_rules),
         "".join(vrt2_rules),
@@ -293,14 +371,16 @@ def symbol_feature_source(
     wave: tuple[str, str, str, list[str]],
     relaxed_wave: tuple[str, str, str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
+    one_cycle_wave: tuple[str, str, str, list[str]],
 ) -> str:
-    liga, ss04, calt, vert, vrt2 = _symbol_feature_rules(
-        extensions, wave, relaxed_wave, manga_wave
+    liga, ss04, ss05, calt, vert, vrt2 = _symbol_feature_rules(
+        extensions, wave, relaxed_wave, one_cycle_wave, manga_wave
     )
     return (
         "languagesystem DFLT dflt;\n\n"
         f"feature liga {{\n{liga}}} liga;\n\n"
         f"feature ss04 {{\n{ss04}}} ss04;\n\n"
+        f"feature ss05 {{\n{ss05}}} ss05;\n\n"
         f"feature calt {{\n{calt}}} calt;\n\n"
         f"feature vert {{\n{vert}}} vert;\n\n"
         f"feature vrt2 {{\n{vrt2}}} vrt2;\n"
@@ -348,6 +428,7 @@ def feature_source(
     wave: tuple[str, str, str, list[str]],
     relaxed_wave: tuple[str, str, str, str, str, list[str]],
     manga_wave: tuple[str, str, list[str]],
+    one_cycle_wave: tuple[str, str, str, list[str]],
     punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
     kana_marks: list[tuple[str, str, str]],
     spacing_marks: Sequence[tuple[str, str, str]],
@@ -357,10 +438,13 @@ def feature_source(
     (
         symbol_ccmp_rules,
         ss04_rules,
+        ss05_rules,
         calt_rules,
         vert_rules,
         vrt2_rules,
-    ) = _symbol_feature_rules(extensions, wave, relaxed_wave, manga_wave)
+    ) = _symbol_feature_rules(
+        extensions, wave, relaxed_wave, one_cycle_wave, manga_wave
+    )
 
     kana_vertical_rules = "".join(
         f"  sub {horizontal} by {vertical};\n"
@@ -400,6 +484,7 @@ def feature_source(
         f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature liga {{\n{liga_rules}}} liga;\n\n"
         f"feature ss04 {{\n{ss04_rules}}} ss04;\n\n"
+        f"feature ss05 {{\n{ss05_rules}}} ss05;\n\n"
         f"feature calt {{\n{calt_rules}}} calt;\n\n"
         f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
         f"feature ss01 {{\n{ss01_rules}}} ss01;\n\n"

@@ -198,6 +198,12 @@ class VariableSymbolTests(unittest.TestCase):
             "seed",
             [f"relaxed{i}" for i in range(20)],
         )
+        one_cycle = (
+            "one-cycle",
+            "wave",
+            "wave.v",
+            [f"one-cycle{i}" for i in range(8)],
+        )
         manga = ("manga", "manga", [f"manga{i}" for i in range(7)])
         glyph_order = [
             ".notdef",
@@ -213,20 +219,23 @@ class VariableSymbolTests(unittest.TestCase):
             *wave[3],
             *relaxed[5],
             *manga[2],
+            *one_cycle[3],
         ]
         font = TTFont()
         font.setGlyphOrder(glyph_order)
 
         addOpenTypeFeaturesFromString(
             font,
-            symbol_feature_source(extensions, wave, relaxed, manga),
+            symbol_feature_source(extensions, wave, relaxed, manga, one_cycle),
             tables={"GSUB"},
         )
 
         feature_tags = {
             record.FeatureTag for record in font["GSUB"].table.FeatureList.FeatureRecord
         }
-        self.assertEqual(feature_tags, {"liga", "ss04", "calt", "vert", "vrt2"})
+        self.assertEqual(
+            feature_tags, {"liga", "ss04", "ss05", "calt", "vert", "vrt2"}
+        )
         self.assertEqual(feature_ligatures(font, "ccmp"), {})
         self.assertEqual(
             feature_ligatures(font, "liga"), {("manga", "wave"): "seed"}
@@ -234,6 +243,7 @@ class VariableSymbolTests(unittest.TestCase):
         expected_vertical = {
             "choon0": "choon3",
             "wave0": "wave5",
+            "one-cycle0": "one-cycle4",
             "manga": "manga3",
             "manga0": "manga4",
         }

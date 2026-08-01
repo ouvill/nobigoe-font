@@ -69,6 +69,7 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 WAVE_GLYPH_COUNT = 10
 RELAXED_WAVE_GLYPH_COUNT = 20
+ONE_CYCLE_WAVE_GLYPH_COUNT = 8
 WAVE_SELECTOR_GLYPH_COUNT = 1
 MANGA_WAVE_GLYPH_COUNT = 7
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
@@ -471,6 +472,7 @@ def make_sine_wave_tile(
     taper_end: bool = False,
     half_waves: float = 3,
     phase_offset_half_waves: float = 0,
+    amplitude_scale: float = 1,
     terminal_phase_extension_half_waves: float = (WAVE_TERMINAL_EXTENSION_HALF_WAVES),
     taper_fraction: float = 1 / 4,
     start_margin: float = 0,
@@ -496,7 +498,7 @@ def make_sine_wave_tile(
     peak_center = (sample_peak_min + sample_peak_max) / 2
     trough_center = (sample_trough_min + sample_trough_max) / 2
     baseline = (peak_center + trough_center) / 2
-    amplitude = (peak_center - trough_center) / 2
+    amplitude = (peak_center - trough_center) / 2 * amplitude_scale
     thickness = (
         (sample_peak_max - sample_peak_min) + (sample_trough_max - sample_trough_min)
     ) / 2
@@ -750,6 +752,63 @@ def make_relaxed_wave_parts(
     )
     tile_center_y = (
         horizontal_middle[0].bounds[1] + horizontal_middle[0].bounds[3]
+    ) / 2
+    vertical_rotation = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + tile_center_y,
+        vertical_origin,
+    )
+    vertical = tuple(
+        _font_geometry.transform_path(outline, vertical_rotation)
+        for outline in horizontal
+    )
+    return horizontal + vertical
+
+def make_one_cycle_wave_parts(
+    source: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, ...]:
+    source_x_min, _, source_x_max, _ = source.bounds
+    start_margin = max(0.0, source_x_min)
+    end_margin = max(0.0, advance - source_x_max)
+    parameters = {
+        "half_waves": 2,
+        "amplitude_scale": 1.2,
+        "phase_offset_half_waves": -0.5,
+        "terminal_phase_extension_half_waves": 0,
+        "taper_fraction": 1 / 6,
+    }
+    horizontal_middle = make_sine_wave_tile(source, advance, **parameters)
+    horizontal = (
+        make_sine_wave_tile(
+            source,
+            advance,
+            taper_start=True,
+            taper_end=True,
+            start_margin=start_margin,
+            end_margin=end_margin,
+            **parameters,
+        ),
+        make_sine_wave_tile(
+            source,
+            advance,
+            taper_start=True,
+            start_margin=start_margin,
+            **parameters,
+        ),
+        horizontal_middle,
+        make_sine_wave_tile(
+            source,
+            advance,
+            taper_end=True,
+            end_margin=end_margin,
+            **parameters,
+        ),
+    )
+    tile_center_y = (
+        horizontal_middle.bounds[1] + horizontal_middle.bounds[3]
     ) / 2
     vertical_rotation = Transform(
         0,
@@ -1427,6 +1486,7 @@ def build(
         NEW_GLYPH_COUNT * len(linear_codepoints)
         + WAVE_GLYPH_COUNT
         + RELAXED_WAVE_GLYPH_COUNT
+        + ONE_CYCLE_WAVE_GLYPH_COUNT
         + WAVE_SELECTOR_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
@@ -1489,7 +1549,31 @@ def build(
         add_stem_hints=False,
     )
 
-    wave_selector_start = relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
+    one_cycle_wave_start = relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
+    one_cycle_wave_names = allocated_names[
+        one_cycle_wave_start : one_cycle_wave_start + ONE_CYCLE_WAVE_GLYPH_COUNT
+    ]
+    one_cycle_wave_parts = make_one_cycle_wave_parts(
+        _font_geometry.glyph_path(font, wave_base),
+        1000,
+        wave_vertical_origin,
+    )
+    _font_operations.append_glyphs(
+        font,
+        list(one_cycle_wave_parts),
+        one_cycle_wave_names,
+        wave_base,
+        wave_vertical_origin,
+        add_stem_hints=False,
+    )
+    one_cycle_wave = (
+        "one_cycle_wave",
+        wave_base,
+        wave_vertical,
+        one_cycle_wave_names,
+    )
+
+    wave_selector_start = one_cycle_wave_start + ONE_CYCLE_WAVE_GLYPH_COUNT
     wave_selector_seed = allocated_names[wave_selector_start]
     _font_operations.append_glyphs(
         font,
@@ -1975,6 +2059,7 @@ def build(
             wave,
             relaxed_wave,
             manga_wave,
+            one_cycle_wave,
             punctuation_variants,
             kana_marks,
             spacing_marks,
