@@ -29,6 +29,7 @@ from nobigoe_font.features import (
 )
 from nobigoe_font.pipeline import (
     COMBINING_MARK_INPUTS,
+    adjust_linear_stroke_width,
     _apply_novel_style,
     _novel_hiragana_mappings,
     _novel_katakana_mappings,
@@ -299,6 +300,17 @@ class TrueTypeBuildTests(unittest.TestCase):
         adjusted = adjust_outline_horizontal_weight(outline, 1)
 
         self.assertEqual(adjusted.bounds[0::2], (71.0, 131.0))
+
+    def test_linear_stroke_adjustment_thins_across_its_axis_and_stays_centered(
+        self,
+    ) -> None:
+        outline = rectangle_path()
+
+        horizontal = adjust_linear_stroke_width(outline, "horizontal", 500, -40)
+        vertical = adjust_linear_stroke_width(outline, "vertical", 300, -80)
+
+        self.assertEqual(horizontal.bounds, (100.0, 120.0, 900.0, 480.0))
+        self.assertEqual(vertical.bounds, (140.0, 100.0, 860.0, 500.0))
 
     def test_wave_stroke_matches_source_phase_weight(self) -> None:
         source = wave_source_path()

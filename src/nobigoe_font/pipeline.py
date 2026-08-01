@@ -18,6 +18,7 @@ from .profiles import (
     FontIdentity,
     KanaStyle,
     LatinBuildProfile,
+    NOTO_CHOON_STROKE_ADJUSTMENTS,
     SHIPPORI_COPYRIGHT,
     SHIPPORI_STROKE_ADJUSTMENTS,
 )
@@ -438,6 +439,30 @@ def flatten_horizontal_centerline(outline: pathops.Path, advance: int) -> pathop
     )
 
 
+def adjust_linear_stroke_width(
+    outline: pathops.Path,
+    axis: str,
+    seam: float,
+    amount: float,
+) -> pathops.Path:
+    if amount == 0:
+        return outline
+    low, high = stroke_band(outline, axis, seam)
+    width = high - low
+    adjusted_width = width + amount
+    if adjusted_width <= 0:
+        raise ValueError("Linear stroke adjustment must retain a positive width")
+    scale = adjusted_width / width
+    center = (low + high) / 2
+    if axis == "horizontal":
+        transform = Transform(1, 0, 0, scale, 0, center * (1 - scale))
+    elif axis == "vertical":
+        transform = Transform(scale, 0, 0, 1, center * (1 - scale), 0)
+    else:
+        raise ValueError(f"Unsupported linear stroke axis {axis!r}")
+    return _font_geometry.transform_path(outline, transform)
+
+
 def make_vertical_parts(
     outline: pathops.Path, advance: int, vertical_origin: int
 ) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
@@ -836,6 +861,7 @@ def add_linear_extension(
     names: list[str],
     *,
     flatten_horizontal: bool = False,
+    stroke_adjustment: float = 0,
 ) -> tuple[str, list[str]]:
     vertical = _font_operations.find_vertical_glyph(font, base)
     advance = font["hmtx"].metrics[base][0]
@@ -845,12 +871,22 @@ def add_linear_extension(
     horizontal_outline = _font_geometry.glyph_path(font, base)
     if flatten_horizontal:
         horizontal_outline = flatten_horizontal_centerline(horizontal_outline, advance)
+    horizontal_outline = adjust_linear_stroke_width(
+        horizontal_outline,
+        "horizontal",
+        advance / 2,
+        stroke_adjustment,
+    )
     horizontal_parts = make_horizontal_parts(horizontal_outline, advance)
     _, _, _, vertical_y_max = _font_geometry.bounds(font, vertical)
     vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
-    vertical_parts = make_vertical_parts(
-        _font_geometry.glyph_path(font, vertical), advance, vertical_origin
+    vertical_outline = adjust_linear_stroke_width(
+        _font_geometry.glyph_path(font, vertical),
+        "vertical",
+        advance * 0.4,
+        stroke_adjustment,
     )
+    vertical_parts = make_vertical_parts(vertical_outline, advance, vertical_origin)
     _font_operations.append_glyphs(
         font,
         list(horizontal_parts + vertical_parts),
@@ -1447,6 +1483,11 @@ def build(
             base,
             names,
             flatten_horizontal=codepoint == 0x30FC,
+            stroke_adjustment=(
+                NOTO_CHOON_STROKE_ADJUSTMENTS[identity.weight_class]
+                if base_type == "noto" and codepoint == 0x30FC
+                else 0
+            ),
         )
         extensions.append((prefix, base, vertical, names))
 
