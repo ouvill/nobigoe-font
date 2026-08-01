@@ -103,6 +103,7 @@ jobs:
         run: |
           uv run nobigoe-build-variable \
             --output /tmp/NobigoeVariableMarks-VF.otf \
+            --novel-output /tmp/NobigoeNovelMincho-VF.otf \
             --static-output-dir /tmp \
             --static-weight Regular \
             --autohint
@@ -124,6 +125,9 @@ jobs:
           ots-sanitize \
             /tmp/NobigoeVariableMarks-VF.otf \
             /tmp/NobigoeVariableMarks-VF-sanitized.otf
+          ots-sanitize \
+            /tmp/NobigoeNovelMincho-VF.otf \
+            /tmp/NobigoeNovelMincho-VF-sanitized.otf
           hb-shape \
             /tmp/NobigoeMincho-Regular.otf \
             "AVATAR あーーー！？" \
@@ -141,6 +145,17 @@ jobs:
             "ーーーー　――――　〜〜〜〜　〰〰〰〰" \
             --variations=wght=550 \
             --direction=ttb >/dev/null
+          hb-shape \
+            /tmp/NobigoeNovelMincho-VF.otf \
+            "春の雨が静かに続く。あ゙ーーー！？" \
+            --variations=wght=550 \
+            --features=kern,liga,calt,ccmp >/dev/null
+          hb-shape \
+            /tmp/NobigoeNovelMincho-VF.otf \
+            "春の雨が静かに続く。あ゙ーーー！？" \
+            --variations=wght=550 \
+            --direction=ttb \
+            --features=calt,vert,vrt2,ccmp >/dev/null
           hb-shape \
             /tmp/NobigoeKoburiMincho-Regular.ttf \
             "待ってーーー。" \

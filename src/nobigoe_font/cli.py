@@ -16,7 +16,6 @@ from .profiles import (
     latin_build_profile,
 )
 from .sources import DEFAULT_CACHE_DIR, SourceCache, SourceOverrides
-from .variable_kana import build_variable_kana_source
 from .variable_stix import build_variable_stix_source
 
 
@@ -76,28 +75,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--variable-kana",
-        action="store_true",
-        help=(
-            "opt in to importing Novel kana from the pinned development "
-            "variable-font source"
-        ),
-    )
-    parser.add_argument(
-        "--variable-kana-source",
-        type=Path,
-        help="local raw Noto Serif JP VF or rebuilt Novel kana design VF",
-    )
-    parser.add_argument(
-        "--build-variable-kana",
-        type=Path,
-        metavar="OUTPUT",
-        help=(
-            "build the development Novel kana design VF at OUTPUT; "
-            "this is not a release artifact"
-        ),
-    )
-    parser.add_argument(
         "--build-variable-stix",
         type=Path,
         metavar="OUTPUT",
@@ -125,66 +102,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _build_variable_kana(args: argparse.Namespace) -> None:
-    incompatible = [
-        option
-        for option, used in (
-            ("--variable-kana", args.variable_kana),
-            ("--build-variable-stix", args.build_variable_stix is not None),
-            ("--output", args.output is not None),
-            ("--source", args.source is not None),
-            ("--latin-source", args.latin_source is not None),
-            ("--punctuation-source", args.punctuation_source is not None),
-            ("--autohint", args.autohint),
-            ("--face", args.face != 0),
-            ("--base koburi", args.base != "noto"),
-            ("--kana-style novel", args.kana_style != "noto"),
-            ("--weight", args.weight != "Regular"),
-            ("--latin-family", args.latin_family != "libertinus"),
-        )
-        if used
-    ]
-    if incompatible:
-        raise ValueError(
-            "--build-variable-kana cannot be combined with " + ", ".join(incompatible)
-        )
-    source = SourceCache(args.cache_dir).resolve_variable_kana(
-        args.variable_kana_source
-    )
-    result = build_variable_kana_source(source, args.build_variable_kana)
-    print(
-        f"Built development design VF at {result.output}; "
-        "this output is not release-ready."
-    )
-    print(
-        f"Encoded kana: {result.encoded_hiragana_count} hiragana, "
-        f"{result.encoded_katakana_count} katakana; "
-        f"adjusted terminals: {result.adjusted_terminal_count}; "
-        f"unresolved terminals: {result.unresolved_terminal_count}."
-    )
-    if result.unresolved_terminal_count:
-        print("Unresolved terminal inventory:")
-        for entry in result.terminal_inventory:
-            if entry.unresolved_count:
-                print(
-                    f"  {entry.weight_class} {entry.script} "
-                    f"U+{entry.codepoint:04X} {entry.orientation} "
-                    f"{entry.glyph_name}: {entry.unresolved_count}"
-                )
-
-
 def _build_variable_stix(args: argparse.Namespace) -> None:
     incompatible = [
         option
         for option, used in (
-            ("--build-variable-kana", args.build_variable_kana is not None),
-            ("--variable-kana", args.variable_kana),
-            ("--variable-kana-source", args.variable_kana_source is not None),
             ("--output", args.output is not None),
             ("--source", args.source is not None),
-            ("--ruby-source", args.ruby_source is not None),
             ("--punctuation-source", args.punctuation_source is not None),
-            ("--sans-source", args.sans_source is not None),
             ("--autohint", args.autohint),
             ("--face", args.face != 0),
             ("--base koburi", args.base != "noto"),
@@ -211,13 +135,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.build_variable_stix is not None:
         _build_variable_stix(args)
         return
-    if args.build_variable_kana is not None:
-        _build_variable_kana(args)
-        return
-    if args.variable_kana_source is not None and not args.variable_kana:
-        raise ValueError("--variable-kana-source requires --variable-kana")
-    if args.variable_kana and (args.base != "noto" or args.kana_style != "novel"):
-        raise ValueError("--variable-kana requires --kana-style novel with --base noto")
     if args.base == "koburi" and args.kana_style == "novel":
         raise ValueError("--kana-style novel requires --base noto")
     if args.base == "koburi" and args.weight != "Regular":
@@ -264,10 +181,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             source=args.source,
             latin_source=args.latin_source,
             punctuation_source=args.punctuation_source,
-            variable_kana_source=args.variable_kana_source,
         ),
         latin_family=args.latin_family,
-        variable_kana=args.variable_kana,
     )
     build(
         sources.source,
@@ -280,5 +195,4 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.base,
         args.autohint,
         args.kana_style,
-        sources.variable_kana_source,
     )

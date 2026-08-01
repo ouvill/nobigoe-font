@@ -30,7 +30,7 @@
 実験的な`nobigoe-build-variable`では`NotoSerifJP-VF.otf`の既存CFF2 Variationを維持し、Notoにない濁点・半濁点付き仮名の横組・縦組CharString、Manga1 PUA、GSUB規則を追加します。全角感嘆符・疑問符とManga1方式の16合字および4異体字は、しっぽり明朝・Noto Sans JP・Adobe-Manga1の輪郭をコピーせず、補間互換の独自Bezier輪郭として生成します。
 
 Novel版のカタカナも源暎こぶり明朝の輪郭をコピーせず、対応する同ウェイトのNoto Serif JP輪郭から派生します。U+30A1–U+30FA、U+30FD–U+30FF、U+31F0–U+31FFの109字、追加するU+1B155、カタカナ`ccmp`出力、全縦組対応字形を、直線主体・曲線主体・小書き・反復記号の4群と3光学マスターで変形します。結合濁点・半濁点は合成後の一体輪郭へ一度だけ適用し、源暎こぶり明朝は寸法と黒みの比較基準としてだけ使用します。
-`--variable-kana`経路は同コミットの`Serif/Variable/TTF/Subset/NotoSerifJP-VF.ttf`を制作正本として使用します。wght 200・400・900から互換輪郭を作り、残る4固定ウェイトを補間します。符号化済みひらがな89字・カタカナ109字と対応する縦組・合成字形の輪郭およびメトリクスはNoto由来です。字別の筆端深度データと局所変形を追加しますが、第三者輪郭を新たに混合しません。`Nobigoe Novel Kana Design` VFはこのNotoソースから生成する編集・比較用中間成果物です。
+Novel可変版は同コミットの`Serif/Variable/OTF/Subset/NotoSerifJP-VF.otf`へ、のびごえ共通字形とOpenType機能を加えたCFF2可変フォントを制作正本として使用します。`wght` 200・400・900の三次ベジェpathマスターを変形し、残る4標準ウェイトを補間してNovel CFF2を構成します。符号化済みひらがな89字・カタカナ109字、Notoの`こ`・`コ`から追加したU+1B132・U+1B155、対応する縦組・`ccmp`字形の輪郭およびメトリクスはNoto由来です。字別の筆端深度データと局所変形を追加しますが、第三者輪郭を新たに混合しません。固定7ウェイトはこのNovel CFF2から実体化します。
 紹介サイトの欧文候補比較では、同じ`NotoSerifJP-VF.ttf`を欧文Unicode範囲へサブセットし、Noto Serif JP内蔵欧文の参考基準としてWOFF2で表示します。輪郭や可変軸を変更せず、通常の配布ZIPには収録しません。
 
 現行Noto cmapではCJK Radicals Supplement／Kangxi Radicalsの293コードポイントが上記Han対象中の290 glyphを共有します。cmapを変更せず共有glyphを一度だけ変換するため、これらのradical aliasも同じ縮小輪郭を表示します。仮名・カタカナ・約物・Latin・追加記号・PUAとの共有glyphは許可せず、変換前にビルドを失敗させます。
