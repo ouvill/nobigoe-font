@@ -892,7 +892,7 @@ def _append_punctuation(
 
     glyphs = []
     for sequence, names in variants:
-        default, rotated, sans,rotated_sanss = names
+        default, rotated, sans, rotated_sans = names
         if len(sequence) > 1:
             glyphs.append((default, serif_masters[sequence]))
         glyphs.extend(
