@@ -161,7 +161,6 @@
       const features = [
         '"ccmp" 1',
         '"calt" 1',
-        canvas.classList.contains("is-vertical") && '"vrt2" 1',
         punctuation && `"${punctuation}" 1`,
       ].filter(Boolean);
       editor.style.fontFeatureSettings = features.join(", ");

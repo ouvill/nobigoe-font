@@ -275,8 +275,7 @@
   max-height: 560px;
   font-feature-settings:
     "ccmp" 1,
-    "calt" 1,
-    "vrt2" 1;
+    "calt" 1;
   writing-mode: vertical-rl;
 }
 
@@ -400,8 +399,7 @@
   writing-mode: vertical-rl;
   font-feature-settings:
     "ccmp" 1,
-    "calt" 1,
-    "vrt2" 1;
+    "calt" 1;
 }
 
 .glyph-meta {
@@ -956,8 +954,7 @@
   overflow: auto;
   font-feature-settings:
     "ccmp" 1,
-    "calt" 1,
-    "vrt2" 1;
+    "calt" 1;
   writing-mode: vertical-rl;
 }
 
@@ -1043,8 +1040,7 @@
   font-weight: 400;
   font-feature-settings:
     "ccmp" 1,
-    "calt" 1,
-    "vrt2" 1;
+    "calt" 1;
   line-height: 2;
   writing-mode: vertical-rl;
 }
@@ -1486,8 +1482,7 @@
   overflow: auto;
   font-feature-settings:
     "ccmp" 1,
-    "calt" 1,
-    "vrt2" 1;
+    "calt" 1;
   writing-mode: vertical-rl;
 }
 
