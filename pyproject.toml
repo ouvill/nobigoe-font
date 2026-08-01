@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 nobigoe-build = "nobigoe_font.cli:main"
+nobigoe-build-essential = "nobigoe_font.essential_cli:main"
 nobigoe-build-variable = "nobigoe_font.variable_cli:main"
 nobigoe-package = "nobigoe_font.release:main"
 nobigoe-measure-kana = "nobigoe_font.novel_metrics:main"

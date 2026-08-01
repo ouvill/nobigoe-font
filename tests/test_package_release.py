@@ -9,6 +9,7 @@ import zipfile
 
 from nobigoe_font.release import (
     ARCHIVE_TIMESTAMP,
+    ESSENTIAL_RELEASE,
     NOVEL_RELEASE,
     RELEASES,
     ReleaseSpec,
@@ -70,6 +71,15 @@ class ReleasePackagingTests(unittest.TestCase):
         self.assertEqual(release_specs(True), (*RELEASES, NOVEL_RELEASE))
         self.assertFalse(parse_args([]).include_experimental)
         self.assertTrue(parse_args(["--include-experimental"]).include_experimental)
+
+    def test_essential_release_is_a_separate_variable_font_archive(self) -> None:
+        self.assertIn(ESSENTIAL_RELEASE, RELEASES)
+        self.assertEqual(
+            ESSENTIAL_RELEASE.archive,
+            f"NobigoeEssential-v{VERSION_NUMBER}.zip",
+        )
+        self.assertEqual(ESSENTIAL_RELEASE.fonts, ("NobigoeEssential-VF.otf",))
+
 
     def test_novel_release_is_a_separate_seven_weight_archive(self) -> None:
         self.assertEqual(

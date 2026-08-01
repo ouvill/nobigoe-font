@@ -42,6 +42,7 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 |---|---|
 | `cli.py` | こぶり版・欧文比較・開発用制作VFの引数検証と入出力の解決 |
 | `variable_cli.py` / `variable_marks.py` | Noto CFF2可変ソースへののびごえ共通カスタマイズと、Nobigoe・Novel固定各7ウェイトの出力 |
+| `essential_cli.py` / `essential.py` | カスタマイズ済み可変ソースから5つの伸長記号と必要なレイアウト閉包だけを残すフォールバック用VF生成 |
 | `pipeline.py` | のびごえ可変版の実体化、Novel固有カスタマイズ、欧文取り込み・命名・ヒント処理 |
 | `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
 | `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
@@ -74,6 +75,9 @@ uv run python tools/measure_stix_stems.py --thin-target noto-latin
 
 # Noto Variableを一度カスタマイズし、Nobigoe・Novelの固定各7ウェイトを生成
 uv run nobigoe-build-variable
+
+# 上で生成した可変ソースから、5文字だけに対応するエッセンシャル版を生成
+uv run nobigoe-build-essential
 
 # 両ファミリーへLibertinus Serifを取り込んだ後、欧文字形だけを再ヒント
 uv run nobigoe-build-variable --autohint
@@ -110,6 +114,8 @@ done
 
 `--static-weight <Weight>`を指定すると、両可変フォントは通常どおり生成したうえで、NobigoeとNovelの指定固定ウェイトだけを実体化します。省略時は両ファミリーの固定7ウェイトをすべて生成します。
 
+`nobigoe-build-essential`は、既定で`dist/NobigoeVariableMarks-VF.otf`を入力し、`ー`、`―`、`〜`、`～`、`〰`だけをUnicodeへ割り当てた`dist/NobigoeEssential-VF.otf`を生成します。`liga`、`calt`、`ss04`、`ss05`、`vert`、`vrt2`から5文字に到達する字形だけを閉包として保持し、ウェイト軸200–900と7つの名前付きインスタンスを引き継ぎます。入力と出力は`--source`と`--output`で変更できます。
+
 生成順序は、`NotoSerifJP-VF.otf`、のびごえ共通字形・OpenType機能の可変カスタマイズ、Novelかな固有の可変カスタマイズ、両可変正本からの固定ウェイト実体化、固定版専用処理です。濁点・半濁点、感嘆符・疑問符合字、連結記号とGSUBはNobigoe可変正本からNovel可変正本へ継承し、Novelかなに対応する濁点・半濁点結合字形は可変段階で同じ意味上の基字変形を受けます。漢字字面調整と欧文取り込みは実体化後に行うため、Noto固定フォントから字形や機能を別に再生成しません。
 
 `nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`と、固定版でも使用するしっぽり明朝の各ウェイトを取得します。Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharString、全角`！`・`？`およびManga1方式の16合字、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。可変版の明朝感嘆符・疑問符は、ExtraLightだけを18本・6本の少数三次ベジェで再設計し、Light以上はしっぽり明朝Regular、Medium、SemiBold、Bold、ExtraBoldの実輪郭を使用します。しっぽり明朝の14曲線からなる疑問符は、右下内側の1曲線を固定パラメータで5分割し、形を変えず18曲線へ揃えます。直立感嘆符は元から6曲線です。黒みはNotoの全角約物ではなく、Noto Serif JPの`川`・`目`・`田`をY=350、450、550、650で切った縦主線幅の中央値を基準にします。200、300、400、500、600、700、900の基準値は順に44.0、53.6、65.2、80.1、95.0、117.0、144.0 unitsです。疑問符はしっぽり明朝の外周、高さ、筆だまりを保って右太線の内周だけを調整し、感嘆符は下部の細い軸を保って上部テーパーだけを左右から調整します。これによりExtraLightで承認した漢字主線との光学差を全ウェイトへ維持します。下点は元輪郭の上端を保って直径をウェイト別に84〜90%へ縮めた正円とし、5連感嘆符は200-unit間隔で配置して全角セル境界でも間隔を維持します。明朝、斜体明朝、ゴシック、斜体ゴシックを`aalt`と`ss01`–`ss03`で選択できます。濁点・半濁点の配置と連結記号の輪郭も同じ7ウェイトのレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`のその他の約物、欧文・ルビ置換は含みません。
@@ -119,7 +125,7 @@ done
 
 可変版では、全角`！`・`？`とU+3099・U+309Aの4列、および`♡`・`♥`とU+3099の2列もCFF2可変字形として生成します。全角約物4列は横組・縦組を別字形とし、`ccmp`、全角幅濁点・半濁点用の`liga`、`vert`、`vrt2`へ登録します。ハート2列は固定版と同じ白抜き合成を行った後、7マスターの輪郭を補間互換な三次ベジェ構造へ揃え、既存の私用領域割り当ても維持します。
 
-公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版と源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
+公開版は[GitHub Releases](https://github.com/ouvill/nobigoe-font/releases)から、Noto版、5文字だけのエッセンシャル版、源暎こぶり明朝版を別々のZIPで配布します。開発中のNovel版は公開版に含めません。
 
 リリース版番号の唯一の正本は`src/nobigoe_font/version.json`です。新しい版ではこのファイルの`version`だけを`N.NNN`形式で更新し、`uv lock`を実行してください。Pythonパッケージのメタデータ、生成フォント、配布ZIP、公開サイト、GitHub Actionsは同じ値を読み取るため、`pyproject.toml`、Webサイト、テスト、説明文へ版番号を転記する必要はありません。
 
@@ -131,7 +137,7 @@ uv run python -m unittest discover -s tests
 
 ## 配布ZIPを作成
 
-既定では安定版2ファミリーだけを、フォント、README、OFL、第三者通知、SHA-256マニフェストを含む再現可能なZIPへまとめます。先にNoto版と源暎こぶり明朝版を生成してください。
+既定では安定版3ファミリーだけを、フォント、README、OFL、第三者通知、SHA-256マニフェストを含む再現可能なZIPへまとめます。先にNoto版、エッセンシャル版、源暎こぶり明朝版を生成してください。
 
 ```sh
 uv run nobigoe-package
@@ -139,6 +145,7 @@ uv run nobigoe-package
 
 ```text
 dist/NobigoeMincho-v<version>.zip
+dist/NobigoeEssential-v<version>.zip
 dist/NobigoeKoburiMincho-v<version>.zip
 ```
 
@@ -154,7 +161,7 @@ dist/NobigoeNovelMincho-v<version>.zip
 
 ## GitHub Releaseを公開
 
-`.github/workflows/release.yml`は`src/nobigoe_font/version.json`と同じ`vN.NNN`タグで起動します。安定版8フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版8フォントを収録した再現可能な2つのZIPと`SHA256SUMS`だけです。次のように正本からタグ名を取得して注釈付きタグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
+`.github/workflows/release.yml`は`src/nobigoe_font/version.json`と同じ`vN.NNN`タグで起動します。安定版9フォントと開発中のNovel版7フォントを生成し、テスト、OpenType Sanitizer、HarfBuzzで検証します。GitHub Releaseへ添付するのは安定版9フォントを収録した再現可能な3つのZIPと`SHA256SUMS`だけです。次のように正本からタグ名を取得して注釈付きタグをpushするか、GitHub Actionsの「Build and publish release」を同じタグ名で手動実行してください。
 
 ```sh
 version=$(PYTHONPATH=src python3 -m nobigoe_font.version)

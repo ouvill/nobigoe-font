@@ -74,6 +74,7 @@ jobs:
       - name: Build stable families and experimental Novel validation fonts
         run: |
           uv run nobigoe-build-variable --autohint
+          uv run nobigoe-build-essential
           uv run nobigoe-build --base koburi
 
       - name: Validate generated fonts
@@ -82,6 +83,8 @@ jobs:
             ots-sanitize "$font" "/tmp/$(basename "$font")"
           done
           hb-shape dist/NobigoeMincho-Regular.otf "あーーー" --features=calt >/dev/null
+          hb-shape dist/NobigoeEssential-VF.otf "ーーー―――〜〜〜～～～〰〰〰" --features=calt,liga >/dev/null
+          hb-shape dist/NobigoeEssential-VF.otf "ーーー―――〜〜〜～～～〰〰〰" --direction=ttb >/dev/null
           hb-shape dist/NobigoeKoburiMincho-Regular.ttf "待ってーーー。" --direction=ttb >/dev/null
           hb-shape dist/NobigoeNovelMincho-Regular.otf "春の雨が静かに続く。" >/dev/null
           hb-shape dist/NobigoeNovelMincho-Black.otf "ぬのめゔゐゑゝゞ" --direction=ttb >/dev/null
@@ -90,7 +93,7 @@ jobs:
         run: |
           uv run nobigoe-package
           cd dist
-          sha256sum NobigoeMincho-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
+          sha256sum NobigoeMincho-v*.zip NobigoeEssential-v*.zip NobigoeKoburiMincho-v*.zip > SHA256SUMS
 
       - name: Create GitHub Release
         env:
@@ -102,5 +105,6 @@ jobs:
             --title "$RELEASE_TAG" \
             --generate-notes \
             dist/NobigoeMincho-v*.zip \
+            dist/NobigoeEssential-v*.zip \
             dist/NobigoeKoburiMincho-v*.zip \
             dist/SHA256SUMS

@@ -28,6 +28,11 @@ NOTO_RELEASE = ReleaseSpec(
     archive=f"NobigoeMincho-v{VERSION_NUMBER}.zip",
     fonts=tuple(f"NobigoeMincho-{weight}.otf" for weight in NOTO_WEIGHT_CLASSES),
 )
+ESSENTIAL_RELEASE = ReleaseSpec(
+    directory=f"NobigoeEssential-v{VERSION_NUMBER}",
+    archive=f"NobigoeEssential-v{VERSION_NUMBER}.zip",
+    fonts=("NobigoeEssential-VF.otf",),
+)
 NOVEL_RELEASE = ReleaseSpec(
     directory=f"NobigoeNovelMincho-v{VERSION_NUMBER}",
     archive=f"NobigoeNovelMincho-v{VERSION_NUMBER}.zip",
@@ -38,7 +43,7 @@ KOBURI_RELEASE = ReleaseSpec(
     archive=f"NobigoeKoburiMincho-v{VERSION_NUMBER}.zip",
     fonts=("NobigoeKoburiMincho-Regular.ttf",),
 )
-RELEASES = (NOTO_RELEASE, KOBURI_RELEASE)
+RELEASES = (NOTO_RELEASE, ESSENTIAL_RELEASE, KOBURI_RELEASE)
 EXPERIMENTAL_RELEASES = (NOVEL_RELEASE,)
 
 

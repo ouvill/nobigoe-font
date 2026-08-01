@@ -31,11 +31,12 @@
 1. [最新のGitHub Release](https://github.com/ouvill/nobigoe-font/releases/latest)を開きます。
 2. 用途に合うZIPをダウンロードして展開します。
 3. 展開した`.otf`または`.ttf`ファイルを、OSのフォント管理画面からインストールします。
-4. アプリケーションのフォント一覧から「のびごえ明朝」または「のびごえこぶり明朝」を選びます。
+4. アプリケーションのフォント一覧から「のびごえ明朝」「のびごえエッセンシャル」または「のびごえこぶり明朝」を選びます。
 
 | ZIP | 収録ファミリー | 内容 |
 |---|---|---|
 | `NobigoeMincho-v<version>.zip` | のびごえ明朝 | ExtraLight / Light / Regular / Medium / SemiBold / Bold / Blackの7ウェイト |
+| `NobigoeEssential-v<version>.zip` | のびごえエッセンシャル | `ー` / `―` / `〜` / `～` / `〰`だけを収録した200–900の可変フォント |
 | `NobigoeKoburiMincho-v<version>.zip` | のびごえこぶり明朝 | Regularの1ウェイト |
 
 > [!NOTE]
@@ -46,11 +47,30 @@
 | ファミリー | 向いている用途 | ウェイト | 形式 |
 |---|---|---|---|
 | Nobigoe Mincho（のびごえ明朝） | 一般的な本文、見出し、ウェブ、印刷物 | 7ウェイト | OpenType/CFF (`.otf`) |
+| Nobigoe Essential（のびごえエッセンシャル） | 任意のフォントへ連結する伸長記号だけを加える用途 | 200–900（可変） | OpenType/CFF2 (`.otf`) |
 | Nobigoe Koburi Mincho（のびごえこぶり明朝） | 小説、長文、縦組など、小ぶりな仮名を生かした本文 | Regular | TrueType (`.ttf`) |
 
-のびごえ明朝はNoto Serif JPの和文とLibertinus Serifの欧文を組み合わせています。のびごえこぶり明朝は源暎こぶり明朝を土台にした独立ファミリーです。伸長記号、濁点・半濁点、感嘆符・疑問符合字、小書きこ・コは両ファミリーで利用でき、のびごえこぶり明朝は元フォントの`ruby`機能も保持しています。
+のびごえ明朝はNoto Serif JPの和文とLibertinus Serifの欧文を組み合わせています。のびごえエッセンシャルはNoto版から`ー`、`―`、`〜`、`～`、`〰`と、それらの連結・縦組・波形切替に必要な字形だけを取り出したフォールバック用ファミリーです。のびごえこぶり明朝は源暎こぶり明朝を土台にした独立ファミリーです。伸長記号、濁点・半濁点、感嘆符・疑問符合字、小書きこ・コは通常の2ファミリーで利用でき、のびごえこぶり明朝は元フォントの`ruby`機能も保持しています。
 
 開発中の`Nobigoe Novel Mincho`（のびごえ小説明朝）は、通常の配布ZIPとタグリリースには含まれません。設計と検証内容は[Novel小説本文設計](docs/novel-design.md)に記載しています。
+
+### 他のフォントと組み合わせる
+
+ウェブでは、のびごえエッセンシャルを使いたい本文フォントより前へ指定します。5文字以外のUnicode割り当てを持たないため、本文は後続フォントのまま、伸長記号だけがのびごえの連結字形になります。
+
+```css
+@font-face {
+  font-family: "Nobigoe Essential";
+  src: url("./NobigoeEssential-VF.otf") format("opentype");
+  font-weight: 200 900;
+}
+
+.example {
+  font-family: "Nobigoe Essential", "任意の本文フォント", serif;
+}
+```
+
+`font-weight`は200から900まで連続して指定できます。OpenTypeの`liga`と`calt`が既定で有効な環境で連結し、`vert` / `vrt2`に対応する環境では縦組字形へ切り替わります。
 
 ## OpenTypeの異体字を選ぶ
 
