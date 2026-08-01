@@ -60,6 +60,7 @@ from .pipeline import (
     RELAXED_WAVE_GLYPH_COUNT,
     WAVE_GLYPH_COUNT,
     WAVE_SELECTOR_GLYPH_COUNT,
+    adjust_linear_stroke_width,
     flatten_horizontal_centerline,
     make_horizontal_parts,
     make_manga_wave_parts,
@@ -68,7 +69,11 @@ from .pipeline import (
     make_vertical_parts,
     make_wave_parts,
 )
-from .profiles import NOTO_WEIGHT_CLASSES, SHIPPORI_STROKE_ADJUSTMENTS
+from .profiles import (
+    NOTO_CHOON_STROKE_ADJUSTMENTS,
+    NOTO_WEIGHT_CLASSES,
+    SHIPPORI_STROKE_ADJUSTMENTS,
+)
 from .punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
     PUNCTUATION_VARIANT_SEQUENCES,
@@ -646,15 +651,23 @@ def _append_symbols(
             horizontal_masters = []
             vertical_masters = []
             for weight in _WEIGHTS:
-                horizontal_outline = flatten_horizontal_centerline(
-                    paths[weight][base], 1000
+                horizontal_outline = adjust_linear_stroke_width(
+                    flatten_horizontal_centerline(paths[weight][base], 1000),
+                    "horizontal",
+                    500,
+                    NOTO_CHOON_STROKE_ADJUSTMENTS[weight],
                 )
                 horizontal_masters.append(
                     _split_horizontal_parts(horizontal_outline, 1000)
                 )
                 vertical_masters.append(
                     _split_vertical_parts(
-                        paths[weight][vertical],
+                        adjust_linear_stroke_width(
+                            paths[weight][vertical],
+                            "vertical",
+                            400,
+                            NOTO_CHOON_STROKE_ADJUSTMENTS[weight],
+                        ),
                         1000,
                         _SYMBOL_VERTICAL_ORIGIN,
                     )

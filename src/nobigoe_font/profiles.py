@@ -239,6 +239,19 @@ SHIPPORI_WEIGHTS = {
     "Bold": "Bold",
     "Black": "ExtraBold",
 }
+# Connected Noto choon bars are optically heavier than representative hiragana.
+# Cross-axis unit adjustments match their middle tiles to the hiragana median
+# under the same 2 * ink area / outline perimeter metric used for punctuation.
+NOTO_CHOON_STROKE_ADJUSTMENTS = {
+    200: 0,
+    300: -2,
+    400: -4,
+    500: -6,
+    600: -9,
+    700: -12,
+    900: -16,
+}
+
 # Match Shippori punctuation to Noto Serif JP's fullwidth !/? stroke weight.
 # Values minimize the mean 2 * ink area / outline perimeter difference.
 SHIPPORI_STROKE_ADJUSTMENTS = {
