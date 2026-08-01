@@ -2,17 +2,15 @@
 
 The detector is geometric rather than glyph-name based. It records every
 one-to-three segment hard cap it can identify, including caps that cannot be
-changed safely. Static ``pathops`` outlines may replace a cap with a cubic;
-TrueType ``glyf`` outlines are edited by moving existing points and handles
-only, so their interpolation topology remains unchanged.
+changed safely. CFF/CFF2 ``pathops`` outlines replace safe caps with cubics.
 """
 
 from __future__ import annotations
 
-from copy import deepcopy
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 import math
-from typing import Iterable, Literal, Protocol, TypeAlias
+from typing import Literal, TypeAlias
 
 import pathops
 from fontTools.pens.recordingPen import RecordingPen
@@ -38,7 +36,6 @@ _LEGACY_MAX_AXIS_DOT = 0.55
 _LEGACY_LONG_SWEEP_HANDLE_RATIO = 4.0
 _LEGACY_REGULAR_NOSE_RATIO = 0.18
 _LEGACY_LONG_SWEEP_NOSE_RATIO = 0.14
-_ON_CURVE = 0x01
 _UNION_OVERRIDABLE_REASONS = frozenset(
     {
         "cap-length-out-of-range",
@@ -50,13 +47,6 @@ _UNION_OVERRIDABLE_REASONS = frozenset(
 )
 
 
-class SimpleGlyfGlyph(Protocol):
-    """Simple-glyph data needed by :func:`taper_glyf_terminals`."""
-
-    numberOfContours: int
-    coordinates: object
-    flags: Iterable[int]
-    endPtsOfContours: Iterable[int]
 
 
 @dataclass(frozen=True)
@@ -210,48 +200,6 @@ class PathTerminalResult:
         return self.inventory.unsafe_count
 
 
-@dataclass(frozen=True)
-class GlyfTerminalResult:
-    """A point-compatible glyph clone and its complete terminal inventory."""
-
-    glyph: SimpleGlyfGlyph
-    inventory: TerminalInventory
-
-    @property
-    def adjusted_count(self) -> int:
-        """Number of terminals changed in :attr:`glyph`."""
-
-        return self.inventory.adjusted_count
-
-    @property
-    def rejected_count(self) -> int:
-        """Number of detected candidates rejected as non-terminals."""
-
-        return self.inventory.rejected_count
-
-    @property
-    def unresolved_count(self) -> int:
-        """Number of detected candidates left unchanged for safety."""
-
-        return self.inventory.unresolved_count
-
-    @property
-    def detected_count(self) -> int:
-        """Number of structurally detected candidates."""
-
-        return self.inventory.detected_count
-
-    @property
-    def safe_count(self) -> int:
-        """Number of adjusted terminals."""
-
-        return self.inventory.safe_count
-
-    @property
-    def unsafe_count(self) -> int:
-        """Number of rejected or unresolved terminals."""
-
-        return self.inventory.unsafe_count
 
 
 @dataclass(frozen=True)
@@ -722,273 +670,240 @@ def taper_path_terminals(outline: pathops.Path) -> PathTerminalResult:
     return PathTerminalResult(tapered, TerminalInventory(records))
 
 
-def _glyf_contours(glyph: SimpleGlyfGlyph) -> tuple[tuple[int, ...], ...]:
-    if getattr(glyph, "numberOfContours", 0) <= 0:
-        return ()
-    contours: list[tuple[int, ...]] = []
-    start = 0
-    for raw_end in glyph.endPtsOfContours:
-        end = int(raw_end)
-        contours.append(tuple(range(start, end + 1)))
-        start = end + 1
-    return tuple(contours)
-
-
-def _glyf_geometries(glyph: SimpleGlyfGlyph) -> tuple[_Geometry, ...]:
-    contours = _glyf_contours(glyph)
-    if not contours:
-        return ()
-    coordinates = tuple(
-        (float(point[0]), float(point[1])) for point in glyph.coordinates
-    )
-    flags = tuple(int(flag) for flag in glyph.flags)
-    if len(coordinates) != len(flags):
-        return ()
-    outline_bounds = _bounds(coordinates)
-    geometries: list[_Geometry] = []
-    for contour_index, contour in enumerate(contours):
-        count = len(contour)
-        if count < 4:
-            continue
-        contour_points = tuple(coordinates[index] for index in contour)
-        contour_area = _signed_area(contour_points)
-        for position, point_index in enumerate(contour):
-            previous_position = (position - 1) % count
-            if (
-                not flags[point_index] & _ON_CURVE
-                or flags[contour[previous_position]] & _ON_CURVE
-            ):
-                continue
-            on_curve_positions = [position]
-            cursor = (position + 1) % count
-            while (
-                cursor != position
-                and flags[contour[cursor]] & _ON_CURVE
-                and len(on_curve_positions) <= _MAX_CAP_SEGMENTS
-            ):
-                on_curve_positions.append(cursor)
-                cursor = (cursor + 1) % count
-            segment_count = len(on_curve_positions) - 1
-            if (
-                not 1 <= segment_count <= _MAX_CAP_SEGMENTS
-                or flags[contour[cursor]] & _ON_CURVE
-            ):
-                continue
-            cap_indices = tuple(contour[item] for item in on_curve_positions)
-            cap_points = tuple(coordinates[index] for index in cap_indices)
-            geometries.append(
-                _classify_geometry(
-                    contour_index=contour_index,
-                    segment_index=position,
-                    point_indices=cap_indices,
-                    cap_points=cap_points,
-                    previous_control=coordinates[contour[previous_position]],
-                    next_control=coordinates[contour[cursor]],
-                    contour_area=contour_area,
-                    outline_bounds=outline_bounds,
-                    source_indices=(
-                        contour[previous_position],
-                        *cap_indices,
-                        contour[cursor],
-                    ),
-                )
-            )
-    geometries.sort(
-        key=lambda item: (item.record.contour_index, item.record.segment_index)
-    )
-    return tuple(geometries)
-
-
-def inventory_glyf_terminals(glyph: SimpleGlyfGlyph) -> TerminalInventory:
-    """Return a non-mutating inventory of simple ``glyf`` cap candidates."""
-
-    return TerminalInventory(tuple(item.record for item in _glyf_geometries(glyph)))
-
-
-def _rounded(point: Point) -> Point:
-    return float(round(point[0])), float(round(point[1]))
-
-
-def _glyf_taper_points(
-    geometry: _Geometry,
-    taper_depth_ratio: float,
-) -> dict[int, Point] | None:
-    if geometry.outward is None:
-        return None
-    cap_indices = geometry.source_indices[1:-1]
+def _variable_path_geometry_is_viable(geometry: _Geometry) -> bool:
     start = geometry.cap_points[0]
     end = geometry.cap_points[-1]
     axis = _unit(_subtract(end, start))
-    if axis is None:
+    if axis is None or geometry.outward is None:
+        return False
+    transverse = _unit(
+        _subtract(geometry.outward, _scale(axis, _dot(geometry.outward, axis)))
+    )
+    cap_length = math.dist(start, end)
+    return (
+        transverse is not None
+        and math.isfinite(cap_length)
+        and cap_length > _GEOMETRY_EPSILON
+        and _all_finite((*geometry.cap_points, transverse))
+    )
+
+
+def _path_geometry_by_candidate_id(
+    outline: pathops.Path,
+) -> tuple[
+    list[tuple[str, tuple[Point, ...]]],
+    tuple[_Geometry, ...],
+    dict[TerminalCandidateId, _Geometry],
+]:
+    commands, geometries, _ = _path_geometries(outline)
+    by_id: dict[TerminalCandidateId, _Geometry] = {}
+    for geometry in geometries:
+        candidate_id = geometry.record.candidate_id
+        if candidate_id in by_id:
+            raise ValueError(
+                f"Outline contains duplicate terminal candidate {candidate_id!r}"
+            )
+        by_id[candidate_id] = geometry
+    return commands, geometries, by_id
+
+
+def _is_union_compatible_path_geometry(geometry: _Geometry) -> bool:
+    record = geometry.record
+    permitted = record.status == "eligible" or (
+        record.status in ("rejected", "unresolved")
+        and record.reason in _UNION_OVERRIDABLE_REASONS
+    )
+    return permitted and _variable_path_geometry_is_viable(geometry)
+
+
+def compatible_path_terminal_ids(
+    outlines: Sequence[pathops.Path],
+) -> frozenset[TerminalCandidateId]:
+    """Return terminal identities that can be tapered in every path master.
+
+    Identities are derived solely from contour and segment topology; no glyph
+    name or font object participates. A returned identity exists exactly once
+    in every outline and passes every non-overridable safety gate there.
+    Duplicate identities in an outline are ambiguous and raise
+    :class:`ValueError`.
+    """
+
+    if not outlines:
+        return frozenset()
+    master_geometries = tuple(
+        _path_geometry_by_candidate_id(outline)[2] for outline in outlines
+    )
+    common_ids = set(master_geometries[0])
+    for geometries_by_id in master_geometries[1:]:
+        common_ids.intersection_update(geometries_by_id)
+    return frozenset(
+        candidate_id
+        for candidate_id in common_ids
+        if all(
+            _is_union_compatible_path_geometry(geometries_by_id[candidate_id])
+            for geometries_by_id in master_geometries
+        )
+    )
+
+
+def _variable_path_terminal_curves(
+    geometry: _Geometry,
+    taper_depth_ratio: float,
+) -> tuple[
+    tuple[Point, Point, Point],
+    tuple[Point, Point, Point],
+] | None:
+    start = geometry.cap_points[0]
+    end = geometry.cap_points[-1]
+    axis = _unit(_subtract(end, start))
+    incoming = _unit(_subtract(start, geometry.previous_control))
+    outgoing = _unit(_subtract(geometry.next_control, end))
+    if (
+        axis is None
+        or incoming is None
+        or outgoing is None
+        or geometry.outward is None
+    ):
         return None
     transverse = _unit(
         _subtract(geometry.outward, _scale(axis, _dot(geometry.outward, axis)))
     )
     if transverse is None:
         return None
+
     cap_length = math.dist(start, end)
     midpoint = _scale(_add(start, end), 0.5)
     depth = max(cap_length * taper_depth_ratio, 1.0)
-    tip = _rounded(_add(midpoint, _scale(transverse, depth)))
-    segment_count = len(cap_indices) - 1
-    if segment_count == 1:
-        # A duplicate on-curve endpoint is an interpolation-compatible cusp.
-        # Adjacent quadratic controls stay untouched, avoiding cross-terminal
-        # handle ownership and preserving the source sides exactly.
-        updates = {
-            cap_indices[0]: tip,
-            cap_indices[1]: tip,
-        }
-    else:
-        # Keep both shoulders and converge every compatible interior point to
-        # one tip, rather than replacing a long cut with a shorter flat cut.
-        updates = {point_index: tip for point_index in cap_indices[1:-1]}
-
-    if not _all_finite(updates.values()):
-        return None
-    adjusted_points = tuple(
-        updates.get(index, point)
-        for index, point in zip(cap_indices, geometry.cap_points, strict=True)
+    tip = _add(midpoint, _scale(transverse, depth))
+    shoulder_handle = cap_length * _BOUNDARY_HANDLE_RATIO
+    nose_handle = cap_length * _TAPER_DEPTH_RATIO
+    curves = (
+        (
+            _add(start, _scale(incoming, shoulder_handle)),
+            _subtract(tip, _scale(axis, nose_handle)),
+            tip,
+        ),
+        (
+            _add(tip, _scale(axis, nose_handle)),
+            _subtract(end, _scale(outgoing, shoulder_handle)),
+            end,
+        ),
     )
-    projections = tuple(_dot(point, axis) for point in adjusted_points)
-    if any(
-        right < left - _GEOMETRY_EPSILON
-        for left, right in zip(projections, projections[1:])
-    ):
-        return None
-    if segment_count >= 2:
-        convex_points: list[Point] = []
-        for point in adjusted_points:
-            if not convex_points or convex_points[-1] != point:
-                convex_points.append(point)
-        turns = tuple(
-            _cross(_subtract(middle, left), _subtract(right, middle))
-            for left, middle, right in zip(
-                convex_points,
-                convex_points[1:],
-                convex_points[2:],
-            )
-        )
-        if not turns or not (
-            min(turns) > _GEOMETRY_EPSILON or max(turns) < -_GEOMETRY_EPSILON
-        ):
-            return None
-    return updates
+    return curves if _all_finite(point for curve in curves for point in curve) else None
 
 
-def taper_glyf_terminals(
-    glyph: SimpleGlyfGlyph,
-    selected_candidate_ids: Iterable[TerminalCandidateId] | None = None,
-    taper_depth_ratio: float = _TAPER_DEPTH_RATIO,
-) -> GlyfTerminalResult:
-    """Clone and taper a simple TrueType glyph without changing point topology.
+def taper_variable_path_terminals(
+    outline: pathops.Path,
+    selected_candidate_ids: Iterable[TerminalCandidateId],
+    taper_depth_ratio: float,
+) -> PathTerminalResult:
+    """Copy and taper exactly the selected topology-compatible path terminals.
 
-    Existing on-curve points and adjacent quadratic handles are moved in
-    place. Point count, contour endpoints, point flags, and point order are
-    never changed, making the result suitable for corresponding edits in
-    variable-font masters.
-
-    When ``selected_candidate_ids`` is supplied, its topology identities can
-    be the union of inventories from several masters. Selection may override
-    only a narrowly missed heuristic threshold; finite, monotonic, curvature,
-    and exterior-fill gates still apply independently in every master. This
-    makes threshold-dependent membership reportable without varying topology.
+    Every selected hard-cap line chain is replaced by exactly two cubic
+    segments. The cap-normal tip depth is
+    ``max(cap_length * taper_depth_ratio, 1)`` and is never rounded here.
+    Selection is glyph-independent: identities refer only to path contour
+    topology. A duplicate or missing identity, a non-finite or negative depth
+    ratio, or any selected candidate that fails a non-overridable geometry
+    gate raises :class:`ValueError`; no partially adjusted result is returned.
     """
 
-    tapered = deepcopy(glyph)
-    geometries = _glyf_geometries(glyph)
-    selected = (
-        None if selected_candidate_ids is None else frozenset(selected_candidate_ids)
-    )
-    records_by_id: dict[TerminalCandidateId, TerminalCandidate] = {}
-    proposals: dict[
-        TerminalCandidateId,
-        tuple[_Geometry, dict[int, Point], bool],
-    ] = {}
-    found_ids: set[TerminalCandidateId] = set()
-    for geometry in geometries:
-        candidate_id = geometry.record.candidate_id
-        found_ids.add(candidate_id)
-        explicitly_selected = selected is not None and candidate_id in selected
-        normally_eligible = geometry.record.status == "eligible"
-        threshold_override = (
-            explicitly_selected
-            and geometry.record.status in ("rejected", "unresolved")
-            and geometry.record.reason in _UNION_OVERRIDABLE_REASONS
+    if (
+        isinstance(taper_depth_ratio, bool)
+        or not isinstance(taper_depth_ratio, (int, float))
+        or not math.isfinite(taper_depth_ratio)
+        or taper_depth_ratio < 0
+    ):
+        raise ValueError(
+            "taper_depth_ratio must be a finite non-negative number; "
+            f"got {taper_depth_ratio!r}"
         )
-        should_adjust = (
-            normally_eligible if selected is None else explicitly_selected
-        ) and (normally_eligible or threshold_override)
-        if not should_adjust:
-            if selected is not None and normally_eligible and not explicitly_selected:
-                records_by_id[candidate_id] = replace(
-                    geometry.record,
+    selected_items = tuple(selected_candidate_ids)
+    try:
+        selected = frozenset(selected_items)
+    except TypeError as error:
+        raise ValueError("Terminal candidate identities must be hashable") from error
+    if len(selected) != len(selected_items):
+        raise ValueError("selected_candidate_ids contains a duplicate identity")
+
+    commands, geometries, geometries_by_id = _path_geometry_by_candidate_id(outline)
+    missing = selected.difference(geometries_by_id)
+    if missing:
+        raise ValueError(
+            f"Selected terminal candidate is absent from the outline: "
+            f"{sorted(missing)!r}"
+        )
+
+    replacements: dict[
+        int,
+        tuple[tuple[Point, Point, Point], tuple[Point, Point, Point]],
+    ] = {}
+    skipped: set[int] = set()
+    occupied_source_indices: set[int] = set()
+    records: list[TerminalCandidate] = []
+    for geometry in geometries:
+        record = geometry.record
+        candidate_id = record.candidate_id
+        if candidate_id not in selected:
+            records.append(
+                replace(
+                    record,
                     status="unresolved",
                     reason="not-selected-by-master-union",
                 )
-            else:
-                records_by_id[candidate_id] = geometry.record
-            continue
-        updates = _glyf_taper_points(geometry, taper_depth_ratio)
-        if updates is None:
-            records_by_id[candidate_id] = replace(
-                geometry.record,
-                status="unresolved",
-                reason="point-compatible-taper-gate-failed",
+                if record.status == "eligible"
+                else record
             )
             continue
-        proposals[candidate_id] = (geometry, updates, threshold_override)
-
-    point_updates: dict[int, tuple[Point, set[TerminalCandidateId]]] = {}
-    conflicts: set[TerminalCandidateId] = set()
-    for candidate_id, (_, updates, _) in proposals.items():
-        for point_index, point in updates.items():
-            existing = point_updates.get(point_index)
-            if existing is None:
-                point_updates[point_index] = (point, {candidate_id})
-                continue
-            existing_point, owners = existing
-            owners.add(candidate_id)
-            if existing_point != point:
-                conflicts.update(owners)
-
-    for candidate_id, (geometry, updates, threshold_override) in proposals.items():
-        if candidate_id in conflicts:
-            records_by_id[candidate_id] = replace(
-                geometry.record,
-                status="unresolved",
-                reason="point-compatible-update-conflict",
+        if not _is_union_compatible_path_geometry(geometry):
+            raise ValueError(
+                f"Selected terminal candidate {candidate_id!r} failed a "
+                f"non-overridable safety gate: {record.reason!r}"
             )
-            continue
-        for point_index, point in updates.items():
-            tapered.coordinates[point_index] = point
-        records_by_id[candidate_id] = replace(
-            geometry.record,
-            status="adjusted",
-            reason="selected-by-master-union" if threshold_override else None,
+        curves = _variable_path_terminal_curves(geometry, float(taper_depth_ratio))
+        if curves is None:
+            raise ValueError(
+                f"Selected terminal candidate {candidate_id!r} could not "
+                "produce finite two-cubic geometry"
+            )
+        source_index = geometry.source_indices[0]
+        if occupied_source_indices.intersection(geometry.source_indices):
+            raise ValueError(
+                f"Selected terminal candidate {candidate_id!r} overlaps another "
+                "selected hard-cap line chain"
+            )
+        replacements[source_index] = curves
+        occupied_source_indices.update(geometry.source_indices)
+        skipped.update(geometry.source_indices[1:])
+        records.append(
+            replace(
+                record,
+                status="adjusted",
+                reason=(
+                    None
+                    if record.status == "eligible"
+                    else "selected-by-master-union"
+                ),
+            )
         )
 
-    if selected is not None:
-        for contour_index, point_indices in selected.difference(found_ids):
-            records_by_id[(contour_index, point_indices)] = TerminalCandidate(
-                contour_index=contour_index,
-                segment_index=point_indices[0] if point_indices else 0,
-                segment_count=max(0, len(point_indices) - 1),
-                point_indices=point_indices,
-                normalized_midpoint=(0.0, 0.0),
-                normalized_axis=(0.0, 0.0),
-                entry_or_exit="unknown",
-                status="unresolved",
-                reason="selected-candidate-not-found",
-            )
-    records = tuple(
-        records_by_id[candidate_id]
-        for candidate_id in sorted(
-            records_by_id,
-            key=lambda item: (item[0], item[1]),
+    if not replacements:
+        return PathTerminalResult(
+            pathops.Path(outline),
+            TerminalInventory(tuple(records)),
         )
-    )
-    return GlyfTerminalResult(tapered, TerminalInventory(records))
+    tapered = pathops.Path()
+    pen = tapered.getPen()
+    for index, (operator, operands) in enumerate(commands):
+        curves = replacements.get(index)
+        if curves is not None:
+            for curve in curves:
+                pen.curveTo(*curve)
+        elif index not in skipped:
+            getattr(pen, operator)(*operands)
+    return PathTerminalResult(tapered, TerminalInventory(tuple(records)))
+
+
 
 
 def _legacy_terminal_curves(
@@ -1077,17 +992,15 @@ def soften_kana_terminals(outline: pathops.Path) -> tuple[pathops.Path, int]:
 
 
 __all__ = (
-    "GlyfTerminalResult",
     "PathTerminalResult",
-    "SimpleGlyfGlyph",
     "TerminalCandidate",
     "TerminalCandidateId",
     "TerminalDirection",
     "TerminalInventory",
     "TerminalStatus",
-    "inventory_glyf_terminals",
+    "compatible_path_terminal_ids",
     "inventory_path_terminals",
     "soften_kana_terminals",
-    "taper_glyf_terminals",
     "taper_path_terminals",
+    "taper_variable_path_terminals",
 )

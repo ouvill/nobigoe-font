@@ -21,7 +21,6 @@ from .profiles import (
     koburi_source,
     latin_font_source,
     noto_serif_source,
-    noto_serif_variable_source,
     stix_two_text_variable_source,
     shippori_source,
 )
@@ -37,7 +36,6 @@ class SourceOverrides:
     source: Path | None = None
     latin_source: Path | None = None
     punctuation_source: Path | None = None
-    variable_kana_source: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -47,7 +45,6 @@ class ResolvedSources:
     source: Path
     latin_source: Path | None
     punctuation_source: Path
-    variable_kana_source: Path | None = None
 
 
 def verify_sha256(path: Path, expected: str) -> None:
@@ -77,10 +74,8 @@ class SourceCache:
         weight: str,
         overrides: SourceOverrides = SourceOverrides(),
         latin_family: LatinFamily = "libertinus",
-        variable_kana: bool = False,
     ) -> ResolvedSources:
         """Resolve all build inputs, downloading only missing or invalid cache data."""
-        resolved_variable_kana_source: Path | None = None
 
         if base == "noto":
             source = overrides.source or self._fetch_direct(noto_serif_source(weight))
@@ -92,16 +87,9 @@ class SourceCache:
                     self.fetch(latin_spec) if latin_spec is not None else None
                 )
             secondary_weight = weight
-            resolved_variable_kana_source = (
-                self.resolve_variable_kana(overrides.variable_kana_source)
-                if variable_kana
-                else None
-            )
         elif base == "koburi":
             if overrides.latin_source is not None:
                 raise ValueError("--latin-source is available for the Noto base only")
-            if variable_kana:
-                raise ValueError("Variable kana is available for the Noto base only")
             source = overrides.source or self._fetch_zip_member(koburi_source())
             latin_source = None
             secondary_weight = "Regular"
@@ -115,13 +103,8 @@ class SourceCache:
             source=source,
             latin_source=latin_source,
             punctuation_source=punctuation_source,
-            variable_kana_source=resolved_variable_kana_source,
         )
 
-    def resolve_variable_kana(self, override: Path | None = None) -> Path:
-        """Resolve the pinned development VF, unless a local source is explicit."""
-
-        return override or self._fetch_direct(noto_serif_variable_source())
 
     def resolve_variable_stix(self, override: Path | None = None) -> Path:
         """Resolve the pinned raw STIX Two Text VF, unless locally overridden."""

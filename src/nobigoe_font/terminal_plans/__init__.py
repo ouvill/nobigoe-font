@@ -1,4 +1,4 @@
-"""Validated optical terminal-depth plans for encoded Novel kana."""
+"""Validated optical terminal-depth plans for Novel kana."""
 
 from __future__ import annotations
 
@@ -6,8 +6,11 @@ from collections.abc import Mapping
 import math
 from typing import Literal, TypeAlias
 
-from ..novel import HIRAGANA_CODEPOINTS
-from ..novel_katakana import KATAKANA_SOURCE_CODEPOINTS
+from ..novel import HIRAGANA_CODEPOINTS, NOVEL_SMALL_KO_CODEPOINT
+from ..novel_katakana import (
+    KATAKANA_CODEPOINTS,
+    NOVEL_SMALL_KATAKANA_KO_CODEPOINT,
+)
 from . import (
     hiragana_3041_3054,
     hiragana_3055_3069,
@@ -45,16 +48,18 @@ _MODULES = (
 
 def _codepoints_for_script(script: str) -> frozenset[int]:
     if script == "hiragana":
-        return HIRAGANA_CODEPOINTS
+        return HIRAGANA_CODEPOINTS | {NOVEL_SMALL_KO_CODEPOINT}
     if script == "katakana":
-        return KATAKANA_SOURCE_CODEPOINTS
+        return KATAKANA_CODEPOINTS
     raise ValueError(f"Unknown kana script {script!r}")
 
 
 def _validated_terminal_depth_scales() -> dict[int, TerminalDepthMasters]:
     loaded: dict[int, TerminalDepthMasters] = {}
     owners: dict[int, str] = {}
-    expected_all = HIRAGANA_CODEPOINTS | KATAKANA_SOURCE_CODEPOINTS
+    expected_all = _codepoints_for_script("hiragana") | _codepoints_for_script(
+        "katakana"
+    )
 
     for module, script, first, last in _MODULES:
         module_name = module.__name__
@@ -125,6 +130,14 @@ def _validated_terminal_depth_scales() -> dict[int, TerminalDepthMasters]:
                 masters[weight] = (float(raw_scales[0]), float(raw_scales[1]))
             loaded[codepoint] = masters
 
+    # The added small-ko outlines are scaled copies of こ/コ. Reuse those
+    # scale-invariant depth plans rather than maintaining duplicate tuning.
+    for codepoint, source_codepoint in (
+        (NOVEL_SMALL_KO_CODEPOINT, 0x3053),
+        (NOVEL_SMALL_KATAKANA_KO_CODEPOINT, 0x30B3),
+    ):
+        loaded[codepoint] = dict(loaded[source_codepoint])
+
     actual_all = set(loaded)
     if actual_all != expected_all:
         missing = expected_all - actual_all
@@ -134,8 +147,8 @@ def _validated_terminal_depth_scales() -> dict[int, TerminalDepthMasters]:
             *(f"extra U+{codepoint:04X}" for codepoint in sorted(extra)),
         ]
         raise ValueError(f"Terminal plans: {', '.join(details)}")
-    if len(loaded) != 198:
-        raise AssertionError("Terminal plans must cover 89 hiragana and 109 katakana")
+    if len(loaded) != 200:
+        raise AssertionError("Terminal plans must cover 90 hiragana and 110 katakana")
     return loaded
 
 
@@ -146,9 +159,13 @@ def terminal_depth_ratio(
     script: KanaScript,
     codepoint: int,
     orientation: KanaOrientation,
-    weight_class: int,
+    weight_class: int | float,
 ) -> float:
-    """Return the tuned convex-tip depth ratio for one semantic kana owner."""
+    """Return the interpolated convex-tip depth ratio for one kana owner.
+
+    ``weight_class`` may be any finite number from 200 through 900. Values
+    between the tuned 200, 400, and 900 masters are linearly interpolated.
+    """
 
     if codepoint not in _codepoints_for_script(script):
         raise ValueError(
@@ -160,14 +177,27 @@ def terminal_depth_ratio(
         orientation_index = 1
     else:
         raise ValueError(f"Unknown kana orientation {orientation!r}")
-    if weight_class not in _MASTER_WEIGHTS:
+    if (
+        isinstance(weight_class, bool)
+        or not isinstance(weight_class, (int, float))
+        or not math.isfinite(weight_class)
+        or not 200 <= weight_class <= 900
+    ):
         raise ValueError(
-            f"Terminal depth plans contain only masters 200, 400, and 900; got {weight_class!r}"
+            f"Terminal depth weight must be a finite number in 200..900; "
+            f"got {weight_class!r}"
         )
-    return (
-        _BASE_DEPTH_RATIO
-        * _TERMINAL_DEPTH_SCALES[codepoint][weight_class][orientation_index]
-    )
+
+    masters = _TERMINAL_DEPTH_SCALES[codepoint]
+    if weight_class in _MASTER_WEIGHTS:
+        scale = masters[int(weight_class)][orientation_index]
+    else:
+        lower, upper = (200, 400) if weight_class < 400 else (400, 900)
+        fraction = (float(weight_class) - lower) / (upper - lower)
+        lower_scale = masters[lower][orientation_index]
+        upper_scale = masters[upper][orientation_index]
+        scale = lower_scale + (upper_scale - lower_scale) * fraction
+    return _BASE_DEPTH_RATIO * scale
 
 
 __all__ = ("terminal_depth_ratio",)

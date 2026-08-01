@@ -1457,7 +1457,7 @@
 
 .variable-kana-prose > p,
 .variable-kana-sheet__scripts [data-variable-specimen] {
-  font-family: "Nobigoe Novel Kana Design VF", var(--serif);
+  font-family: "Nobigoe Novel Mincho VF", var(--serif);
   font-weight: 400;
   font-feature-settings:
     "ccmp" 1,

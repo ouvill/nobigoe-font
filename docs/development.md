@@ -41,16 +41,16 @@ Pythonコードは`src/nobigoe_font/`へ集約し、CLI、生成パイプライ�
 | モジュール | 責務 |
 |---|---|
 | `cli.py` | こぶり版・欧文比較・開発用制作VFの引数検証と入出力の解決 |
-| `variable_cli.py` / `variable_marks.py` | Noto CFF2可変ソースへののびごえ共通カスタマイズと、Nobigoe・Novel固定各7ウェイトの出力 |
+| `variable_cli.py` / `variable_marks.py` / `variable_novel.py` | Noto CFF2可変ソースへののびごえ共通カスタマイズ、Novel CFF2派生、両可変正本からの固定7ウェイト出力 |
 | `essential_cli.py` / `essential.py` | カスタマイズ済み可変ソースから5つの伸長記号と必要なレイアウト閉包だけを残すフォールバック用VF生成 |
-| `pipeline.py` | のびごえ可変版の実体化、Novel固有カスタマイズ、欧文取り込み・命名・ヒント処理 |
+| `pipeline.py` | 可変正本の固定ウェイト実体化、Novel固定版専用カスタマイズ、欧文取り込み・命名・ヒント処理 |
 | `profiles.py` / `sources.py` | ファミリー、ウェイト、固定取得元、SHA-256検証済みキャッシュ |
 | `marks.py` / `mark_positions/` | 濁点・半濁点の対象、配置型、JSON設定の検証 |
 | `geometry.py` / `operations.py` | 輪郭変換、cmap、CFF／TrueType、欧文レイアウトの操作 |
 | `punctuation.py` / `features.py` | 感嘆符・疑問符合字の合成とOpenType機能の生成・結合 |
 | `metadata.py` / `hinting.py` / `release.py` | 命名、欧文再ヒント、配布ZIP作成 |
 | `novel.py` / `novel_katakana.py` / `novel_han.py` / `novel_metrics.py` | Novelひらがな・カタカナの3マスター設計、Unicode 15.1 Han集合と等方縮小、字面・ink・カウンター計測 |
-| `kana_terminals.py` / `terminal_plans/` / `variable_kana.py` | 互換トポロジーの筆端変形、字別・横縦・3マスター台帳、可変制作正本の生成と固定ウェイト実体化 |
+| `kana_terminals.py` / `terminal_plans/` | 三次ベジェpathの互換トポロジーを保つ筆端変形と、字別・横縦・3マスター台帳 |
 | `variable_stix.py` / `stix_latin_tuning.json` | STIX Two Textの主線基準ウェイト補間、制作VFの生成、固定7ウェイト実体化 |
 
 ## 自動取得して生成
@@ -95,9 +95,10 @@ for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
     --output "dist/comparison/NobigoeMinchoSTIX-$weight.otf"
 done
 
-# レビュー済みNovelかな制作VFを明示して同じ派生経路を再現
+# カスタマイズ済みNobigoe CFF2と派生Novel CFF2の出力先を明示
 uv run nobigoe-build-variable \
-  --novel-kana-source dist/NobigoeNovelKanaDesign-VF.ttf
+  --output dist/NobigoeVariableMarks-VF.otf \
+  --novel-output dist/NobigoeNovelMincho-VF.otf
 
 # 源暎こぶり明朝版Regular
 uv run nobigoe-build --base koburi
@@ -110,13 +111,13 @@ for latin in noto libertinus stix-two-text source-serif-4; do
 done
 ```
 
-既定の`nobigoe-build-variable`は、共通カスタマイズ済みCFF2可変フォントを`dist/NobigoeVariableMarks-VF.otf`へ作り、そこへNovelかなと対応する濁点・半濁点結合字形の可変カスタマイズを重ねた`dist/NobigoeNovelMincho-VF.otf`も作ります。各可変正本から`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeNovelMincho-<Weight>.otf`を実体化した後、可変化されていないLibertinus Serif欧文の取り込み、Novel版の漢字字面調整、リリース用の命名と著作権表示、任意の欧文再ヒントを固定ウェイトへ適用します。可変フォントの出力先は`--output`と`--novel-output`、固定ウェイトの出力ディレクトリは`--static-output-dir`、Novelかな制作VFは`--novel-kana-source`で変更できます。`--build-variable-kana OUTPUT`と`--build-variable-stix OUTPUT`は、それぞれの調整済み制作VFを明示した場所へ生成します。`--latin-family stix-two-text`は公式STIX可変TTFまたは後者から対象ウェイトの欧文を実体化します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
+既定の`nobigoe-build-variable`は、共通カスタマイズ済みCFF2可変フォントを`dist/NobigoeVariableMarks-VF.otf`へ作り、その三次ベジェ輪郭を直接入力として`dist/NobigoeNovelMincho-VF.otf`を派生します。Novel変換は`wght` 200・400・900のpathマスターへ仮名字面と筆端の変形を適用し、標準の200・300・400・500・600・700・900へ補間した輪郭で既存CFF2 VarStoreを置き換えます。独立したかな制作TTFは生成も入力もしません。各可変正本から`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeNovelMincho-<Weight>.otf`を実体化した後、可変化されていないLibertinus Serif欧文の取り込み、Novel版の漢字字面調整、リリース用の命名と著作権表示、任意の欧文再ヒントを固定ウェイトだけへ適用します。可変フォントの出力先は`--output`と`--novel-output`、固定ウェイトの出力ディレクトリは`--static-output-dir`で変更できます。`--build-variable-stix OUTPUT`は調整済みSTIX制作VFを明示した場所へ生成し、`--latin-family stix-two-text`は公式STIX可変TTFまたはその制作VFから対象ウェイトの欧文を実体化します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
 `--static-weight <Weight>`を指定すると、両可変フォントは通常どおり生成したうえで、NobigoeとNovelの指定固定ウェイトだけを実体化します。省略時は両ファミリーの固定7ウェイトをすべて生成します。
 
 `nobigoe-build-essential`は、既定で`dist/NobigoeVariableMarks-VF.otf`を入力し、`ー`、`―`、`〜`、`～`、`〰`だけをUnicodeへ割り当てた`dist/NobigoeEssential-VF.otf`を生成します。`liga`、`calt`、`ss04`、`ss05`、`vert`、`vrt2`から5文字に到達する字形だけを閉包として保持し、ウェイト軸200–900と7つの名前付きインスタンスを引き継ぎます。入力と出力は`--source`と`--output`で変更できます。
 
-生成順序は、`NotoSerifJP-VF.otf`、のびごえ共通字形・OpenType機能の可変カスタマイズ、Novelかな固有の可変カスタマイズ、両可変正本からの固定ウェイト実体化、固定版専用処理です。濁点・半濁点、感嘆符・疑問符合字、連結記号とGSUBはNobigoe可変正本からNovel可変正本へ継承し、Novelかなに対応する濁点・半濁点結合字形は可変段階で同じ意味上の基字変形を受けます。漢字字面調整と欧文取り込みは実体化後に行うため、Noto固定フォントから字形や機能を別に再生成しません。
+生成順序は、`NotoSerifJP-VF.otf`、のびごえ共通字形・OpenType機能の可変カスタマイズ、カスタマイズ済みNobigoe CFF2からのNovel三次ベジェpathマスター生成、標準7位置を格納したNovel CFF2、両可変正本からの固定ウェイト実体化、固定版専用処理です。符号化済み仮名、縦組字形、既存の濁点・半濁点付き`ccmp`出力はUnicode上の基字を所有者として一度だけ同じNovel変形を受けます。濁点・半濁点、感嘆符・疑問符合字、連結記号とGSUBはNobigoe可変正本からNovel可変正本へ継承し、Novelかなに対応する生成済み濁点・半濁点結合字形は7位置の三次ベジェ輪郭として再合成します。漢字字面調整と欧文取り込みは実体化後に行うため、Noto固定フォントから字形や機能を別に再生成しません。
 
 `nobigoe-build-variable`は固定コミットの`NotoSerifJP-VF.otf`と、固定版でも使用するしっぽり明朝の各ウェイトを取得します。Notoに既存一体字形がない濁点・半濁点列の横組・縦組CFF2 CharString、全角`！`・`？`およびManga1方式の16合字、連続する`ー`、`―`、`〜`（`～`）、`〰`をつなぐ可変字形とGSUB規則を追加します。可変版の明朝感嘆符・疑問符は、ExtraLightだけを18本・6本の少数三次ベジェで再設計し、Light以上はしっぽり明朝Regular、Medium、SemiBold、Bold、ExtraBoldの実輪郭を使用します。しっぽり明朝の14曲線からなる疑問符は、右下内側の1曲線を固定パラメータで5分割し、形を変えず18曲線へ揃えます。直立感嘆符は元から6曲線です。黒みはNotoの全角約物ではなく、Noto Serif JPの`川`・`目`・`田`をY=350、450、550、650で切った縦主線幅の中央値を基準にします。200、300、400、500、600、700、900の基準値は順に44.0、53.6、65.2、80.1、95.0、117.0、144.0 unitsです。疑問符はしっぽり明朝の外周、高さ、筆だまりを保って右太線の内周だけを調整し、感嘆符は下部の細い軸を保って上部テーパーだけを左右から調整します。これによりExtraLightで承認した漢字主線との光学差を全ウェイトへ維持します。下点は元輪郭の上端を保って直径をウェイト別に84〜90%へ縮めた正円とし、5連感嘆符は200-unit間隔で配置して全角セル境界でも間隔を維持します。明朝、斜体明朝、ゴシック、斜体ゴシックを`aalt`と`ss01`–`ss03`で選択できます。濁点・半濁点の配置と連結記号の輪郭も同じ7ウェイトのレビュー済みマスターを`wght`軸上で補間し、Notoの既存CFF2字形とVariationStoreは維持します。緩い波線は`ss04`、または先頭に`~`を置く方法で選択できます。既定出力は`dist/NobigoeVariableMarks-VF.otf`です。この実験的出力には`nobigoe-build`のその他の約物、欧文・ルビ置換は含みません。
 疑問符の下点は本体全体の外接中心ではなく、下へ伸びる線の終端中心へ揃えます。

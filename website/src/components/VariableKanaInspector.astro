@@ -1,6 +1,6 @@
 ---
 import { NOVEL_PROSE_SPECIMEN, WEIGHTS } from "../data/site";
-import variableFontUrl from "../assets/fonts/NobigoeNovelKanaDesign-VF.woff2?url";
+import variableFontUrl from "../assets/fonts/NobigoeNovelMincho-VF.woff2?url";
 const weightPosition = (weight: number) =>
   `${((weight - 200) / (900 - 200)) * 100}%`;
 const hiraganaRows = [
@@ -37,19 +37,20 @@ const katakanaRows = [
 >
   <summary>
     <span>
-      <small>05 / OPTIONAL DESIGN VF</small>
-      <strong>開発用の可変かなを検査する</strong>
+      <small>05 / NOVEL CFF2 VF</small>
+      <strong>Novelの可変かなを検査する</strong>
     </span>
     <span aria-hidden="true">＋</span>
   </summary>
 
   <div class="variable-kana-inspector__body">
     <header class="variable-kana-introduction">
-      <p class="variable-kana-badge">DEVELOPMENT SOURCE · NOT A RELEASE</p>
+      <p class="variable-kana-badge">CFF2 DEVELOPMENT SOURCE · NOT A RELEASE</p>
       <div>
-        <h3>Novel Kana Design VF</h3>
+        <h3>Novel CFF2 Variable</h3>
         <p>
-          これは字形設計を確認するための開発ソースです。配布中の「のびごえ明朝」やNovelの静的7ウェイトとは別物で、リリース済みファミリーではありません。
+          カスタマイズ済みNobigoe
+          CFF2から三次ベジェのまま派生した、Novel静的7ウェイトの可変正本です。開発中のNovelファミリーは通常の配布ZIPやタグリリースには含まれません。
         </p>
       </div>
       <p
@@ -247,7 +248,7 @@ const katakanaRows = [
         const source = inspector.dataset.variableFontSrc;
         if (!source) throw new Error("The development VF path is missing.");
         const face = new FontFace(
-          "Nobigoe Novel Kana Design VF",
+          "Nobigoe Novel Mincho VF",
           `url("${source}") format("woff2")`,
           { style: "normal", weight: "200 900", display: "swap" },
         );
