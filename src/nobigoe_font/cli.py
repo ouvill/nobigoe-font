@@ -39,6 +39,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="hiragana design; novel is available for the Noto base only",
     )
     parser.add_argument(
+        "--han-brush-elements",
+        action="store_true",
+        help=(
+            "match Han start, end, and uroko elements; locally reshape them "
+            "while keeping stroke bodies, hige, and metrics"
+        ),
+    )
+    parser.add_argument(
         "--weight",
         choices=tuple(NOTO_WEIGHT_CLASSES),
         default="Regular",
@@ -113,6 +121,7 @@ def _build_variable_stix(args: argparse.Namespace) -> None:
             ("--face", args.face != 0),
             ("--base koburi", args.base != "noto"),
             ("--kana-style novel", args.kana_style != "noto"),
+            ("--han-brush-elements", args.han_brush_elements),
             ("--weight", args.weight != "Regular"),
             ("--latin-family", args.latin_family != "libertinus"),
         )
@@ -137,6 +146,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
     if args.base == "koburi" and args.kana_style == "novel":
         raise ValueError("--kana-style novel requires --base noto")
+    if args.base == "koburi" and args.han_brush_elements:
+        raise ValueError("--han-brush-elements requires --base noto")
     if args.base == "koburi" and args.weight != "Regular":
         raise ValueError("GenEi Koburi Mincho is available in Regular only")
     if args.base == "koburi" and args.latin_source is not None:
@@ -195,4 +206,5 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.base,
         args.autohint,
         args.kana_style,
+        han_brush_elements=args.han_brush_elements,
     )

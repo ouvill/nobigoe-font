@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "selected": {
+    "start": "B",
+    "end": "B",
+    "uroko": "B",
+    "horizontal-start": "B",
+    "dot": "C",
+    "left-sweep": "C",
+    "right-sweep": "C",
+    "hook": "B",
+    "fold": "B",
+    "box-left-bottom": "B",
+    "box-right-bottom": "B",
+    "box-left-top": "B",
+    "left-sweep-start": "B"
+  },
+  "pending": []
+}
