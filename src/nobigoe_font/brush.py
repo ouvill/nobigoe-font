@@ -1983,10 +1983,21 @@ def _is_right_sweep_terminal(
     )
 
 
+def _is_left_sweep_terminal(
+    start: Point,
+    cap_start: Point,
+    cap_end: Point,
+    end: Point,
+) -> bool:
+    return (
+        max(cap_start[0], cap_end[0]) < min(start[0], end[0]) - _GEOMETRY_EPSILON
+        and max(cap_start[1], cap_end[1]) < min(start[1], end[1]) - _GEOMETRY_EPSILON
+    )
+
+
 def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
     starts = _command_starts(commands)
-    used_commands: set[int] = set()
-    elements: list[_TerminalElement] = []
+    candidates: list[_TerminalElement] = []
     for contour_start, contour_end in _contour_ranges(commands):
         segment_indices = tuple(range(contour_start + 1, contour_end))
         for position, cap_index in enumerate(segment_indices):
@@ -2068,8 +2079,10 @@ def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
                 ):
                     continue
                 role = "hook"
-            else:
+            elif _is_left_sweep_terminal(start, cap_start, cap_end, end):
                 role = "left-sweep"
+            else:
+                continue
             outgoing_curve_count = 1
             if role == "hook":
                 next_index = outgoing_index + 1
@@ -2097,15 +2110,7 @@ def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
                     or abs(_dot(down_direction, across_direction)) > _MAX_HOOK_BASIS_DOT
                 ):
                     continue
-            command_indices = {
-                incoming_index,
-                cap_index,
-                *range(outgoing_index, outgoing_index + outgoing_curve_count),
-            }
-            if used_commands.intersection(command_indices):
-                continue
-            used_commands.update(command_indices)
-            elements.append(
+            candidates.append(
                 _TerminalElement(
                     incoming_index,
                     cap_index,
@@ -2118,7 +2123,23 @@ def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
                     outgoing_curve_count,
                 )
             )
-    return tuple(elements)
+    ranked = sorted(
+        enumerate(candidates),
+        key=lambda item: (item[1].role == "left-sweep", item[0]),
+    )
+    used_commands: set[int] = set()
+    selected_positions: set[int] = set()
+    for position, element in ranked:
+        command_indices = _terminal_command_indices(element)
+        if used_commands.intersection(command_indices):
+            continue
+        used_commands.update(command_indices)
+        selected_positions.add(position)
+    return tuple(
+        element
+        for position, element in enumerate(candidates)
+        if position in selected_positions
+    )
 
 
 def _edit_hook_terminal(

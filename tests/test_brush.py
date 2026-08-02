@@ -200,6 +200,41 @@ def _synthetic_right_sweep_terminal(
     return outline
 
 
+def _right_sweep_with_opening_seam() -> pathops.Path:
+    outline = pathops.Path()
+    pen = outline.getPen()
+    pen.moveTo((609, 491))
+    pen.lineTo((588, 483))
+    pen.curveTo((632, 235), (738, 33), (896, -79))
+    pen.curveTo((903, -47), (927, -24), (961, -15))
+    pen.lineTo((964, -4))
+    pen.curveTo((796, 87), (659, 263), (609, 491))
+    pen.closePath()
+    return outline
+
+
+def _crossed_sweeps_with_opening_seam() -> pathops.Path:
+    outline = pathops.Path()
+    pen = outline.getPen()
+    pen.moveTo((316, 550))
+    pen.lineTo((299, 539))
+    pen.curveTo((335, 413), (392, 304), (467, 213))
+    pen.curveTo((363, 97), (224, 0), (46, -64))
+    pen.lineTo((54, -79))
+    pen.curveTo((247, -26), (394, 62), (505, 170))
+    pen.curveTo((609, 59), (742, -23), (894, -77))
+    pen.curveTo((908, -45), (934, -25), (965, -23))
+    pen.lineTo((968, -13))
+    pen.curveTo((808, 32), (661, 107), (544, 210))
+    pen.curveTo((625, 299), (683, 399), (723, 503))
+    pen.curveTo((750, 500), (760, 505), (764, 517))
+    pen.lineTo((661, 555))
+    pen.curveTo((627, 447), (574, 344), (500, 252))
+    pen.curveTo((418, 336), (354, 435), (316, 550))
+    pen.closePath()
+    return outline
+
+
 def _synthetic_hook_terminal() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
@@ -1162,6 +1197,27 @@ class BrushElementTests(unittest.TestCase):
                     )
                 self.assertEqual(_commands(source), source_commands)
 
+    def test_right_sweep_terminal_wins_over_opening_seam(self) -> None:
+        source = _right_sweep_with_opening_seam()
+
+        elements = _terminal_elements(list(_commands(source)))
+        result = apply_brush_elements(source)
+
+        self.assertEqual(len(elements), 1)
+        self.assertEqual(elements[0].role, "right-sweep")
+        self.assertEqual(elements[0].cap_line_index, 4)
+        self.assertEqual(result.adjusted_terminal_count, 1)
+
+    def test_crossed_sweep_opening_seam_is_not_a_terminal(self) -> None:
+        source = _crossed_sweeps_with_opening_seam()
+
+        elements = _terminal_elements(list(_commands(source)))
+
+        self.assertEqual(
+            [(element.cap_line_index, element.role) for element in elements],
+            [(4, "left-sweep"), (8, "right-sweep")],
+        )
+
     def test_short_curve_is_not_a_right_sweep_terminal(self) -> None:
         commands = list(_commands(_synthetic_right_sweep_terminal(short_curve=True)))
 
@@ -1173,7 +1229,7 @@ class BrushElementTests(unittest.TestCase):
             "left sweep": (_noto_left_sweep(), "left-sweep"),
             "edge too long for a cap": (
                 _synthetic_right_sweep_terminal(long_cap=True),
-                "left-sweep",
+                None,
             ),
         }
 
@@ -1181,8 +1237,11 @@ class BrushElementTests(unittest.TestCase):
             with self.subTest(label):
                 elements = _terminal_elements(list(_commands(source)))
 
-                self.assertEqual(len(elements), 1)
-                self.assertEqual(elements[0].role, expected_role)
+                if expected_role is None:
+                    self.assertEqual(elements, ())
+                else:
+                    self.assertEqual(len(elements), 1)
+                    self.assertEqual(elements[0].role, expected_role)
 
     def test_left_sweep_start_matches_selected_b_in_affine_basis(self) -> None:
         source = _synthetic_left_sweep_start()
