@@ -22,7 +22,6 @@ from nobigoe_font.brush import (
     _vertical_end_elements,
     _terminal_elements,
     _vertical_start_elements,
-    _vertical_start_pairs,
     apply_brush_elements,
 )
 from nobigoe_font.cli import parse_args
@@ -149,7 +148,7 @@ def _noto_crossed_vertical_stroke() -> pathops.Path:
     pen.lineTo((808, 472))
     pen.lineTo((532, 472))
     pen.lineTo((532, 793))
-    pen.curveTo((532, 793), (570, 823), (570, 823))
+    pen.curveTo((556, 797), (564, 807), (567, 821))
     pen.lineTo((464, 834))
     pen.lineTo((464, 472))
     pen.closePath()
@@ -668,7 +667,7 @@ def _short_vertical_start() -> pathops.Path:
     pen = outline.getPen()
     pen.moveTo((66, 0))
     pen.lineTo((66, 84))
-    pen.curveTo((80, 87), (94, 97), (102, 111))
+    pen.curveTo((86, 87), (94, 97), (102, 111))
     pen.lineTo((0, 122))
     pen.lineTo((0, 0))
     pen.closePath()
@@ -727,9 +726,9 @@ def _squat_vertical_start_lookalike() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
     pen.moveTo((40, 0))
-    pen.lineTo((40, 44))
-    pen.curveTo((48, 46), (52, 50), (54, 56))
-    pen.lineTo((0, 60))
+    pen.lineTo((40, 100))
+    pen.curveTo((48, 102), (54, 106), (60, 112))
+    pen.lineTo((0, 116))
     pen.lineTo((0, 0))
     pen.closePath()
     return outline
@@ -743,7 +742,7 @@ def _short_complete_vertical_stroke() -> pathops.Path:
     pen.lineTo((8, 0))
     pen.curveTo((20, 0), (36, 8), (40, 18))
     pen.lineTo((40, 220))
-    pen.curveTo((48, 222), (52, 226), (54, 232))
+    pen.curveTo((54, 223), (60, 229), (62, 237))
     pen.closePath()
     return outline
 
@@ -757,7 +756,7 @@ def _overlapping_vertical_starts() -> pathops.Path:
     pen.lineTo((65, 68))
     pen.lineTo((65, 151))
     pen.lineTo((65, 263))
-    pen.curveTo((80, 270), (90, 285), (95, 295))
+    pen.curveTo((80, 270), (90, 285), (98, 295))
     pen.closePath()
     return outline
 
@@ -1433,7 +1432,7 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         ends = _vertical_end_elements(commands, pairs)
         result = apply_brush_elements(source)
 
@@ -1451,7 +1450,7 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         ends = _vertical_end_elements(commands, pairs)
         result = apply_brush_elements(source)
 
@@ -1468,7 +1467,7 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
 
         self.assertEqual(len(starts), 1)
@@ -1480,7 +1479,7 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
 
         self.assertEqual(len(starts), 1)
@@ -1492,14 +1491,14 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
 
         self.assertEqual(len(starts), 1)
         self.assertEqual(result.adjusted_stroke_count, 1)
         self.assertIn(("lineTo", ((0.0, 0.0),)), _commands(result.path))
 
-    def test_segmented_vertical_starts_use_the_exposed_short_pair(self) -> None:
+    def test_segmented_vertical_starts_are_found_from_the_cap_marker(self) -> None:
         fixtures = {
             "病・水・草・読型": _segmented_short_vertical_start(),
             "唐・書型": _crossbar_split_vertical_start(),
@@ -1507,20 +1506,20 @@ class BrushElementTests(unittest.TestCase):
         for label, source in fixtures.items():
             with self.subTest(label):
                 commands = list(_commands(source))
-                standard_pairs = _paired_strokes(
-                    _long_non_horizontal_sides(commands),
-                    commands,
-                )
-                starts = _vertical_start_elements(
-                    commands,
-                    _vertical_start_pairs(commands),
-                )
+                standard_pair_indices = {
+                    frozenset((pair.left.command_index, pair.right.command_index))
+                    for pair in _paired_strokes(
+                        _long_non_horizontal_sides(commands),
+                        commands,
+                    )
+                }
+                starts = _vertical_start_elements(commands)
 
-                self.assertEqual(
-                    _vertical_start_elements(commands, standard_pairs),
-                    (),
-                )
                 self.assertEqual(len(starts), 1)
+                self.assertNotIn(
+                    starts[0].side_command_indices,
+                    standard_pair_indices,
+                )
                 self.assertGreaterEqual(
                     apply_brush_elements(source).adjusted_stroke_count,
                     1,
@@ -1529,10 +1528,7 @@ class BrushElementTests(unittest.TestCase):
     def test_curved_vertical_start_preserves_its_sweep_terminal(self) -> None:
         source = _curved_vertical_start_with_sweep_terminal()
         source_commands = _commands(source)
-        starts = _vertical_start_elements(
-            list(source_commands),
-            _vertical_start_pairs(list(source_commands)),
-        )
+        starts = _vertical_start_elements(list(source_commands))
 
         result = apply_brush_elements(source)
 
@@ -1545,7 +1541,7 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(_overlapping_vertical_starts()))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
 
         self.assertEqual(len(starts), 1)
         self.assertGreater(
@@ -1560,7 +1556,7 @@ class BrushElementTests(unittest.TestCase):
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         ends = _vertical_end_elements(commands, pairs)
         result = apply_brush_elements(source)
         result_commands = _commands(result.path)
@@ -1583,14 +1579,15 @@ class BrushElementTests(unittest.TestCase):
         self.assertEqual(result.adjusted_stroke_count, 1)
         self.assertGreaterEqual(math.dist(body_start, body_end), 0.99 * 40)
 
-    def test_squat_cap_shape_is_not_a_short_vertical_start(self) -> None:
+    def test_vertical_start_requires_noto_control_point_relationship(self) -> None:
         source = _squat_vertical_start_lookalike()
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
 
+        self.assertEqual(len(pairs), 1)
         self.assertEqual(starts, ())
         self.assertEqual(result.adjusted_stroke_count, 0)
 
@@ -1615,7 +1612,7 @@ class BrushElementTests(unittest.TestCase):
         source = _noto_crossed_vertical_stroke()
         commands = list(_commands(source))
         pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
-        starts = _vertical_start_elements(commands, pairs)
+        starts = _vertical_start_elements(commands)
         ends = _vertical_end_elements(commands, pairs)
 
         result = apply_brush_elements(source)

@@ -35,8 +35,6 @@ _MAX_RIGHT_SWEEP_CAP_TO_SHORT_SIDE_RATIO = 0.35
 _MIN_CLOSED_DOT_SIDE_TO_CAP_RATIO = 10.0
 _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO = 0.75
 _MAX_HOOK_BASIS_DOT = 0.05
-_MIN_VERTICAL_START_SIDE_ASPECT_RATIO = 0.65
-_MIN_VERTICAL_START_LONG_SIDE_ASPECT_RATIO = 1.6
 _MAX_HORIZONTAL_STROKE_WIDTH = 80.0
 
 
@@ -472,6 +470,7 @@ def _stroke_pair(
 def _paired_strokes(
     sides: tuple[_LineSide, ...],
     commands: list[Command] | None = None,
+    start_elements: tuple[_VerticalStartElement, ...] | None = None,
 ) -> tuple[_StrokePair, ...]:
     candidates = tuple(
         pair
@@ -479,12 +478,18 @@ def _paired_strokes(
         for second in sides[first_index + 1 :]
         if (pair := _stroke_pair(first, second)) is not None
     )
+    if start_elements is None:
+        start_elements = (
+            _vertical_start_elements(commands) if commands is not None else ()
+        )
+    vertical_start_pairs = frozenset(
+        element.side_command_indices for element in start_elements
+    )
 
     def role_count(pair: _StrokePair) -> int:
-        if commands is None:
-            return 0
-        return int(bool(_vertical_start_elements(commands, (pair,)))) + int(
-            bool(_vertical_end_elements(commands, (pair,)))
+        indices = frozenset((pair.left.command_index, pair.right.command_index))
+        return int(indices in vertical_start_pairs) + int(
+            commands is not None and bool(_vertical_end_elements(commands, (pair,)))
         )
 
     used: set[int] = set()
@@ -499,78 +504,6 @@ def _paired_strokes(
         used.update(indices)
         selected.append(pair)
     return tuple(selected)
-
-
-def _vertical_start_sides(commands: list[Command]) -> tuple[_LineSide, ...]:
-    sides = list(_long_non_horizontal_sides(commands))
-    starts = _command_starts(commands)
-    minimum_length = _MIN_STROKE_WIDTH * _MIN_VERTICAL_START_SIDE_ASPECT_RATIO
-    for command_index, (operator, operands) in enumerate(commands):
-        start = starts[command_index]
-        if operator != "curveTo" or start is None:
-            continue
-        tangent_segments = (
-            (start, operands[0]),
-            (operands[1], operands[2]),
-        )
-        for tangent_start, tangent_end in tangent_segments:
-            vector = _subtract(tangent_end, tangent_start)
-            length = math.hypot(*vector)
-            direction = _unit(vector)
-            if (
-                direction is not None
-                and length >= minimum_length
-                and abs(vector[1]) >= _MIN_SIDE_SLOPE * abs(vector[0])
-            ):
-                sides.append(
-                    _LineSide(
-                        command_index,
-                        tangent_start,
-                        tangent_end,
-                        direction,
-                        length,
-                    )
-                )
-    return tuple(sides)
-
-
-def _vertical_start_has_lower_branches(
-    commands: list[Command],
-    pair: _StrokePair,
-) -> bool:
-    context = _vertical_pair_context(commands, pair)
-    if context is None:
-        return False
-    down_side, up_side, segment_indices, _ = context
-    if (
-        commands[down_side.command_index][0] != "lineTo"
-        or commands[up_side.command_index][0] != "lineTo"
-    ):
-        return False
-    down_position = segment_indices.index(down_side.command_index)
-    up_position = segment_indices.index(up_side.command_index)
-    next_index = segment_indices[(down_position + 1) % len(segment_indices)]
-    previous_index = segment_indices[(up_position - 1) % len(segment_indices)]
-    starts = _command_starts(commands)
-    previous_start = starts[previous_index]
-    if previous_start is None:
-        return False
-    down_end = commands[down_side.command_index][1][-1]
-    up_start = starts[up_side.command_index]
-    if up_start is None:
-        return False
-    next_end = commands[next_index][1][-1]
-    across = (-pair.axis[1], pair.axis[0])
-    if _dot(_subtract(up_side.end, down_side.start), across) < 0:
-        across = _scale(across, -1)
-    down_branch = _subtract(next_end, down_end)
-    up_branch = _subtract(previous_start, up_start)
-    return (
-        _dot(down_branch, across) < -0.75 * pair.width
-        and _dot(up_branch, across) > 0.75 * pair.width
-        and abs(_dot(down_branch, pair.axis)) <= pair.width
-        and abs(_dot(up_branch, pair.axis)) <= pair.width
-    )
 
 
 def _vertical_start_command_indices(
@@ -621,51 +554,6 @@ def _supported_start_terminal_overlap(
         and terminal.role != "hook"
         and terminal.incoming_curve_index + 1 == terminal.cap_line_index
     )
-
-
-def _vertical_start_pairs(commands: list[Command]) -> tuple[_StrokePair, ...]:
-    sides = _vertical_start_sides(commands)
-    pairs: list[_StrokePair] = []
-    terminal_elements: tuple[_TerminalElement, ...] | None = None
-    for first_index, first in enumerate(sides):
-        for second in sides[first_index + 1 :]:
-            if first.command_index == second.command_index:
-                continue
-            pair = _stroke_pair(
-                first,
-                second,
-                min_aspect_ratio=_MIN_VERTICAL_START_SIDE_ASPECT_RATIO,
-            )
-            if pair is None:
-                continue
-            starts = _vertical_start_elements(commands, (pair,))
-            if not starts:
-                continue
-            has_curved_side = any(
-                commands[index][0] == "curveTo"
-                for index in starts[0].side_command_indices
-            )
-            if has_curved_side:
-                if terminal_elements is None:
-                    terminal_elements = _terminal_elements(commands)
-                if not any(
-                    _supported_start_terminal_overlap(
-                        commands,
-                        starts[0],
-                        terminal,
-                    )
-                    for terminal in terminal_elements
-                ):
-                    continue
-            minimum_ratio = min(pair.left.length, pair.right.length) / pair.width
-            maximum_ratio = max(pair.left.length, pair.right.length) / pair.width
-            if (
-                minimum_ratio >= _MIN_STROKE_ASPECT_RATIO
-                or maximum_ratio >= _MIN_VERTICAL_START_LONG_SIDE_ASPECT_RATIO
-                or _vertical_start_has_lower_branches(commands, pair)
-            ):
-                pairs.append(pair)
-    return tuple(pairs)
 
 
 _VERTICAL_REFERENCE_WIDTH = 68.0
@@ -1226,6 +1114,237 @@ def _vertical_pair_context(
     )
 
 
+_MIN_VERTICAL_START_BODY_ASPECT_RATIO = 0.25
+_MIN_VERTICAL_START_CAP_REACH = 18.0
+
+
+def _vertical_start_body_side(
+    commands: list[Command],
+    starts: tuple[Point | None, ...],
+    command_index: int,
+    *,
+    from_start: bool,
+) -> _LineSide | None:
+    operator, operands = commands[command_index]
+    command_start = starts[command_index]
+    if command_start is None:
+        return None
+    if operator == "lineTo":
+        start, end = command_start, operands[-1]
+    elif operator == "curveTo":
+        if from_start:
+            start, end = command_start, operands[0]
+        else:
+            start, end = operands[1], operands[2]
+    else:
+        return None
+    vector = _subtract(end, start)
+    direction = _unit(vector)
+    length = math.hypot(*vector)
+    if direction is None or abs(vector[1]) < _MIN_SIDE_SLOPE * abs(vector[0]):
+        return None
+    return _LineSide(command_index, start, end, direction, length)
+
+
+def _match_vertical_start_curve(
+    commands: list[Command],
+    starts: tuple[Point | None, ...],
+    contour_start: int,
+    segment_indices: tuple[int, ...],
+    curve_position: int,
+    *,
+    include_preceding_line: bool,
+    include_following_line: bool,
+) -> _VerticalStartElement | None:
+    curve_index = segment_indices[curve_position]
+    curve_start = starts[curve_index]
+    curve_operator, curve_operands = commands[curve_index]
+    if curve_operator != "curveTo" or curve_start is None:
+        return None
+
+    segment_count = len(segment_indices)
+    previous_position = (curve_position - 1) % segment_count
+    if include_preceding_line:
+        preceding_cap_index = segment_indices[previous_position]
+        if commands[preceding_cap_index][0] != "lineTo":
+            return None
+        up_position = (previous_position - 1) % segment_count
+    else:
+        up_position = previous_position
+
+    following_position = (curve_position + 1) % segment_count
+    if include_following_line:
+        following_index = segment_indices[following_position]
+        if commands[following_index][0] != "lineTo":
+            return None
+        down_position = (following_position + 1) % segment_count
+    elif curve_position == segment_count - 1:
+        down_position = 0
+    else:
+        return None
+    if down_position in {up_position, curve_position}:
+        return None
+
+    cap_positions: list[int] = []
+    position = (up_position + 1) % segment_count
+    while position != down_position and len(cap_positions) <= 3:
+        cap_positions.append(position)
+        position = (position + 1) % segment_count
+    if (
+        not 1 <= len(cap_positions) <= 3
+        or curve_position not in cap_positions
+        or sum(
+            commands[segment_indices[position]][0] == "curveTo"
+            for position in cap_positions
+        )
+        != 1
+    ):
+        return None
+
+    up_side = _vertical_start_body_side(
+        commands,
+        starts,
+        segment_indices[up_position],
+        from_start=False,
+    )
+    down_side = _vertical_start_body_side(
+        commands,
+        starts,
+        segment_indices[down_position],
+        from_start=True,
+    )
+    if up_side is None or down_side is None:
+        return None
+    pair = _stroke_pair(
+        down_side,
+        up_side,
+        min_aspect_ratio=_MIN_VERTICAL_START_BODY_ASPECT_RATIO,
+    )
+    if pair is None or abs(pair.axis[1]) < 0.9:
+        return None
+
+    across = (-pair.axis[1], pair.axis[0])
+    if _dot(_subtract(curve_operands[0], curve_start), across) < 0:
+        across = _scale(across, -1)
+    upward = _scale(pair.axis, -1)
+
+    def normalized(point: Point) -> Point:
+        offset = _subtract(point, curve_start)
+        return (
+            _dot(offset, across) / pair.width,
+            _dot(offset, upward) / pair.width,
+        )
+
+    # Noto keeps this cap's point-to-point progression across weights even
+    # though its body-width ratios change substantially from ExtraLight to
+    # Black. Match the left return and both controls against the curve end.
+    left_top, first_control, second_control, cap_end = (
+        normalized(down_side.start),
+        *(normalized(point) for point in curve_operands),
+    )
+    if (
+        not -1.25 <= left_top[0] <= -0.75
+        or cap_end[0] <= _GEOMETRY_EPSILON
+        or cap_end[1] <= _GEOMETRY_EPSILON
+        or cap_end[0] * pair.width < _MIN_VERTICAL_START_CAP_REACH
+        or not 0.45 <= first_control[0] / cap_end[0] <= 0.90
+        or not 0.75 <= second_control[0] / cap_end[0] <= 1.05
+        or not -0.05 <= first_control[1] / cap_end[1] <= 0.25
+        or not 0.30 <= second_control[1] / cap_end[1] <= 0.70
+        or not 1.10 <= left_top[1] / cap_end[1] <= 1.80
+        or not 1.00 <= cap_end[0] / cap_end[1] <= 1.80
+    ):
+        return None
+
+    if include_preceding_line:
+        cap_lead = normalized(up_side.end)
+        if not (abs(cap_lead[0]) <= 0.25 and -0.45 <= cap_lead[1] <= 0):
+            return None
+    elif math.dist(up_side.end, curve_start) > _GEOMETRY_EPSILON:
+        return None
+
+    wraps = up_position >= down_position
+    if wraps:
+        before_close_positions = tuple(
+            position for position in cap_positions if position > up_position
+        )
+        after_move_positions = tuple(
+            position for position in cap_positions if position < down_position
+        )
+        if not before_close_positions:
+            return None
+    else:
+        before_close_positions = tuple(cap_positions)
+        after_move_positions = ()
+    before_close_indices = tuple(
+        segment_indices[position] for position in before_close_positions
+    )
+    return _VerticalStartElement(
+        before_close_indices[0],
+        len(before_close_indices),
+        contour_start if wraps else None,
+        len(after_move_positions),
+        down_side,
+        up_side,
+        pair.axis,
+        across,
+        pair.width,
+    )
+
+
+def _vertical_start_elements(
+    commands: list[Command],
+) -> tuple[_VerticalStartElement, ...]:
+    starts = _command_starts(commands)
+    elements: list[_VerticalStartElement] = []
+    for contour_start, contour_end in _contour_ranges(commands):
+        segment_indices = tuple(
+            index
+            for index in range(contour_start + 1, contour_end)
+            if commands[index][0] in {"lineTo", "curveTo"}
+        )
+        for curve_position, curve_index in enumerate(segment_indices):
+            if commands[curve_index][0] != "curveTo":
+                continue
+            following_line_options = (
+                (False, True) if curve_position == len(segment_indices) - 1 else (True,)
+            )
+            for include_preceding_line in (False, True):
+                for include_following_line in following_line_options:
+                    element = _match_vertical_start_curve(
+                        commands,
+                        starts,
+                        contour_start,
+                        segment_indices,
+                        curve_position,
+                        include_preceding_line=include_preceding_line,
+                        include_following_line=include_following_line,
+                    )
+                    if element is not None:
+                        elements.append(element)
+
+    ranked = sorted(
+        enumerate(elements),
+        key=lambda item: (
+            -min(item[1].down_side.length, item[1].up_side.length) / item[1].width,
+            item[0],
+        ),
+    )
+    used_commands: set[int] = set()
+    selected_positions: set[int] = set()
+    for position, element in ranked:
+        command_indices = _vertical_start_command_indices(element)
+        if used_commands.intersection(command_indices):
+            continue
+        used_commands.update(command_indices)
+        selected_positions.add(position)
+    return tuple(
+        element
+        for position, element in enumerate(elements)
+        if position in selected_positions
+    )
+
+
 def _cap_segment_indices(
     segment_indices: tuple[int, ...],
     first_index: int,
@@ -1239,115 +1358,6 @@ def _cap_segment_indices(
         cap_indices.append(segment_indices[position])
         position = (position + 1) % len(segment_indices)
     return tuple(cap_indices)
-
-
-def _vertical_start_elements(
-    commands: list[Command],
-    pairs: tuple[_StrokePair, ...],
-) -> tuple[_VerticalStartElement, ...]:
-    elements: list[_VerticalStartElement] = []
-    for pair in pairs:
-        context = _vertical_pair_context(commands, pair)
-        if context is None:
-            continue
-        down_side, up_side, segment_indices, contour_start = context
-        down_position = segment_indices.index(down_side.command_index)
-        up_position = segment_indices.index(up_side.command_index)
-        wraps = up_position >= down_position
-        cap_indices = _cap_segment_indices(
-            segment_indices,
-            up_side.command_index,
-            down_side.command_index,
-        )
-        if (
-            not 1 <= len(cap_indices) <= 3
-            or not any(commands[index][0] == "curveTo" for index in cap_indices)
-            or any(
-                commands[index][0] not in {"lineTo", "curveTo"} for index in cap_indices
-            )
-        ):
-            continue
-        down_top = down_side.start
-        up_top = up_side.end
-        if (
-            math.dist(down_top, up_top) > 2 * pair.width
-            or abs(_dot(_subtract(up_top, down_top), pair.axis)) > 1.2 * pair.width
-        ):
-            continue
-        if not wraps and commands[cap_indices[-1]][1][-1] != down_top:
-            continue
-        if wraps:
-            before_close = tuple(
-                index for index in cap_indices if index > up_side.command_index
-            )
-            after_move = tuple(
-                index for index in cap_indices if index < down_side.command_index
-            )
-            if not before_close or after_move != tuple(
-                range(
-                    contour_start + 1,
-                    contour_start + 1 + len(after_move),
-                )
-            ):
-                continue
-        else:
-            before_close = cap_indices
-            after_move = ()
-        across = (-pair.axis[1], pair.axis[0])
-        if _dot(_subtract(up_top, down_top), across) < 0:
-            across = _scale(across, -1)
-        elements.append(
-            _VerticalStartElement(
-                before_close[0],
-                len(before_close),
-                contour_start if wraps else None,
-                len(after_move),
-                down_side,
-                up_side,
-                pair.axis,
-                across,
-                pair.width,
-            )
-        )
-
-    def edited_command_indices(element: _VerticalStartElement) -> frozenset[int]:
-        indices = set(element.side_command_indices)
-        indices.update(
-            range(
-                element.first_cap_index,
-                element.first_cap_index + element.cap_command_count,
-            )
-        )
-        if element.contour_move_index is not None:
-            indices.add(element.contour_move_index)
-            indices.update(
-                range(
-                    element.contour_move_index + 1,
-                    element.contour_move_index + 1 + element.post_move_cap_count,
-                )
-            )
-        return frozenset(indices)
-
-    ranked = sorted(
-        enumerate(elements),
-        key=lambda item: (
-            -min(item[1].down_side.length, item[1].up_side.length) / item[1].width,
-            item[0],
-        ),
-    )
-    used_commands: set[int] = set()
-    selected_positions: set[int] = set()
-    for position, element in ranked:
-        command_indices = edited_command_indices(element)
-        if used_commands.intersection(command_indices):
-            continue
-        used_commands.update(command_indices)
-        selected_positions.add(position)
-    return tuple(
-        element
-        for position, element in enumerate(elements)
-        if position in selected_positions
-    )
 
 
 def _vertical_end_elements(
@@ -2787,15 +2797,18 @@ def apply_brush_elements(
     recording = RecordingPen()
     outline.draw(recording)
     commands: list[Command] = list(recording.value)
-    pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
+    vertical_start_elements = _vertical_start_elements(commands)
+    pairs = _paired_strokes(
+        _long_non_horizontal_sides(commands),
+        commands,
+        vertical_start_elements,
+    )
     edits: list[_CommandEdit] = []
     uroko_elements = _uroko_elements(commands)
     terminal_elements = _terminal_elements(commands)
     horizontal_start_elements = _horizontal_start_elements(commands)
     fold_elements = _fold_elements(commands)
     box_elements = _box_elements(commands)
-    start_pairs = _vertical_start_pairs(commands)
-    vertical_start_elements = _vertical_start_elements(commands, start_pairs)
     vertical_end_elements = _vertical_end_elements(commands, pairs)
     left_sweep_start_candidates = _left_sweep_start_elements(commands)
     left_sweep_start_command_indices = frozenset(
@@ -2864,17 +2877,9 @@ def apply_brush_elements(
     vertical_end_by_pair = {
         element.side_command_indices: element for element in vertical_end_elements
     }
-    vertical_pairs_by_commands = {
-        frozenset((pair.left.command_index, pair.right.command_index)): pair
-        for pair in pairs
-    }
-    vertical_pairs_by_commands.update(
-        {
-            frozenset((pair.left.command_index, pair.right.command_index)): pair
-            for pair in start_pairs
-        }
+    vertical_pair_command_indices = tuple(
+        dict.fromkeys((*vertical_start_by_pair, *vertical_end_by_pair))
     )
-    vertical_pairs = tuple(vertical_pairs_by_commands.values())
     uroko_command_indices = {
         command_index
         for element in uroko_elements
@@ -2953,10 +2958,7 @@ def apply_brush_elements(
             )
             edits.append(_CommandEdit(element.following_line_index, 1, ()))
     adjusted_vertical_stroke_count = 0
-    for pair in vertical_pairs:
-        side_command_indices = frozenset(
-            (pair.left.command_index, pair.right.command_index)
-        )
+    for side_command_indices in vertical_pair_command_indices:
         start = vertical_start_by_pair.get(side_command_indices)
         end = vertical_end_by_pair.get(side_command_indices)
         if start is None and end is None:
