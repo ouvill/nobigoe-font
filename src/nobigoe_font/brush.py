@@ -308,6 +308,19 @@ class _TerminalElement:
 
 
 @dataclass(frozen=True)
+class _TerminalGeometry:
+    start: Point
+    cap_start: Point
+    cap_end: Point
+    end: Point
+    incoming_span: float
+    outgoing_span: float
+    cap_length: float
+    incoming_direction: Point
+    outgoing_direction: Point
+
+
+@dataclass(frozen=True)
 class _CommandEdit:
     """A localized edit produced by a geometric element matcher.
 
@@ -1995,134 +2008,187 @@ def _is_left_sweep_terminal(
     )
 
 
-def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
-    starts = _command_starts(commands)
-    candidates: list[_TerminalElement] = []
-    for contour_start, contour_end in _contour_ranges(commands):
-        segment_indices = tuple(range(contour_start + 1, contour_end))
-        for position, cap_index in enumerate(segment_indices):
-            incoming_index = segment_indices[position - 1]
-            outgoing_index = segment_indices[(position + 1) % len(segment_indices)]
-            linear = incoming_index + 1 == cap_index and cap_index + 1 == outgoing_index
-            wraps_at_start = (
-                cap_index == contour_start + 1
-                and outgoing_index == cap_index + 1
-                and incoming_index == contour_end - 1
-            )
-            if not linear and not wraps_at_start:
-                continue
-            incoming_operator, incoming_operands = commands[incoming_index]
-            cap_operator, cap_operands = commands[cap_index]
-            outgoing_operator, outgoing_operands = commands[outgoing_index]
-            start = starts[incoming_index]
-            cap_start = starts[cap_index]
-            if (
-                incoming_operator != "curveTo"
-                or cap_operator != "lineTo"
-                or outgoing_operator != "curveTo"
-                or start is None
-                or cap_start is None
-            ):
-                continue
-            cap_end = cap_operands[-1]
-            end = outgoing_operands[-1]
-            cap_length = math.dist(cap_start, cap_end)
-            cap_vector = _subtract(cap_end, cap_start)
-            incoming_span = math.dist(start, cap_start)
-            outgoing_span = math.dist(cap_end, end)
-            incoming_direction = _first_unit(
-                _subtract(cap_start, incoming_operands[-2]),
-                _subtract(cap_start, incoming_operands[0]),
-                _subtract(cap_start, start),
-            )
-            outgoing_direction = _first_unit(
-                _subtract(outgoing_operands[0], cap_end),
-                _subtract(outgoing_operands[1], cap_end),
-                _subtract(end, cap_end),
-            )
-            if (
-                not _MIN_TERMINAL_CAP_LENGTH <= cap_length <= _MAX_TERMINAL_CAP_LENGTH
-                or abs(cap_vector[1]) < 0.35 * cap_length
-                or incoming_span < _MIN_TERMINAL_CURVE_SPAN
-                or outgoing_span < _MIN_TERMINAL_CURVE_SPAN
-                or incoming_direction is None
-                or outgoing_direction is None
-                or _dot(incoming_direction, outgoing_direction)
-                > _MAX_TERMINAL_TANGENT_DOT
-            ):
-                continue
-            if _is_right_sweep_terminal(
-                start,
-                cap_start,
-                cap_end,
-                end,
-                incoming_span,
-                outgoing_span,
-                cap_length,
-                incoming_direction,
-                outgoing_direction,
-            ):
-                role: TerminalRole = "right-sweep"
-            elif math.dist(start, end) <= _GEOMETRY_EPSILON:
-                if (
-                    min(incoming_span, outgoing_span)
-                    < _MIN_CLOSED_DOT_SIDE_TO_CAP_RATIO * cap_length
-                ):
-                    continue
-                role = "closed-dot"
-            elif incoming_span < 300 and outgoing_span < 300:
-                if (
-                    start[0] - cap_start[0]
-                    < _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO * incoming_span
-                    or end[0] - cap_end[0]
-                    < _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO * outgoing_span
-                ):
-                    continue
-                role = "hook"
-            elif _is_left_sweep_terminal(start, cap_start, cap_end, end):
-                role = "left-sweep"
-            else:
-                continue
-            outgoing_curve_count = 1
-            if role == "hook":
-                next_index = outgoing_index + 1
-                while (
-                    outgoing_curve_count < 3
-                    and next_index < contour_end
-                    and next_index != incoming_index
-                    and commands[next_index][0] == "curveTo"
-                ):
-                    outgoing_curve_count += 1
-                    end = commands[next_index][1][-1]
-                    next_index += 1
-                if outgoing_curve_count != 3:
-                    continue
-                down_direction = _unit(_subtract(cap_end, cap_start))
-                across_direction = _unit(
-                    _add(
-                        _subtract(end, cap_start),
-                        _scale(_subtract(cap_end, cap_start), 0.5),
-                    )
-                )
-                if (
-                    down_direction is None
-                    or across_direction is None
-                    or abs(_dot(down_direction, across_direction)) > _MAX_HOOK_BASIS_DOT
-                ):
-                    continue
-            candidates.append(
-                _TerminalElement(
-                    incoming_index,
-                    cap_index,
-                    outgoing_index,
-                    start,
-                    cap_start,
-                    cap_end,
-                    end,
-                    role,
-                    outgoing_curve_count,
-                )
-            )
+def _classify_terminal_role(geometry: _TerminalGeometry) -> TerminalRole | None:
+    if _is_right_sweep_terminal(
+        geometry.start,
+        geometry.cap_start,
+        geometry.cap_end,
+        geometry.end,
+        geometry.incoming_span,
+        geometry.outgoing_span,
+        geometry.cap_length,
+        geometry.incoming_direction,
+        geometry.outgoing_direction,
+    ):
+        return "right-sweep"
+    if math.dist(geometry.start, geometry.end) <= _GEOMETRY_EPSILON:
+        if (
+            min(geometry.incoming_span, geometry.outgoing_span)
+            < _MIN_CLOSED_DOT_SIDE_TO_CAP_RATIO * geometry.cap_length
+        ):
+            return None
+        return "closed-dot"
+    if geometry.incoming_span < 300 and geometry.outgoing_span < 300:
+        if (
+            geometry.start[0] - geometry.cap_start[0]
+            < _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO * geometry.incoming_span
+            or geometry.end[0] - geometry.cap_end[0]
+            < _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO * geometry.outgoing_span
+        ):
+            return None
+        return "hook"
+    if _is_left_sweep_terminal(
+        geometry.start,
+        geometry.cap_start,
+        geometry.cap_end,
+        geometry.end,
+    ):
+        return "left-sweep"
+    return None
+
+
+def _hook_curve_run(
+    commands: list[Command],
+    contour_end: int,
+    incoming_index: int,
+    outgoing_index: int,
+    geometry: _TerminalGeometry,
+) -> tuple[int, Point] | None:
+    outgoing_curve_count = 1
+    end = geometry.end
+    next_index = outgoing_index + 1
+    while (
+        outgoing_curve_count < 3
+        and next_index < contour_end
+        and next_index != incoming_index
+        and commands[next_index][0] == "curveTo"
+    ):
+        outgoing_curve_count += 1
+        end = commands[next_index][1][-1]
+        next_index += 1
+    if outgoing_curve_count != 3:
+        return None
+    down_direction = _unit(_subtract(geometry.cap_end, geometry.cap_start))
+    across_direction = _unit(
+        _add(
+            _subtract(end, geometry.cap_start),
+            _scale(_subtract(geometry.cap_end, geometry.cap_start), 0.5),
+        )
+    )
+    if (
+        down_direction is None
+        or across_direction is None
+        or abs(_dot(down_direction, across_direction)) > _MAX_HOOK_BASIS_DOT
+    ):
+        return None
+    return outgoing_curve_count, end
+
+
+def _match_terminal_candidate(
+    commands: list[Command],
+    starts: tuple[Point | None, ...],
+    contour_start: int,
+    contour_end: int,
+    segment_indices: tuple[int, ...],
+    position: int,
+) -> _TerminalElement | None:
+    cap_index = segment_indices[position]
+    incoming_index = segment_indices[position - 1]
+    outgoing_index = segment_indices[(position + 1) % len(segment_indices)]
+    linear = incoming_index + 1 == cap_index and cap_index + 1 == outgoing_index
+    wraps_at_start = (
+        cap_index == contour_start + 1
+        and outgoing_index == cap_index + 1
+        and incoming_index == contour_end - 1
+    )
+    if not linear and not wraps_at_start:
+        return None
+
+    incoming_operator, incoming_operands = commands[incoming_index]
+    cap_operator, cap_operands = commands[cap_index]
+    outgoing_operator, outgoing_operands = commands[outgoing_index]
+    start = starts[incoming_index]
+    cap_start = starts[cap_index]
+    if (
+        incoming_operator != "curveTo"
+        or cap_operator != "lineTo"
+        or outgoing_operator != "curveTo"
+        or start is None
+        or cap_start is None
+    ):
+        return None
+
+    cap_end = cap_operands[-1]
+    end = outgoing_operands[-1]
+    cap_length = math.dist(cap_start, cap_end)
+    cap_vector = _subtract(cap_end, cap_start)
+    incoming_span = math.dist(start, cap_start)
+    outgoing_span = math.dist(cap_end, end)
+    incoming_direction = _first_unit(
+        _subtract(cap_start, incoming_operands[-2]),
+        _subtract(cap_start, incoming_operands[0]),
+        _subtract(cap_start, start),
+    )
+    outgoing_direction = _first_unit(
+        _subtract(outgoing_operands[0], cap_end),
+        _subtract(outgoing_operands[1], cap_end),
+        _subtract(end, cap_end),
+    )
+    if (
+        not _MIN_TERMINAL_CAP_LENGTH <= cap_length <= _MAX_TERMINAL_CAP_LENGTH
+        or abs(cap_vector[1]) < 0.35 * cap_length
+        or incoming_span < _MIN_TERMINAL_CURVE_SPAN
+        or outgoing_span < _MIN_TERMINAL_CURVE_SPAN
+        or incoming_direction is None
+        or outgoing_direction is None
+        or _dot(incoming_direction, outgoing_direction) > _MAX_TERMINAL_TANGENT_DOT
+    ):
+        return None
+
+    geometry = _TerminalGeometry(
+        start,
+        cap_start,
+        cap_end,
+        end,
+        incoming_span,
+        outgoing_span,
+        cap_length,
+        incoming_direction,
+        outgoing_direction,
+    )
+    role = _classify_terminal_role(geometry)
+    if role is None:
+        return None
+
+    outgoing_curve_count = 1
+    if role == "hook":
+        hook_run = _hook_curve_run(
+            commands,
+            contour_end,
+            incoming_index,
+            outgoing_index,
+            geometry,
+        )
+        if hook_run is None:
+            return None
+        outgoing_curve_count, end = hook_run
+
+    return _TerminalElement(
+        incoming_index,
+        cap_index,
+        outgoing_index,
+        start,
+        cap_start,
+        cap_end,
+        end,
+        role,
+        outgoing_curve_count,
+    )
+
+
+def _select_non_overlapping_terminals(
+    candidates: list[_TerminalElement],
+) -> tuple[_TerminalElement, ...]:
     ranked = sorted(
         enumerate(candidates),
         key=lambda item: (item[1].role == "left-sweep", item[0]),
@@ -2140,6 +2206,25 @@ def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
         for position, element in enumerate(candidates)
         if position in selected_positions
     )
+
+
+def _terminal_elements(commands: list[Command]) -> tuple[_TerminalElement, ...]:
+    starts = _command_starts(commands)
+    candidates: list[_TerminalElement] = []
+    for contour_start, contour_end in _contour_ranges(commands):
+        segment_indices = tuple(range(contour_start + 1, contour_end))
+        for position in range(len(segment_indices)):
+            candidate = _match_terminal_candidate(
+                commands,
+                starts,
+                contour_start,
+                contour_end,
+                segment_indices,
+                position,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
+    return _select_non_overlapping_terminals(candidates)
 
 
 def _edit_hook_terminal(
