@@ -17,8 +17,6 @@ from nobigoe_font.brush import (
     _edit_terminal,
     _edit_horizontal_start,
     _horizontal_start_elements,
-    _long_non_horizontal_sides,
-    _paired_strokes,
     _vertical_end_elements,
     _terminal_elements,
     _vertical_start_elements,
@@ -140,7 +138,7 @@ def _noto_crossed_vertical_stroke() -> pathops.Path:
     pen.lineTo((464, 443))
     pen.lineTo((464, -76))
     pen.lineTo((477, -76))
-    pen.curveTo((477, -76), (532, -49), (532, -49))
+    pen.curveTo((499, -76), (532, -60), (532, -49))
     pen.lineTo((532, 443))
     pen.lineTo((932, 443))
     pen.curveTo((932, 443), (958, 459), (958, 459))
@@ -658,6 +656,32 @@ def _vertical_end_without_start() -> pathops.Path:
     pen.lineTo((478, -78))
     pen.curveTo((500, -78), (525, -65), (531, -51))
     pen.lineTo((531, 400))
+    pen.closePath()
+    return outline
+
+
+def _segmented_vertical_end() -> pathops.Path:
+    outline = pathops.Path()
+    pen = outline.getPen()
+    pen.moveTo((0, 120))
+    pen.lineTo((0, 0))
+    pen.lineTo((13, 0))
+    pen.curveTo((38, 0), (65, 14), (65, 23))
+    pen.lineTo((65, 80))
+    pen.lineTo((300, 80))
+    pen.lineTo((300, 120))
+    pen.closePath()
+    return outline
+
+
+def _vertical_end_lookalike() -> pathops.Path:
+    outline = pathops.Path()
+    pen = outline.getPen()
+    pen.moveTo((0, 400))
+    pen.lineTo((0, 0))
+    pen.lineTo((13, 0))
+    pen.curveTo((15, 0), (65, 25), (65, 25))
+    pen.lineTo((65, 400))
     pen.closePath()
     return outline
 
@@ -1430,10 +1454,9 @@ class BrushElementTests(unittest.TestCase):
     def test_vertical_start_does_not_imply_end_pressure(self) -> None:
         source = _embedded_vertical_start()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
-        ends = _vertical_end_elements(commands, pairs)
+        ends = _vertical_end_elements(commands)
         result = apply_brush_elements(source)
 
         self.assertEqual(len(starts), 1)
@@ -1448,10 +1471,9 @@ class BrushElementTests(unittest.TestCase):
     def test_vertical_end_does_not_imply_start_pressure(self) -> None:
         source = _vertical_end_without_start()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
-        ends = _vertical_end_elements(commands, pairs)
+        ends = _vertical_end_elements(commands)
         result = apply_brush_elements(source)
 
         self.assertEqual(starts, ())
@@ -1462,10 +1484,33 @@ class BrushElementTests(unittest.TestCase):
             _stroke_width(source, 380),
         )
 
+    def test_segmented_vertical_end_is_found_from_cap_marker(self) -> None:
+        source = _segmented_vertical_end()
+        commands = list(_commands(source))
+
+        ends = _vertical_end_elements(commands)
+        result = apply_brush_elements(source)
+
+        self.assertEqual(len(ends), 1)
+        self.assertLess(
+            min(ends[0].down_side.length, ends[0].up_side.length) / ends[0].width,
+            1.2,
+        )
+        self.assertEqual(result.adjusted_stroke_count, 1)
+
+    def test_vertical_end_requires_noto_control_point_relationship(self) -> None:
+        source = _vertical_end_lookalike()
+        commands = list(_commands(source))
+
+        ends = _vertical_end_elements(commands)
+        result = apply_brush_elements(source)
+
+        self.assertEqual(ends, ())
+        self.assertEqual(result.adjusted_stroke_count, 0)
+
     def test_vertical_start_is_detected_across_contour_boundary(self) -> None:
         source = _wrapped_vertical_start()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
@@ -1477,7 +1522,6 @@ class BrushElementTests(unittest.TestCase):
     def test_exposed_start_pair_wins_over_attached_lower_fragment(self) -> None:
         source = _split_vertical_start()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
@@ -1489,7 +1533,6 @@ class BrushElementTests(unittest.TestCase):
     def test_short_exposed_vertical_start_uses_relative_side_length(self) -> None:
         source = _short_vertical_start()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
@@ -1506,19 +1549,13 @@ class BrushElementTests(unittest.TestCase):
         for label, source in fixtures.items():
             with self.subTest(label):
                 commands = list(_commands(source))
-                standard_pair_indices = {
-                    frozenset((pair.left.command_index, pair.right.command_index))
-                    for pair in _paired_strokes(
-                        _long_non_horizontal_sides(commands),
-                        commands,
-                    )
-                }
                 starts = _vertical_start_elements(commands)
 
                 self.assertEqual(len(starts), 1)
-                self.assertNotIn(
-                    starts[0].side_command_indices,
-                    standard_pair_indices,
+                self.assertLess(
+                    min(starts[0].down_side.length, starts[0].up_side.length)
+                    / starts[0].width,
+                    1.2,
                 )
                 self.assertGreaterEqual(
                     apply_brush_elements(source).adjusted_stroke_count,
@@ -1539,7 +1576,6 @@ class BrushElementTests(unittest.TestCase):
 
     def test_overlapping_vertical_starts_keep_stronger_local_pair(self) -> None:
         commands = list(_commands(_overlapping_vertical_starts()))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
 
@@ -1554,10 +1590,9 @@ class BrushElementTests(unittest.TestCase):
     def test_short_complete_vertical_stroke_keeps_a_straight_body(self) -> None:
         source = _short_complete_vertical_stroke()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
-        ends = _vertical_end_elements(commands, pairs)
+        ends = _vertical_end_elements(commands)
         result = apply_brush_elements(source)
         result_commands = _commands(result.path)
         body_line_index = next(
@@ -1582,12 +1617,10 @@ class BrushElementTests(unittest.TestCase):
     def test_vertical_start_requires_noto_control_point_relationship(self) -> None:
         source = _squat_vertical_start_lookalike()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
 
         starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
 
-        self.assertEqual(len(pairs), 1)
         self.assertEqual(starts, ())
         self.assertEqual(result.adjusted_stroke_count, 0)
 
@@ -1611,9 +1644,8 @@ class BrushElementTests(unittest.TestCase):
     ) -> None:
         source = _noto_crossed_vertical_stroke()
         commands = list(_commands(source))
-        pairs = _paired_strokes(_long_non_horizontal_sides(commands), commands)
         starts = _vertical_start_elements(commands)
-        ends = _vertical_end_elements(commands, pairs)
+        ends = _vertical_end_elements(commands)
 
         result = apply_brush_elements(source)
 
