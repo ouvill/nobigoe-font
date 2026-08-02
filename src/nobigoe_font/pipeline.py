@@ -23,6 +23,7 @@ from .profiles import (
 from . import geometry as _font_geometry
 from . import operations as _font_operations
 from . import marks as _mark_positioning
+from .brush import apply_han_brush_elements
 from .features import feature_source, merge_features
 from .hinting import autohint_latin_glyphs
 from .metadata import rename_font
@@ -1156,11 +1157,14 @@ def build(
     base_type: BaseType,
     autohint: bool = False,
     kana_style: KanaStyle = "noto",
+    han_brush_elements: bool = False,
 ) -> None:
     if kana_style not in {"noto", "novel"}:
         raise ValueError(f"Unknown kana style {kana_style!r}")
     if kana_style == "novel" and base_type != "noto":
         raise ValueError("--kana-style novel requires --base noto")
+    if han_brush_elements and base_type != "noto":
+        raise ValueError("--han-brush-elements requires --base noto")
     if autohint and latin_source_path is None:
         raise ValueError("--autohint requires an imported Latin source")
     font = TTFont(source_path, fontNumber=face, recalcTimestamp=True)
@@ -1944,6 +1948,8 @@ def build(
             native_katakana_vertical_ccmp_outputs | generated_vertical_mark_outputs,
             missing_small_glyphs,
         )
+    if han_brush_elements:
+        apply_han_brush_elements(font)
     _apply_novel_style(
         font,
         identity.weight_class,
