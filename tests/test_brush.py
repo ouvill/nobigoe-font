@@ -19,6 +19,7 @@ from nobigoe_font.brush import (
     _horizontal_start_elements,
     _vertical_design_scales,
     _vertical_end_elements,
+    _vertical_end_design,
     _terminal_elements,
     _vertical_start_design,
     _vertical_start_elements,
@@ -99,7 +100,7 @@ def _noto_vertical_stroke() -> pathops.Path:
     return outline
 
 
-def _selected_vertical_stroke_b() -> pathops.Path:
+def _silver_vertical_stroke() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
     pen.moveTo((445.9167388793148, 828.0832611206853))
@@ -108,11 +109,27 @@ def _selected_vertical_stroke_b() -> pathops.Path:
         (460, 694.906889112866),
         (460, 627.9473775300144),
     )
-    pen.lineTo((462, 203))
-    pen.curveTo((460, 73), (457, 29), (451, -57))
-    pen.curveTo((451, -67), (462, -77), (475, -77))
-    pen.curveTo((499, -77), (527, -60), (535, -44))
-    pen.curveTo((531, 31), (529, 71), (527, 191))
+    pen.lineTo((460, 203.24978336205572))
+    pen.curveTo(
+        (460, 73.08326112068525),
+        (456.10711336914545, 29.476692978918102),
+        (448.33304448274095, -57.08326112068523),
+    )
+    pen.curveTo(
+        (448.33304448274095, -67.04163056034261),
+        (461.2081528017131, -77),
+        (474.08326112068524, -77),
+    )
+    pen.curveTo(
+        (499.83347775862954, -77),
+        (528, -57.08326112068523),
+        (536.2497833620557, -43),
+    )
+    pen.curveTo(
+        (530.7516628019667, 34.26674238942996),
+        (528, 73.08326112068522),
+        (528, 189.16652224137044),
+    )
     pen.lineTo((528, 760.0832611206853))
     pen.curveTo(
         (528, 767.1248916810279),
@@ -1779,20 +1796,94 @@ class BrushElementTests(unittest.TestCase):
             0.0,
         )
 
-    def test_vertical_stroke_matches_selected_b_recipe(self) -> None:
+    def test_vertical_stroke_matches_silver_profile(self) -> None:
         source = _noto_vertical_stroke()
         source_commands = _commands(source)
 
-        result = apply_brush_elements(source)
+        result = apply_brush_elements(
+            source,
+            BrushElementStyle(vertical_end_profile="silver"),
+        )
         difference = pathops.op(
             result.path,
-            _selected_vertical_stroke_b(),
+            _silver_vertical_stroke(),
             pathops.PathOp.XOR,
         )
 
         self.assertEqual(result.adjusted_stroke_count, 1)
         self.assertFalse(difference.verbs)
         self.assertEqual(_commands(source), source_commands)
+
+    def test_vertical_end_profiles_share_a_single_width_relative_basis(
+        self,
+    ) -> None:
+        end = _vertical_end_elements(list(_commands(_noto_vertical_stroke())))[0]
+        basis = end.down_side.end
+        silver = _vertical_end_design(end, 1.0, "silver")
+        traditional = _vertical_end_design(end, 1.0, "traditional")
+
+        def height(point: Point) -> float:
+            offset = point[0] - basis[0], point[1] - basis[1]
+            return -(offset[0] * end.axis[0] + offset[1] * end.axis[1])
+
+        def across(point: Point) -> float:
+            offset = point[0] - basis[0], point[1] - basis[1]
+            return offset[0] * end.across[0] + offset[1] * end.across[1]
+
+        self.assertAlmostEqual(height(silver.first_cap_end), 0.0)
+        self.assertAlmostEqual(
+            across(silver.right_bottom) - across(silver.left_bottom),
+            end.width * (2.0 - 1.0 / math.sqrt(2.0)),
+        )
+        self.assertAlmostEqual(
+            height(silver.left_first_control),
+            height(silver.right_second_control),
+        )
+        self.assertAlmostEqual(
+            height(traditional.left_first_control),
+            end.width * math.sqrt(2.0),
+        )
+        self.assertAlmostEqual(
+            height(traditional.left_first_control),
+            height(traditional.right_second_control),
+        )
+        self.assertLess(
+            height(traditional.left_body),
+            height(silver.left_body),
+        )
+        self.assertLess(
+            across(traditional.right_bottom) - across(traditional.left_bottom),
+            across(silver.right_bottom) - across(silver.left_bottom),
+        )
+
+    def test_vertical_end_profile_defaults_to_traditional_and_switches(self) -> None:
+        source = _noto_vertical_stroke()
+
+        default = apply_brush_elements(source)
+        traditional = apply_brush_elements(
+            source,
+            BrushElementStyle(vertical_end_profile="traditional"),
+        )
+        silver = apply_brush_elements(
+            source,
+            BrushElementStyle(vertical_end_profile="silver"),
+        )
+        default_difference = pathops.op(
+            default.path,
+            traditional.path,
+            pathops.PathOp.XOR,
+        )
+        profile_difference = pathops.op(
+            silver.path,
+            traditional.path,
+            pathops.PathOp.XOR,
+        )
+
+        self.assertEqual(default.adjusted_stroke_count, 1)
+        self.assertEqual(traditional.adjusted_stroke_count, 1)
+        self.assertEqual(silver.adjusted_stroke_count, 1)
+        self.assertFalse(default_difference.verbs)
+        self.assertTrue(profile_difference.verbs)
 
     def test_crossbar_fragments_only_receive_exposed_endpoint_designs(
         self,
@@ -1843,8 +1934,19 @@ class BrushElementTests(unittest.TestCase):
         )
 
     def test_cli_requires_explicit_opt_in(self) -> None:
-        self.assertFalse(parse_args([]).han_brush_elements)
-        self.assertTrue(parse_args(["--han-brush-elements"]).han_brush_elements)
+        defaults = parse_args([])
+        selected = parse_args(
+            [
+                "--han-brush-elements",
+                "--han-brush-end-profile",
+                "silver",
+            ]
+        )
+
+        self.assertFalse(defaults.han_brush_elements)
+        self.assertEqual(defaults.han_brush_end_profile, "traditional")
+        self.assertTrue(selected.han_brush_elements)
+        self.assertEqual(selected.han_brush_end_profile, "silver")
 
     def test_koburi_base_rejects_han_brush_elements_before_loading_sources(
         self,
@@ -1863,6 +1965,23 @@ class BrushElementTests(unittest.TestCase):
                 0,
                 "koburi",
                 han_brush_elements=True,
+            )
+
+    def test_nondefault_end_profile_requires_han_brush_elements(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "--han-brush-end-profile requires --han-brush-elements",
+        ):
+            build(
+                Path("source.otf"),
+                None,
+                Path("punctuation.otf"),
+                Path("output.otf"),
+                Mock(),
+                Mock(),
+                0,
+                "noto",
+                han_brush_end_profile="silver",
             )
 
 

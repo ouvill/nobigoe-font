@@ -16,6 +16,13 @@ from .novel_han import collect_novel_han_glyphs
 
 Point: TypeAlias = tuple[float, float]
 Command: TypeAlias = tuple[str, tuple[Point, ...]]
+VerticalEndProfile: TypeAlias = Literal["traditional", "silver"]
+DEFAULT_VERTICAL_END_PROFILE: VerticalEndProfile = "traditional"
+VERTICAL_END_PROFILES: tuple[VerticalEndProfile, ...] = (
+    DEFAULT_VERTICAL_END_PROFILE,
+    "silver",
+)
+
 
 _MIN_SIDE_LENGTH = 140.0
 _MIN_SIDE_SLOPE = 0.5
@@ -46,6 +53,7 @@ class BrushElementStyle:
     right_sweep_incoming_ratio: float = 0.20
     right_sweep_outgoing_ratio: float = 0.022
     hook_rounding_ratio: float = 0.03
+    vertical_end_profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE
 
 
 DEFAULT_BRUSH_ELEMENT_STYLE = BrushElementStyle()
@@ -193,6 +201,20 @@ class _VerticalEndDesign:
     right_first_control: Point
     right_second_control: Point
     right_body: Point
+
+
+@dataclass(frozen=True)
+class _VerticalEndDimensions:
+    left_extension: float
+    right_extension: float
+    left_outer_height: float
+    right_outer_height: float
+    left_run: float
+    right_run: float
+    left_cap_span: float
+    right_cap_span: float
+    left_cap_second_handle_ratio: float
+    right_cap_first_handle_ratio: float
 
 
 @dataclass(frozen=True)
@@ -519,9 +541,56 @@ def _vertical_design_point(
     )
 
 
+def _vertical_end_dimensions(
+    profile: str,
+) -> _VerticalEndDimensions:
+    width = _VERTICAL_REFERENCE_WIDTH
+    pressure = width * (1.0 - 1.0 / _SILVER_RATIO)
+    if profile == "silver":
+        total_extension = pressure
+        left_outer_height = pressure
+        right_outer_height = width / 2.0
+        left_run = width * (1.0 + 2.0 * _SILVER_RATIO)
+        right_run = width * (2.0 + _SILVER_RATIO)
+        left_cap_second_handle_ratio = 0.5
+        right_cap_first_handle_ratio = _SILVER_RATIO - 1.0
+    elif profile == "traditional":
+        total_extension = pressure / 2.0
+        left_outer_height = pressure
+        right_outer_height = width * (_SILVER_RATIO - 1.0)
+        left_run = width * (3.0 * _SILVER_RATIO - 2.0)
+        right_run = 2.0 * width
+        bezier_circle_ratio = 4.0 * (_SILVER_RATIO - 1.0) / 3.0
+        left_cap_second_handle_ratio = bezier_circle_ratio
+        right_cap_first_handle_ratio = bezier_circle_ratio
+    else:
+        raise ValueError(f"Unknown vertical end profile {profile!r}")
+
+    left_extension = total_extension * _SILVER_RATIO / (1.0 + _SILVER_RATIO)
+    right_extension = total_extension / (1.0 + _SILVER_RATIO)
+    cap_width = width + total_extension
+    if profile == "silver":
+        left_cap_span = cap_width * (1.0 - 1.0 / _SILVER_RATIO)
+    else:
+        left_cap_span = cap_width / (1.0 + _SILVER_RATIO)
+    return _VerticalEndDimensions(
+        left_extension=left_extension,
+        right_extension=right_extension,
+        left_outer_height=left_outer_height,
+        right_outer_height=right_outer_height,
+        left_run=left_run,
+        right_run=right_run,
+        left_cap_span=left_cap_span,
+        right_cap_span=cap_width - left_cap_span,
+        left_cap_second_handle_ratio=left_cap_second_handle_ratio,
+        right_cap_first_handle_ratio=right_cap_first_handle_ratio,
+    )
+
+
 def _vertical_design_scales(
     start: _VerticalStartElement | None,
     end: _VerticalEndElement | None,
+    end_profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE,
 ) -> tuple[float, float]:
     element = start if start is not None else end
     if element is None:
@@ -539,20 +608,27 @@ def _vertical_design_scales(
         straight_body = min(element.width, 0.25 * side.length)
         return max(0.0, side.length - straight_body)
 
+    end_dimensions = _vertical_end_dimensions(end_profile)
+    end_left_depth = end_dimensions.left_outer_height + end_dimensions.left_run
+    end_right_depth = end_dimensions.right_outer_height + end_dimensions.right_run
     end_scale = (
         min(
             1.0,
-            available_design_span(element.down_side) / (280.0 * unit_scale),
-            available_design_span(element.up_side) / (240.0 * unit_scale),
+            available_design_span(element.down_side) / (end_left_depth * unit_scale),
+            available_design_span(element.up_side) / (end_right_depth * unit_scale),
         )
         if end is not None
         else 0.0
     )
     if start is not None and end is not None:
+        start_left_depth = _VERTICAL_REFERENCE_WIDTH * math.sqrt(5.0)
+        start_right_depth = _VERTICAL_REFERENCE_WIDTH * (1.0 - 1.0 / _SILVER_RATIO)
         joint_scale = min(
             1.0,
-            available_design_span(element.down_side) / (480.0 * unit_scale),
-            available_design_span(element.up_side) / (260.0 * unit_scale),
+            available_design_span(element.down_side)
+            / ((start_left_depth + end_left_depth) * unit_scale),
+            available_design_span(element.up_side)
+            / ((start_right_depth + end_right_depth) * unit_scale),
         )
         end_scale = min(end_scale, joint_scale)
     return start_scale, end_scale
@@ -657,14 +733,15 @@ def _vertical_start_design(
 def _vertical_end_design(
     element: _VerticalEndElement,
     axial_scale: float,
+    profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE,
 ) -> _VerticalEndDesign:
-    def point(
-        anchor: Point,
-        across: float,
-        down: float,
-    ) -> Point:
+    dimensions = _vertical_end_dimensions(profile)
+    width = _VERTICAL_REFERENCE_WIDTH
+    basis = element.down_side.end
+
+    def point(across: float, down: float) -> Point:
         return _vertical_design_point(
-            anchor,
+            basis,
             element.axis,
             element.across,
             element.width,
@@ -673,22 +750,81 @@ def _vertical_end_design(
             axial_scale,
         )
 
-    left_anchor = element.down_side.end
-    right_anchor = element.up_side.start
+    def outer_control(
+        extension: float,
+        run: float,
+        outer_across: float,
+        outer_height: float,
+        direction: float,
+    ) -> Point:
+        radius = (run * run + extension * extension) / (2.0 * extension)
+        handle = 4.0 * radius * extension / (3.0 * (math.hypot(run, extension) + run))
+        tangent_down = (radius - extension) / radius
+        tangent_across = run / radius
+        return point(
+            outer_across + direction * handle * tangent_across,
+            -outer_height - handle * tangent_down,
+        )
+
+    left_outer_across = -dimensions.left_extension
+    right_outer_across = width + dimensions.right_extension
+    bottom_across = left_outer_across + dimensions.left_cap_span
+    left_body_control_height = dimensions.left_outer_height + dimensions.left_run / 2.0
+    right_body_control_height = (
+        dimensions.right_outer_height + dimensions.right_run / 2.0
+    )
     return _VerticalEndDesign(
-        left_body=point(left_anchor, 2, -280),
-        left_first_control=point(left_anchor, 0, -150),
-        left_second_control=point(left_anchor, -3, -106),
-        left_bottom=point(left_anchor, -9, -20),
-        first_cap_first_control=point(left_anchor, -9, -10),
-        first_cap_second_control=point(left_anchor, 2, 0),
-        first_cap_end=point(left_anchor, 15, 0),
-        second_cap_first_control=point(left_anchor, 39, 0),
-        second_cap_second_control=point(right_anchor, -1, 11),
-        right_bottom=point(right_anchor, 7, -5),
-        right_first_control=point(right_anchor, 3, -80),
-        right_second_control=point(right_anchor, 1, -120),
-        right_body=point(right_anchor, -1, -240),
+        left_body=point(
+            0.0,
+            -(dimensions.left_outer_height + dimensions.left_run),
+        ),
+        left_first_control=point(0.0, -left_body_control_height),
+        left_second_control=outer_control(
+            dimensions.left_extension,
+            dimensions.left_run,
+            left_outer_across,
+            dimensions.left_outer_height,
+            1.0,
+        ),
+        left_bottom=point(
+            left_outer_across,
+            -dimensions.left_outer_height,
+        ),
+        first_cap_first_control=point(
+            left_outer_across,
+            -dimensions.left_outer_height / 2.0,
+        ),
+        first_cap_second_control=point(
+            bottom_across
+            - dimensions.left_cap_span * dimensions.left_cap_second_handle_ratio,
+            0.0,
+        ),
+        first_cap_end=point(bottom_across, 0.0),
+        second_cap_first_control=point(
+            bottom_across
+            + dimensions.right_cap_span * dimensions.right_cap_first_handle_ratio,
+            0.0,
+        ),
+        second_cap_second_control=point(
+            width,
+            -dimensions.left_outer_height,
+        ),
+        right_bottom=point(
+            right_outer_across,
+            -dimensions.right_outer_height,
+        ),
+        right_first_control=outer_control(
+            dimensions.right_extension,
+            dimensions.right_run,
+            right_outer_across,
+            dimensions.right_outer_height,
+            -1.0,
+        ),
+        right_second_control=point(width, -right_body_control_height),
+        right_body=point(
+            width,
+            -(dimensions.right_outer_height + dimensions.right_run),
+        ),
     )
 
 
@@ -2898,6 +3034,7 @@ def apply_brush_elements(
     sweep caps are rounded by splitting their existing adjacent curves, and
     hook caps receive the selected B curve recipe in their local basis.
     """
+    _ = _vertical_end_dimensions(style.vertical_end_profile)
 
     recording = RecordingPen()
     outline.draw(recording)
@@ -3066,11 +3203,19 @@ def apply_brush_elements(
         element = start if start is not None else end
         if element is None:
             raise AssertionError("Matched vertical element unexpectedly missing")
-        start_scale, end_scale = _vertical_design_scales(start, end)
+        start_scale, end_scale = _vertical_design_scales(
+            start,
+            end,
+            style.vertical_end_profile,
+        )
         start_design = (
             _vertical_start_design(start, start_scale) if start is not None else None
         )
-        end_design = _vertical_end_design(end, end_scale) if end is not None else None
+        end_design = (
+            _vertical_end_design(end, end_scale, style.vertical_end_profile)
+            if end is not None
+            else None
+        )
         side_edits = _vertical_stroke_side_edits(
             element,
             start_design,
@@ -3158,7 +3303,10 @@ def apply_brush_elements(
     )
 
 
-def apply_han_brush_elements(font: TTFont) -> HanBrushResult:
+def apply_han_brush_elements(
+    font: TTFont,
+    style: BrushElementStyle = DEFAULT_BRUSH_ELEMENT_STYLE,
+) -> HanBrushResult:
     """Apply matched brush-element edits to every encoded or reachable Han form."""
 
     if "CFF " not in font:
@@ -3171,7 +3319,7 @@ def apply_han_brush_elements(font: TTFont) -> HanBrushResult:
         outline = geometry.glyph_path(font, name)
         if not outline.verbs:
             raise ValueError(f"Han glyph {name!r} has an empty outline")
-        result = apply_brush_elements(outline)
+        result = apply_brush_elements(outline, style)
         if result.adjusted_element_count == 0:
             continue
         vertical_origin = 0

@@ -23,7 +23,13 @@ from .profiles import (
 from . import geometry as _font_geometry
 from . import operations as _font_operations
 from . import marks as _mark_positioning
-from .brush import apply_han_brush_elements
+from .brush import (
+    DEFAULT_VERTICAL_END_PROFILE,
+    VERTICAL_END_PROFILES,
+    BrushElementStyle,
+    VerticalEndProfile,
+    apply_han_brush_elements,
+)
 from .features import feature_source, merge_features
 from .hinting import autohint_latin_glyphs
 from .metadata import rename_font
@@ -775,6 +781,7 @@ def make_relaxed_wave_parts(
     )
     return horizontal + vertical
 
+
 def make_one_cycle_wave_parts(
     source: pathops.Path, advance: int, vertical_origin: int
 ) -> tuple[pathops.Path, ...]:
@@ -815,9 +822,7 @@ def make_one_cycle_wave_parts(
             **parameters,
         ),
     )
-    tile_center_y = (
-        horizontal_middle.bounds[1] + horizontal_middle.bounds[3]
-    ) / 2
+    tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
     vertical_rotation = Transform(
         0,
         -1,
@@ -984,6 +989,7 @@ def autohint_latin_glyphs(
         )
         hinted_path.replace(output_path)
 
+
 def _rename_release_font(
     font: TTFont,
     latin_font: TTFont | None,
@@ -1098,9 +1104,7 @@ def build_static_instance(
     latin_font = TTFont(latin_source_path) if latin_source_path else None
     if latin_font and latin_profile.variations:
         if "fvar" not in latin_font:
-            raise ValueError(
-                f"{latin_profile.family} requires a variable Latin source"
-            )
+            raise ValueError(f"{latin_profile.family} requires a variable Latin source")
         instantiateVariableFont(
             latin_font,
             dict(latin_profile.variations),
@@ -1145,7 +1149,6 @@ def build_novel_static_instance(
     )
 
 
-
 def build(
     source_path: Path,
     latin_source_path: Path | None,
@@ -1158,9 +1161,14 @@ def build(
     autohint: bool = False,
     kana_style: KanaStyle = "noto",
     han_brush_elements: bool = False,
+    han_brush_end_profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE,
 ) -> None:
     if kana_style not in {"noto", "novel"}:
         raise ValueError(f"Unknown kana style {kana_style!r}")
+    if han_brush_end_profile not in VERTICAL_END_PROFILES:
+        raise ValueError(f"Unknown Han brush end profile {han_brush_end_profile!r}")
+    if not han_brush_elements and han_brush_end_profile != DEFAULT_VERTICAL_END_PROFILE:
+        raise ValueError("--han-brush-end-profile requires --han-brush-elements")
     if kana_style == "novel" and base_type != "noto":
         raise ValueError("--kana-style novel requires --base noto")
     if han_brush_elements and base_type != "noto":
@@ -1949,7 +1957,10 @@ def build(
             missing_small_glyphs,
         )
     if han_brush_elements:
-        apply_han_brush_elements(font)
+        apply_han_brush_elements(
+            font,
+            BrushElementStyle(vertical_end_profile=han_brush_end_profile),
+        )
     _apply_novel_style(
         font,
         identity.weight_class,
@@ -1960,7 +1971,6 @@ def build(
 
     if base_type == "noto":
         _font_operations.remove_repeated_ligatures(font, "ccmp", cmap[0x2015])
-
 
     merge_features(
         font,

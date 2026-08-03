@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
 from nobigoe_font import geometry
+from nobigoe_font.brush import BrushElementStyle, apply_brush_elements
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,11 @@ PATTERNS = (
         "c",
         "C 荒筆構造",
         "節点を増やし、置きと抜きの方向変化を強調する。",
+    ),
+    Pattern(
+        "d",
+        "D 穏健構造",
+        "接線を連続させ、張り出しと角の変化を抑える。",
     ),
     Pattern("genryu", "源流明朝", "実輪郭の参照形"),
 )
@@ -187,9 +194,14 @@ def _load_selection(path: Path) -> dict[str, str]:
     for element, choice in data["selected"].items():
         if element not in element_keys:
             raise ValueError(f"Unknown element {element!r} in {path}")
-        if not isinstance(choice, str) or choice.lower() not in {"a", "b", "c"}:
+        if not isinstance(choice, str):
             raise ValueError(f"Unknown choice {choice!r} for {element!r} in {path}")
-        selected[element] = choice.lower()
+        normalized_choice = choice.lower()
+        if normalized_choice not in {"a", "b", "c"} and not (
+            element == "end" and normalized_choice == "d"
+        ):
+            raise ValueError(f"Unknown choice {choice!r} for {element!r} in {path}")
+        selected[element] = normalized_choice
     return selected
 
 
@@ -295,24 +307,101 @@ def _prototype_end(variant: str) -> pathops.Path:
         pen.curveTo((460, -74), (512, -78), (532, -45))
         pen.curveTo((530, 30), (528, 100), (527, 170))
         pen.lineTo((527, 260))
-    elif variant == "b":
-        pen.moveTo((462, 260))
-        pen.lineTo((462, 203))
-        pen.curveTo((460, 73), (457, 29), (451, -57))
-        pen.curveTo((451, -67), (462, -77), (475, -77))
-        pen.curveTo((499, -77), (527, -60), (535, -44))
-        pen.curveTo((531, 31), (529, 71), (527, 191))
-        pen.lineTo((527, 260))
-    else:
-        pen.moveTo((462, 260))
-        pen.lineTo((462, 210))
-        pen.curveTo((461, 130), (454, 35), (442, -60))
-        pen.curveTo((442, -75), (458, -88), (477, -84))
-        pen.curveTo((505, -82), (538, -60), (544, -40))
-        pen.curveTo((539, 20), (536, 95), (526, 188))
-        pen.lineTo((526, 260))
+        pen.closePath()
+        return outline
+
+    if variant == "d":
+        width = 68.0
+        ratio = math.sqrt(2.0)
+        pressure = width * (1.0 - 1.0 / ratio)
+        total_extension = pressure / 3.0
+        left_extension = total_extension * ratio / (1.0 + ratio)
+        right_extension = total_extension / (1.0 + ratio)
+        left_height = pressure
+        right_height = pressure * ratio
+        left_run = width * (3.0 * ratio - 2.0)
+        right_run = 2.0 * width
+        kappa = 4.0 * (ratio - 1.0) / 3.0
+
+        left_stem_x = 460.0
+        right_stem_x = left_stem_x + width
+        baseline_y = -77.0
+        left_outer = (
+            left_stem_x - left_extension,
+            baseline_y + left_height,
+        )
+        right_outer = (
+            right_stem_x + right_extension,
+            baseline_y + right_height,
+        )
+        cap_width = width + total_extension
+        bottom = (
+            left_outer[0] + cap_width / (1.0 + ratio),
+            baseline_y,
+        )
+        left_body = (left_stem_x, left_outer[1] + left_run)
+        right_body = (right_stem_x, right_outer[1] + right_run)
+
+        # The side transitions are cubic smoothsteps: their vertical controls
+        # are equally spaced, while lateral pressure reaches zero velocity at
+        # both ends. The two cap halves use the quarter-ellipse kappa, so every
+        # join is tangent-continuous: vertical at the shoulders, horizontal at
+        # the bottom.
+        pen.moveTo((left_stem_x, 260.0))
+        pen.lineTo(left_body)
+        pen.curveTo(
+            (left_stem_x, left_body[1] - left_run / 3.0),
+            (left_outer[0], left_outer[1] + left_run / 3.0),
+            left_outer,
+        )
+        pen.curveTo(
+            (
+                left_outer[0],
+                left_outer[1] + kappa * (bottom[1] - left_outer[1]),
+            ),
+            (
+                bottom[0] - kappa * (bottom[0] - left_outer[0]),
+                bottom[1],
+            ),
+            bottom,
+        )
+        pen.curveTo(
+            (
+                bottom[0] + kappa * (right_outer[0] - bottom[0]),
+                bottom[1],
+            ),
+            (
+                right_outer[0],
+                right_outer[1] - kappa * (right_outer[1] - bottom[1]),
+            ),
+            right_outer,
+        )
+        pen.curveTo(
+            (
+                right_outer[0],
+                right_outer[1] + right_run / 3.0,
+            ),
+            (
+                right_stem_x,
+                right_body[1] - right_run / 3.0,
+            ),
+            right_body,
+        )
+        pen.lineTo((right_stem_x, 260.0))
+        pen.closePath()
+        return outline
+
+    pen.moveTo((460, 260))
+    pen.lineTo((460, -77))
+    pen.lineTo((474, -77))
+    pen.curveTo((499, -77), (528, -60), (528, -49))
+    pen.lineTo((528, 260))
     pen.closePath()
-    return outline
+    profile = "silver" if variant == "b" else "traditional"
+    return apply_brush_elements(
+        outline,
+        BrushElementStyle(vertical_end_profile=profile),
+    ).path
 
 
 def _prototype_uroko(variant: str) -> pathops.Path:
@@ -976,6 +1065,8 @@ def _page(
         confirmed_choice = selection.get(element_key)
         cards: list[str] = []
         for pattern in PATTERNS:
+            if pattern.key == "d" and element_key != "end":
+                continue
             outline = _pattern_outline(
                 pattern,
                 noto,
@@ -985,7 +1076,9 @@ def _page(
                 element.reference_contour,
             )
             choice = pattern.key.upper()
-            selectable = pattern.key in {"a", "b", "c"}
+            selectable = pattern.key in {"a", "b", "c"} or (
+                element_key == "end" and pattern.key == "d"
+            )
             filename = _design_filename(element_key, pattern.key)
             _write_editable_svg(
                 outline,
@@ -1038,6 +1131,24 @@ def _page(
                     "右辺は独立した短い筆置き曲線で戻す。"
                     "左右の収束位置は揃えない。"
                 )
+            if element_key == "end" and pattern.key == "b":
+                card_label = "B 白銀比"
+                note = (
+                    "縦画幅と一つの基準点から全節点を導出する。"
+                    "左右の長い収束と、左寄りの最下点から右へ返す筆圧を持つ。"
+                )
+            if element_key == "end" and pattern.key == "c":
+                card_label = "C 伝統的"
+                note = (
+                    "白銀比と共通の節点順を使いながら、"
+                    "張り出しと収束長を抑えた古典的な留め。"
+                )
+            if element_key == "end" and pattern.key == "d":
+                card_label = "D 穏健"
+                note = (
+                    "側面を三次smoothstep、底部を四分楕円として接線を連続させ、"
+                    "張り出しを白銀比圧力の3分の1へ抑えた静かな留め。"
+                )
             if element_key == "horizontal-start" and pattern.key == "b":
                 note = (
                     "横画幅に対する白銀比で上下頂点を置き、"
@@ -1072,13 +1183,13 @@ def _page(
 *{{box-sizing:border-box}}body{{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans JP",sans-serif}}
 main{{max-width:1640px;margin:auto;padding:48px 36px 80px}}h1{{font:700 38px/1.2 serif;margin:0 0 12px}}.lead{{max-width:900px;font-size:17px;line-height:1.8;margin:0 0 52px}}
 section{{border-top:1px solid var(--line);padding:34px 0 46px}}section>header{{display:grid;grid-template-columns:120px 120px 1fr;align-items:baseline;gap:12px;margin-bottom:20px}}h2{{font:700 28px serif;margin:0}}.eyebrow{{font:700 11px monospace;letter-spacing:.14em;color:var(--accent)}}section header p{{margin:0;line-height:1.6}}
-.cards{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}}.card{{background:var(--card);border:1px solid var(--line);padding:16px;min-width:0}}.card.selected{{border:3px solid var(--accent);padding:14px}}h3{{margin:0 0 10px;font-size:16px}}svg{{display:block;width:100%;height:360px;background:#fff;border:1px solid #eee}}svg path{{fill:var(--ink)}}.card p{{font-size:13px;line-height:1.6;min-height:42px;margin:10px 0;color:#554d43}}.choice{{display:inline-block;padding:4px 8px;background:var(--accent);color:white;font:700 12px monospace;margin-left:8px}}.pick{{display:block;border-top:1px solid var(--line);padding-top:10px;font-weight:700;cursor:pointer}}.pick input{{margin-right:8px}}.selection{{position:sticky;top:12px;z-index:2;display:flex;align-items:center;gap:16px;width:max-content;max-width:100%;padding:12px 16px;background:#8f2d20;color:white;font-weight:700;margin-bottom:24px}}.selection button{{border:1px solid white;background:transparent;color:white;font-weight:700;cursor:pointer}}
+        .cards{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}}#end .cards{{grid-template-columns:repeat(6,minmax(0,1fr))}}.card{{background:var(--card);border:1px solid var(--line);padding:16px;min-width:0}}.card.selected{{border:3px solid var(--accent);padding:14px}}h3{{margin:0 0 10px;font-size:16px}}svg{{display:block;width:100%;height:360px;background:#fff;border:1px solid #eee}}svg path{{fill:var(--ink)}}.card p{{font-size:13px;line-height:1.6;min-height:42px;margin:10px 0;color:#554d43}}.choice{{display:inline-block;padding:4px 8px;background:var(--accent);color:white;font:700 12px monospace;margin-left:8px}}.pick{{display:block;border-top:1px solid var(--line);padding-top:10px;font-weight:700;cursor:pointer}}.pick input{{margin-right:8px}}.selection{{position:sticky;top:12px;z-index:2;display:flex;gap:14px;align-items:center;background:#171512;color:#fff;padding:12px 16px;margin:0 0 36px;font:700 13px/1.5 monospace}}.selection output{{flex:1}}button{{font:inherit;cursor:pointer}}.combination-cards .card p{{min-height:0}}
 svg{{overflow:hidden}}
 .handles line{{stroke:#3478a8;stroke-width:.8;vector-effect:non-scaling-stroke}}.handles .anchor{{fill:#1677b8;stroke:white;stroke-width:.6;vector-effect:non-scaling-stroke}}.handles .control{{fill:#d4422f;stroke:white;stroke-width:.6;vector-effect:non-scaling-stroke}}.hide-handles .handles{{display:none}}.topology{{font-family:monospace;color:var(--accent)!important;min-height:0!important}}#nodes{{border:1px solid #fff;background:transparent!important}}
 .card-actions{{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}}.card-actions .pick{{border:0;padding:0}}.card-actions a,.upload{{display:block;padding:7px 9px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer}}.upload input{{display:block;width:100%;margin-top:6px;font-size:10px}}.card.custom{{outline:3px dashed #3478a8;outline-offset:-7px}}.card.custom .topology{{color:#3478a8!important}}
-@media(max-width:1000px){{.cards{{grid-template-columns:repeat(2,1fr)}}section>header{{grid-template-columns:1fr}}}}@media(max-width:600px){{main{{padding:24px 14px}}.cards{{grid-template-columns:1fr}}}}
+        @media(max-width:1000px){{.cards,#end .cards{{grid-template-columns:repeat(2,1fr)}}section>header{{grid-template-columns:1fr}}}}@media(max-width:600px){{main{{padding:24px 14px}}.cards,#end .cards{{grid-template-columns:1fr}}}}
 </style></head><body><main><h1>漢字毛筆エレメント デザインパターン</h1>
-<p class="lead">フォント全体をビルドせず、コードで定義したエレメント単体の輪郭トポロジーをSVGで比較します。A / B / Cは比率違いではなく、輪郭セグメントとオンカーブ点・オフカーブ制御点の構成自体が異なります。書き出したSVGと保管済みSVGは判断・指示用の参考データであり、コードへ再入力しません。Inkscapeで試作した輪郭は、同じカードのファイル入力へ読み込むとその場だけでプレビューできます。<span class="choice">確定選択はselection.jsonから読込</span></p>
+        <p class="lead">フォント全体をビルドせず、コードで定義したエレメント単体の輪郭トポロジーをSVGで比較します。A / B / Cは比率違いではなく、輪郭セグメントとオンカーブ点・オフカーブ制御点の構成自体が異なります。終筆Dは、角のない穏やかな別構造を追加比較します。書き出したSVGと保管済みSVGは判断・指示用の参考データであり、コードへ再入力しません。Inkscapeで試作した輪郭は、同じカードのファイル入力へ読み込むとその場だけでプレビューできます。<span class="choice">確定選択はselection.jsonから読込</span></p>
 <div class="selection"><output id="selection">{initial_selection}</output><button id="nodes" type="button">制御点を隠す</button><button id="copy" type="button">選択をコピー</button><button id="save" type="button">選択JSONを保存</button></div>
 {"".join(sections)}</main><script>
 const labels={json.dumps(labels, ensure_ascii=False)};

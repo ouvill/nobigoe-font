@@ -6,6 +6,8 @@ import argparse
 from pathlib import Path
 from typing import Sequence
 
+from .brush import DEFAULT_VERTICAL_END_PROFILE, VERTICAL_END_PROFILES
+
 from .pipeline import build
 from .profiles import (
     LATIN_FAMILIES,
@@ -44,6 +46,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help=(
             "match Han start, end, and uroko elements; locally reshape them "
             "while keeping stroke bodies, hige, and metrics"
+        ),
+    )
+    parser.add_argument(
+        "--han-brush-end-profile",
+        choices=VERTICAL_END_PROFILES,
+        default=DEFAULT_VERTICAL_END_PROFILE,
+        help=(
+            "vertical stroke ending used with --han-brush-elements; "
+            "traditional is the compact default, silver is long and asymmetric"
         ),
     )
     parser.add_argument(
@@ -122,6 +133,10 @@ def _build_variable_stix(args: argparse.Namespace) -> None:
             ("--base koburi", args.base != "noto"),
             ("--kana-style novel", args.kana_style != "noto"),
             ("--han-brush-elements", args.han_brush_elements),
+            (
+                "--han-brush-end-profile",
+                args.han_brush_end_profile != DEFAULT_VERTICAL_END_PROFILE,
+            ),
             ("--weight", args.weight != "Regular"),
             ("--latin-family", args.latin_family != "libertinus"),
         )
@@ -144,6 +159,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.build_variable_stix is not None:
         _build_variable_stix(args)
         return
+    if (
+        not args.han_brush_elements
+        and args.han_brush_end_profile != DEFAULT_VERTICAL_END_PROFILE
+    ):
+        raise ValueError("--han-brush-end-profile requires --han-brush-elements")
     if args.base == "koburi" and args.kana_style == "novel":
         raise ValueError("--kana-style novel requires --base noto")
     if args.base == "koburi" and args.han_brush_elements:
@@ -207,4 +227,5 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.autohint,
         args.kana_style,
         han_brush_elements=args.han_brush_elements,
+        han_brush_end_profile=args.han_brush_end_profile,
     )
