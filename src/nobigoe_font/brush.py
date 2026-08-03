@@ -34,6 +34,8 @@ _MIN_CLOSED_DOT_SIDE_TO_CAP_RATIO = 10.0
 _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO = 0.75
 _MAX_HOOK_BASIS_DOT = 0.05
 _MAX_HORIZONTAL_STROKE_WIDTH = 80.0
+_HORIZONTAL_START_REFERENCE_WIDTH = 33.0
+_SILVER_RATIO = math.sqrt(2.0)
 
 
 @dataclass(frozen=True)
@@ -940,48 +942,81 @@ def _edit_horizontal_start(
     outgoing_end_override: Point | None = None,
 ) -> tuple[Command, ...]:
     outgoing_end = outgoing_end_override or element.outgoing_end
-    incoming_axis = (
-        _unit(_subtract(element.incoming_start, element.cap_start)) or element.axis
+    axis = element.axis
+    outward = element.incoming_outward
+    unit = element.width / _HORIZONTAL_START_REFERENCE_WIDTH
+    incoming_axis = _unit(_subtract(element.incoming_start, element.cap_start)) or axis
+
+    # Preserve design B's horizontal center while replacing its arbitrary
+    # apex and handle positions with a stroke-width-relative silver-ratio
+    # construction.
+    previous_top = _add(
+        _add(element.cap_start, _scale(incoming_axis, 10.0 * unit)),
+        _scale(outward, 4.0 * unit),
     )
-    unit = element.width / 33.0
+    previous_bottom = _add(
+        _add(element.cap_end, _scale(axis, 28.0 * unit)),
+        _scale(outward, -7.0 * unit),
+    )
+    midpoint_along = (_dot(previous_top, axis) + _dot(previous_bottom, axis)) / 2.0
 
-    def point(
-        anchor: Point,
-        axis: Point,
-        along: float,
-        outward: float,
-    ) -> Point:
-        return _add(
-            _add(anchor, _scale(axis, along * unit)),
-            _scale(element.incoming_outward, outward * unit),
+    expanded_height = _SILVER_RATIO * element.width
+    extension = (expanded_height - element.width) / 2.0
+    apex_separation = element.width / _SILVER_RATIO
+    top_along = midpoint_along - apex_separation / 2.0
+    bottom_along = midpoint_along + apex_separation / 2.0
+    top_base = _dot(element.cap_start, outward)
+    bottom_base = _dot(element.cap_end, outward)
+
+    def local(along: float, away: float) -> Point:
+        return _add(_scale(axis, along), _scale(outward, away))
+
+    top_apex = local(top_along, top_base + extension)
+    bottom_apex = local(bottom_along, bottom_base - extension)
+    cap_length = math.hypot(expanded_height, apex_separation)
+    bottom_run = _SILVER_RATIO * cap_length
+    shared_join_along = bottom_along + bottom_run
+    top_run = shared_join_along - top_along
+
+    def circular_arc(
+        apex_along: float,
+        base_away: float,
+        run: float,
+        side: float,
+    ) -> tuple[Point, Point, Point, Point]:
+        radius = (run * run + extension * extension) / (2.0 * extension)
+        handle = 4.0 * radius * extension / (3.0 * (math.hypot(run, extension) + run))
+        tangent_along = (radius - extension) / radius
+        tangent_away = run / radius
+        apex = local(apex_along, base_away + side * extension)
+        first_control = local(
+            apex_along + handle * tangent_along,
+            base_away + side * extension - side * handle * tangent_away,
         )
+        second_control = local(
+            apex_along + run - handle,
+            base_away,
+        )
+        body = local(apex_along + run, base_away)
+        return apex, first_control, second_control, body
 
-    # Selected design B uses the 33-unit Noto cap as its local basis.  Keep
-    # the upper and lower handles on their respective incoming/outgoing axes
-    # instead of deriving them from unrelated interpolation factors.
-    incoming_body = point(element.cap_start, incoming_axis, 143.0, 0.0)
-    new_cap_start = point(element.cap_start, incoming_axis, 10.0, 4.0)
-    new_cap_end = point(element.cap_end, element.axis, 28.0, -7.0)
-    outgoing_body = point(element.cap_end, element.axis, 178.0, 0.0)
+    top_apex, top_first, top_second, top_body = circular_arc(
+        top_along,
+        top_base,
+        top_run,
+        1.0,
+    )
+    bottom_apex, bottom_first, bottom_second, bottom_body = circular_arc(
+        bottom_along,
+        bottom_base,
+        bottom_run,
+        -1.0,
+    )
     return (
-        ("lineTo", (incoming_body,)),
-        (
-            "curveTo",
-            (
-                point(element.cap_start, incoming_axis, 98.0, 1.0),
-                point(element.cap_start, incoming_axis, 54.0, 3.0),
-                new_cap_start,
-            ),
-        ),
-        ("lineTo", (new_cap_end,)),
-        (
-            "curveTo",
-            (
-                point(element.cap_end, element.axis, 78.0, -5.0),
-                point(element.cap_end, element.axis, 126.0, -1.0),
-                outgoing_body,
-            ),
-        ),
+        ("lineTo", (top_body,)),
+        ("curveTo", (top_second, top_first, top_apex)),
+        ("lineTo", (bottom_apex,)),
+        ("curveTo", (bottom_first, bottom_second, bottom_body)),
         ("lineTo", (outgoing_end,)),
     )
 

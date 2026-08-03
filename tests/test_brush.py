@@ -69,22 +69,6 @@ def _noto_horizontal_stroke() -> pathops.Path:
     return outline
 
 
-def _selected_horizontal_start_b() -> pathops.Path:
-    outline = pathops.Path()
-    pen = outline.getPen()
-    pen.moveTo((841, 514))
-    pen.lineTo((778, 431))
-    pen.lineTo((191, 431))
-    pen.curveTo((146, 432), (102, 434), (58, 435))
-    pen.lineTo((86, 391))
-    pen.curveTo((136, 393), (184, 397), (236, 398))
-    pen.lineTo((928, 398))
-    pen.curveTo((944, 398), (956, 401), (959, 413))
-    pen.curveTo((914, 455), (841, 514), (841, 514))
-    pen.closePath()
-    return outline
-
-
 def _selected_uroko_b() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
@@ -861,7 +845,9 @@ class BrushElementTests(unittest.TestCase):
             ),
         )
 
-    def test_horizontal_start_matches_selected_b_normalized_recipe(self) -> None:
+    def test_horizontal_start_uses_aligned_silver_ratio_circle_arcs(
+        self,
+    ) -> None:
         source = _noto_horizontal_stroke()
         source_commands = _commands(source)
         elements = _horizontal_start_elements(list(source_commands))
@@ -880,19 +866,72 @@ class BrushElementTests(unittest.TestCase):
             ),
         )
         edited_commands = _commands(edited)
-        expected_commands = _commands(_selected_horizontal_start_b())
-        difference = pathops.op(
-            edited,
-            _selected_horizontal_start_b(),
-            pathops.PathOp.XOR,
-        )
+        top_body = replacement[0][1][0]
+        top_curve = replacement[1][1]
+        top_apex = top_curve[-1]
+        bottom_apex = replacement[2][1][0]
+        bottom_curve = replacement[3][1]
+        bottom_body = bottom_curve[-1]
+        silver_ratio = math.sqrt(2.0)
+        expanded_height = element.width * silver_ratio
+        extension = (expanded_height - element.width) / 2.0
+        apex_separation = element.width / silver_ratio
+        cap_length = math.hypot(expanded_height, apex_separation)
 
         self.assertEqual(
             tuple(operator for operator, _ in replacement),
             ("lineTo", "curveTo", "lineTo", "curveTo", "lineTo"),
         )
-        self.assertEqual(edited_commands, expected_commands)
-        self.assertFalse(difference.verbs)
+        self.assertAlmostEqual(top_apex[1], element.cap_start[1] + extension)
+        self.assertAlmostEqual(
+            bottom_apex[1],
+            element.cap_end[1] - extension,
+        )
+        self.assertAlmostEqual(bottom_apex[0] - top_apex[0], apex_separation)
+        self.assertAlmostEqual(top_apex[1] - bottom_apex[1], expanded_height)
+        self.assertAlmostEqual(
+            bottom_body[0] - bottom_apex[0],
+            silver_ratio * cap_length,
+        )
+        self.assertAlmostEqual(top_body[0], bottom_body[0])
+        self.assertAlmostEqual(top_curve[0][1], top_body[1])
+        self.assertAlmostEqual(bottom_curve[-2][1], bottom_body[1])
+
+        top_run = top_body[0] - top_apex[0]
+        top_radius = (top_run * top_run + extension * extension) / (2.0 * extension)
+        top_center = (top_body[0], top_body[1] + top_radius)
+        top_radius_vector = (
+            top_apex[0] - top_center[0],
+            top_apex[1] - top_center[1],
+        )
+        top_tangent = (
+            top_curve[1][0] - top_apex[0],
+            top_curve[1][1] - top_apex[1],
+        )
+        self.assertAlmostEqual(
+            top_radius_vector[0] * top_tangent[0]
+            + top_radius_vector[1] * top_tangent[1],
+            0.0,
+        )
+
+        bottom_run = bottom_body[0] - bottom_apex[0]
+        bottom_radius = (bottom_run * bottom_run + extension * extension) / (
+            2.0 * extension
+        )
+        bottom_center = (bottom_body[0], bottom_body[1] - bottom_radius)
+        bottom_radius_vector = (
+            bottom_apex[0] - bottom_center[0],
+            bottom_apex[1] - bottom_center[1],
+        )
+        bottom_tangent = (
+            bottom_curve[0][0] - bottom_apex[0],
+            bottom_curve[0][1] - bottom_apex[1],
+        )
+        self.assertAlmostEqual(
+            bottom_radius_vector[0] * bottom_tangent[0]
+            + bottom_radius_vector[1] * bottom_tangent[1],
+            0.0,
+        )
         self.assertEqual(
             edited_commands[: element.incoming_line_index],
             source_commands[: element.incoming_line_index],

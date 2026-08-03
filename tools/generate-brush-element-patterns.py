@@ -347,10 +347,18 @@ def _prototype_horizontal_start(variant: str) -> pathops.Path:
         pen.lineTo((280, 398))
     elif variant == "b":
         pen.moveTo((280, 431))
-        pen.lineTo((191, 431))
-        pen.curveTo((146, 432), (102, 434), (58, 435))
-        pen.lineTo((86, 391))
-        pen.curveTo((136, 393), (184, 397), (236, 398))
+        pen.lineTo((157.457505, 431))
+        pen.curveTo(
+            (124.962448, 431),
+            (92.507568, 433.283801),
+            (60.332738, 437.834524),
+        )
+        pen.lineTo((83.667262, 391.165476))
+        pen.curveTo(
+            (108.000927, 395.712095),
+            (132.702728, 398),
+            (157.457505, 398),
+        )
         pen.lineTo((280, 398))
     else:
         pen.moveTo((280, 431))
@@ -1014,9 +1022,9 @@ def _page(
                 note = "右斜めへ立ち上がる起点と天頂だけへ" "小さな丸みを加えた確定案。"
             if element_key == "horizontal-start" and pattern.key == "b":
                 note = (
-                    "源流明朝と同じ二つの曲線で起筆を作り、"
-                    "左上端をy=435、左下端をy=391として"
-                    "Notoとの中間の高さに整えた指定案。"
+                    "横画幅に対する白銀比で上下頂点を置き、"
+                    "下側接点へ上側接点を揃えた二つの仮想円弧。"
+                    "上側は接続距離に応じて大きい半径を使う。"
                 )
             cards.append(
                 f'<article id="card-{element_key}-{choice}" '
