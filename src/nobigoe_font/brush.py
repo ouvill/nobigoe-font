@@ -528,22 +528,17 @@ def _vertical_design_scales(
         raise ValueError("Vertical design needs a start or end element")
     unit_scale = element.width / _VERTICAL_REFERENCE_WIDTH
 
-    # Keep a visible straight body between an exposed endpoint treatment and
-    # the next contour junction.  A fixed percentage alone leaves almost no
-    # stem on short components and when start and end share the same sides.
+    # Preserve the start's proportions.  On a short component its virtual
+    # circle is clipped where the contour reaches the next junction instead
+    # of being compressed along the stem axis.
+    start_scale = 1.0 if start is not None else 0.0
+
+    # The end still reserves a visible body because it has no analogous
+    # circle that can be cut at an intervening contour junction.
     def available_design_span(side: _LineSide) -> float:
         straight_body = min(element.width, 0.25 * side.length)
         return max(0.0, side.length - straight_body)
 
-    start_scale = (
-        min(
-            1.0,
-            available_design_span(element.down_side) / (200.0 * unit_scale),
-            available_design_span(element.up_side) / (20.0 * unit_scale),
-        )
-        if start is not None
-        else 0.0
-    )
     end_scale = (
         min(
             1.0,
@@ -559,18 +554,48 @@ def _vertical_design_scales(
             available_design_span(element.down_side) / (480.0 * unit_scale),
             available_design_span(element.up_side) / (260.0 * unit_scale),
         )
-        start_scale = min(start_scale, joint_scale)
         end_scale = min(end_scale, joint_scale)
     return start_scale, end_scale
+
+
+def _split_cubic_at_axis_depth(
+    start: Point,
+    first: Point,
+    second: Point,
+    end: Point,
+    axis: Point,
+    depth: float,
+) -> tuple[
+    tuple[Point, Point, Point, Point],
+    tuple[Point, Point, Point, Point],
+]:
+    start_depth = _dot(start, axis)
+    end_depth = _dot(end, axis)
+    if depth <= start_depth + _GEOMETRY_EPSILON:
+        return (start, start, start, start), (start, first, second, end)
+    if depth >= end_depth - _GEOMETRY_EPSILON:
+        return (start, first, second, end), (end, end, end, end)
+
+    lower = 0.0
+    upper = 1.0
+    for _ in range(32):
+        factor = (lower + upper) / 2.0
+        split = _split_cubic(start, first, second, end, factor)
+        split_depth = _dot(split[0][-1], axis)
+        if split_depth < depth:
+            lower = factor
+        else:
+            upper = factor
+    return _split_cubic(start, first, second, end, (lower + upper) / 2.0)
 
 
 def _vertical_start_design(
     element: _VerticalStartElement,
     axial_scale: float,
 ) -> _VerticalStartDesign:
-    # K5 gives the two sides different jobs.  The left virtual circle takes
-    # w√5 to settle into the stem; the right brush placement uses its own
-    # short return and is deliberately not aligned to the left join.
+    # The two sides have different jobs.  The left join sits w√5 below
+    # the basis; the right brush placement uses its own short return and is
+    # deliberately not aligned to the left join.
     width = _VERTICAL_REFERENCE_WIDTH
     extension = width * (_SILVER_RATIO - 1.0) / 2.0
     pressure = width * (1.0 - 1.0 / _SILVER_RATIO)
@@ -678,51 +703,43 @@ def _vertical_stroke_side_edits(
 
     down_replacement: list[Command] = []
     preserved_down_curve = False
+    clipped_start_curve = False
     if start_design is not None:
-        down_replacement.append(
-            (
-                "curveTo",
-                (
-                    start_design.left_first_control,
-                    start_design.left_second_control,
-                    start_design.left_body,
-                ),
-            )
+        if end_design is not None:
+            start_limit = _dot(end_design.left_body, element.axis)
+        elif down_operator == "curveTo":
+            start_limit = _dot(down_operands[-1], element.axis)
+        else:
+            start_limit = _dot(element.down_side.end, element.axis)
+
+        start_curve = (
+            start_design.left_apex,
+            start_design.left_first_control,
+            start_design.left_second_control,
+            start_design.left_body,
         )
-        down_current = start_design.left_body
-        if down_operator == "curveTo" and end_design is None:
-            target_depth = max(
-                0.0,
-                _dot(
-                    _subtract(start_design.left_body, element.down_side.start),
-                    element.axis,
-                ),
+        if start_limit < _dot(start_design.left_body, element.axis):
+            start_curve, _ = _split_cubic_at_axis_depth(
+                *start_curve,
+                element.axis,
+                start_limit,
             )
-            lower = 0.0
-            upper = 0.5
-            for _ in range(24):
-                factor = (lower + upper) / 2
-                split_point = _split_cubic(
-                    element.down_side.start,
-                    down_operands[0],
-                    down_operands[1],
-                    down_operands[2],
-                    factor,
-                )[0][-1]
-                depth = _dot(
-                    _subtract(split_point, element.down_side.start),
-                    element.axis,
-                )
-                if depth < target_depth:
-                    lower = factor
-                else:
-                    upper = factor
-            _, preserved = _split_cubic(
+            clipped_start_curve = True
+        down_replacement.append(("curveTo", start_curve[1:]))
+        down_current = start_curve[-1]
+
+        if (
+            down_operator == "curveTo"
+            and end_design is None
+            and not clipped_start_curve
+        ):
+            _, preserved = _split_cubic_at_axis_depth(
                 element.down_side.start,
                 down_operands[0],
                 down_operands[1],
                 down_operands[2],
-                (lower + upper) / 2,
+                element.axis,
+                _dot(start_design.left_body, element.axis),
             )
             join_offset = _subtract(start_design.left_body, preserved[0])
             down_replacement.append(
@@ -739,6 +756,7 @@ def _vertical_stroke_side_edits(
             preserved_down_curve = True
     else:
         down_current = element.down_side.start
+
     if end_design is not None:
         if math.dist(down_current, end_design.left_body) > _GEOMETRY_EPSILON:
             down_replacement.append(("lineTo", (end_design.left_body,)))
@@ -754,6 +772,7 @@ def _vertical_stroke_side_edits(
         )
     elif (
         not preserved_down_curve
+        and not clipped_start_curve
         and math.dist(down_current, element.down_side.end) > _GEOMETRY_EPSILON
     ):
         down_replacement.append(("lineTo", (element.down_side.end,)))

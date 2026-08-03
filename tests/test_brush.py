@@ -17,6 +17,7 @@ from nobigoe_font.brush import (
     _edit_terminal,
     _edit_horizontal_start,
     _horizontal_start_elements,
+    _vertical_design_scales,
     _vertical_end_elements,
     _terminal_elements,
     _vertical_start_design,
@@ -1641,16 +1642,30 @@ class BrushElementTests(unittest.TestCase):
         self.assertEqual(starts[0].up_side.command_index, 6)
         self.assertEqual(result.adjusted_stroke_count, 1)
 
-    def test_short_exposed_vertical_start_uses_relative_side_length(self) -> None:
+    def test_short_exposed_vertical_start_clips_circle_at_contour_join(self) -> None:
         source = _short_vertical_start()
         commands = list(_commands(source))
 
         starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
+        result_commands = _commands(result.path)
 
         self.assertEqual(len(starts), 1)
+        start = starts[0]
+        self.assertEqual(_vertical_design_scales(start, None)[0], 1.0)
         self.assertEqual(result.adjusted_stroke_count, 1)
-        self.assertIn(("lineTo", ((0.0, 0.0),)), _commands(result.path))
+        self.assertEqual(result_commands[-2][0], "curveTo")
+        join = result_commands[-2][1][-1]
+        self.assertAlmostEqual(
+            join[0] * start.axis[0] + join[1] * start.axis[1],
+            start.down_side.end[0] * start.axis[0]
+            + start.down_side.end[1] * start.axis[1],
+        )
+        self.assertNotAlmostEqual(
+            join[0] * start.across[0] + join[1] * start.across[1],
+            start.down_side.end[0] * start.across[0]
+            + start.down_side.end[1] * start.across[1],
+        )
 
     def test_segmented_vertical_starts_are_found_from_the_cap_marker(self) -> None:
         fixtures = {
@@ -1698,7 +1713,9 @@ class BrushElementTests(unittest.TestCase):
         self.assertEqual(starts[0].cap_command_count, 1)
         self.assertEqual(starts[0].post_move_cap_count, 0)
 
-    def test_short_complete_vertical_stroke_keeps_a_straight_body(self) -> None:
+    def test_short_complete_vertical_stroke_keeps_endpoint_curves_in_order(
+        self,
+    ) -> None:
         source = _short_complete_vertical_stroke()
         commands = list(_commands(source))
 
@@ -1722,8 +1739,12 @@ class BrushElementTests(unittest.TestCase):
             starts[0].side_command_indices,
             ends[0].side_command_indices,
         )
+        self.assertEqual(_vertical_design_scales(starts[0], ends[0])[0], 1.0)
         self.assertEqual(result.adjusted_stroke_count, 1)
-        self.assertGreaterEqual(math.dist(body_start, body_end), 0.99 * 40)
+        body_progress = (body_end[0] - body_start[0]) * starts[0].axis[0] + (
+            body_end[1] - body_start[1]
+        ) * starts[0].axis[1]
+        self.assertGreater(body_progress, 0.0)
 
     def test_vertical_start_requires_noto_control_point_relationship(self) -> None:
         source = _squat_vertical_start_lookalike()
@@ -1735,7 +1756,7 @@ class BrushElementTests(unittest.TestCase):
         self.assertEqual(starts, ())
         self.assertEqual(result.adjusted_stroke_count, 0)
 
-    def test_vertical_start_k5_joins_each_side_independently(self) -> None:
+    def test_vertical_start_joins_each_side_independently(self) -> None:
         start = _vertical_start_elements(list(_commands(_noto_vertical_stroke())))[0]
         design = _vertical_start_design(start, 1.0)
         basis = start.up_side.end

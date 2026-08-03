@@ -1035,7 +1035,7 @@ def _page(
             if element_key == "start" and pattern.key == "b":
                 note = (
                     "左辺は白銀比から求めた仮想円弧で長く収束し、"
-                    "右辺は独立した短い筆置き曲線で戻すK5案。"
+                    "右辺は独立した短い筆置き曲線で戻す。"
                     "左右の収束位置は揃えない。"
                 )
             if element_key == "horizontal-start" and pattern.key == "b":
