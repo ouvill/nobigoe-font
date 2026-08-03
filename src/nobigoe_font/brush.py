@@ -170,8 +170,10 @@ class _VerticalStartDesign:
     left_first_control: Point
     left_second_control: Point
     left_body: Point
-    right_top: Point
-    shoulder: Point
+    right_body: Point
+    right_first_control: Point
+    right_second_control: Point
+    right_apex: Point
     cap_first_control: Point
     cap_second_control: Point
 
@@ -566,15 +568,31 @@ def _vertical_start_design(
     element: _VerticalStartElement,
     axial_scale: float,
 ) -> _VerticalStartDesign:
-    # Source-space offsets reproduce the selected Genryu-based B recipe for
-    # Noto Serif JP U+4E28, normalized by its 68-unit source stem width.
-    def point(
-        anchor: Point,
-        across: float,
-        down: float,
-    ) -> Point:
+    # K5 gives the two sides different jobs.  The left virtual circle takes
+    # w√5 to settle into the stem; the right brush placement uses its own
+    # short return and is deliberately not aligned to the left join.
+    width = _VERTICAL_REFERENCE_WIDTH
+    extension = width * (_SILVER_RATIO - 1.0) / 2.0
+    pressure = width * (1.0 - 1.0 / _SILVER_RATIO)
+    right_overhang = width * (_SILVER_RATIO - 1.0)
+    left_apex_down = -width / _SILVER_RATIO
+    left_body_down = width * math.sqrt(5.0)
+    left_run = left_body_down - left_apex_down
+    left_radius = (left_run * left_run + extension * extension) / (2.0 * extension)
+    left_handle = (
+        4.0
+        * left_radius
+        * extension
+        / (3.0 * (math.hypot(left_run, extension) + left_run))
+    )
+    left_tangent_down = (left_radius - extension) / left_radius
+    left_tangent_across = left_run / left_radius
+    cap_handle_ratio = 4.0 * (_SILVER_RATIO - 1.0) / 3.0
+    return_handle = pressure / (2.0 * _SILVER_RATIO)
+
+    def point(across: float, down: float) -> Point:
         return _vertical_design_point(
-            anchor,
+            element.up_side.end,
             element.axis,
             element.across,
             element.width,
@@ -583,17 +601,31 @@ def _vertical_start_design(
             axial_scale,
         )
 
-    left_anchor = element.down_side.start
-    right_anchor = element.up_side.end
+    left_apex_across = -width - extension
+    cap_left_basis = -width - pressure / 2.0
+    cap_left_control_across = cap_left_basis + cap_handle_ratio * (
+        right_overhang - cap_left_basis
+    )
     return _VerticalStartDesign(
-        left_apex=point(left_anchor, -11, -5),
-        left_first_control=point(left_anchor, -2, 50),
-        left_second_control=point(left_anchor, 2, 134),
-        left_body=point(left_anchor, 2, 200),
-        right_top=point(right_anchor, -1, 20),
-        shoulder=point(right_anchor, 16, 9),
-        cap_first_control=point(right_anchor, 34, -3),
-        cap_second_control=point(right_anchor, 34, -13),
+        left_apex=point(left_apex_across, left_apex_down),
+        left_first_control=point(
+            left_apex_across + left_handle * left_tangent_across,
+            left_apex_down + left_handle * left_tangent_down,
+        ),
+        left_second_control=point(
+            -width,
+            left_body_down - left_handle,
+        ),
+        left_body=point(-width, left_body_down),
+        right_body=point(0.0, pressure),
+        right_first_control=point(0.0, pressure - return_handle),
+        right_second_control=point(right_overhang, return_handle),
+        right_apex=point(right_overhang, 0.0),
+        cap_first_control=point(
+            right_overhang,
+            -cap_handle_ratio * right_overhang,
+        ),
+        cap_second_control=point(cap_left_control_across, left_apex_down),
     )
 
 
@@ -728,14 +760,14 @@ def _vertical_stroke_side_edits(
 
     up_replacement: list[Command] = []
     if up_operator == "curveTo" and start_design is not None and end_design is None:
-        endpoint_offset = _subtract(start_design.right_top, up_operands[2])
+        endpoint_offset = _subtract(start_design.right_body, up_operands[2])
         up_replacement.append(
             (
                 "curveTo",
                 (
                     up_operands[0],
                     _add(up_operands[1], endpoint_offset),
-                    start_design.right_top,
+                    start_design.right_body,
                 ),
             )
         )
@@ -755,7 +787,7 @@ def _vertical_stroke_side_edits(
         else:
             up_current = element.up_side.start
         up_target = (
-            start_design.right_top if start_design is not None else element.up_side.end
+            start_design.right_body if start_design is not None else element.up_side.end
         )
         if math.dist(up_current, up_target) > _GEOMETRY_EPSILON:
             up_replacement.append(("lineTo", (up_target,)))
@@ -778,7 +810,14 @@ def _edit_vertical_start_cap(
     design: _VerticalStartDesign,
 ) -> tuple[Command, ...]:
     return (
-        ("lineTo", (design.shoulder,)),
+        (
+            "curveTo",
+            (
+                design.right_first_control,
+                design.right_second_control,
+                design.right_apex,
+            ),
+        ),
         (
             "curveTo",
             (

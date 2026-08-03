@@ -256,12 +256,24 @@ def _prototype_start(variant: str) -> pathops.Path:
         pen.lineTo((528, 760))
         pen.lineTo((528, 540))
     elif variant == "b":
-        pen.moveTo((462, 540))
-        pen.lineTo((462, 619))
-        pen.curveTo((462, 685), (458, 769), (449, 824))
-        pen.curveTo((562, 793), (562, 783), (544, 771))
-        pen.lineTo((527, 760))
-        pen.lineTo((527, 540))
+        pen.moveTo((460, 540))
+        pen.lineTo((460, 627.9473775300144))
+        pen.curveTo(
+            (460, 694.906889112866),
+            (455.29398557410025, 761.7836122842157),
+            (445.9167388793148, 828.0832611206853),
+        )
+        pen.curveTo(
+            (508.65278981321916, 828.0832611206853),
+            (556.1665222413704, 795.5559406896788),
+            (556.1665222413704, 780),
+        )
+        pen.curveTo(
+            (556.1665222413704, 772.9583694396574),
+            (528, 767.1248916810279),
+            (528, 760.0832611206853),
+        )
+        pen.lineTo((528, 540))
     else:
         pen.moveTo((462, 540))
         pen.lineTo((462, 620))
@@ -1020,6 +1032,12 @@ def _page(
             )
             if element_key == "uroko" and pattern.key == "b":
                 note = "右斜めへ立ち上がる起点と天頂だけへ" "小さな丸みを加えた確定案。"
+            if element_key == "start" and pattern.key == "b":
+                note = (
+                    "左辺は白銀比から求めた仮想円弧で長く収束し、"
+                    "右辺は独立した短い筆置き曲線で戻すK5案。"
+                    "左右の収束位置は揃えない。"
+                )
             if element_key == "horizontal-start" and pattern.key == "b":
                 note = (
                     "横画幅に対する白銀比で上下頂点を置き、"

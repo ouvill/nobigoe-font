@@ -19,6 +19,7 @@ from nobigoe_font.brush import (
     _horizontal_start_elements,
     _vertical_end_elements,
     _terminal_elements,
+    _vertical_start_design,
     _vertical_start_elements,
     apply_brush_elements,
 )
@@ -100,16 +101,28 @@ def _noto_vertical_stroke() -> pathops.Path:
 def _selected_vertical_stroke_b() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
-    pen.moveTo((449, 824))
-    pen.curveTo((458, 769), (462, 685), (462, 619))
+    pen.moveTo((445.9167388793148, 828.0832611206853))
+    pen.curveTo(
+        (455.29398557410025, 761.7836122842157),
+        (460, 694.906889112866),
+        (460, 627.9473775300144),
+    )
     pen.lineTo((462, 203))
     pen.curveTo((460, 73), (457, 29), (451, -57))
     pen.curveTo((451, -67), (462, -77), (475, -77))
     pen.curveTo((499, -77), (527, -60), (535, -44))
     pen.curveTo((531, 31), (529, 71), (527, 191))
-    pen.lineTo((527, 760))
-    pen.lineTo((544, 771))
-    pen.curveTo((562, 783), (562, 793), (449, 824))
+    pen.lineTo((528, 760.0832611206853))
+    pen.curveTo(
+        (528, 767.1248916810279),
+        (556.1665222413704, 772.9583694396574),
+        (556.1665222413704, 780),
+    )
+    pen.curveTo(
+        (556.1665222413704, 795.5559406896788),
+        (508.65278981321916, 828.0832611206853),
+        (445.9167388793148, 828.0832611206853),
+    )
     pen.closePath()
     return outline
 
@@ -1721,6 +1734,29 @@ class BrushElementTests(unittest.TestCase):
 
         self.assertEqual(starts, ())
         self.assertEqual(result.adjusted_stroke_count, 0)
+
+    def test_vertical_start_k5_joins_each_side_independently(self) -> None:
+        start = _vertical_start_elements(list(_commands(_noto_vertical_stroke())))[0]
+        design = _vertical_start_design(start, 1.0)
+        basis = start.up_side.end
+
+        def down_depth(point: Point) -> float:
+            offset = point[0] - basis[0], point[1] - basis[1]
+            return offset[0] * start.axis[0] + offset[1] * start.axis[1]
+
+        left_depth = down_depth(design.left_body)
+        right_depth = down_depth(design.right_body)
+
+        self.assertAlmostEqual(left_depth, start.width * math.sqrt(5.0))
+        self.assertAlmostEqual(
+            right_depth,
+            start.width * (1.0 - 1.0 / math.sqrt(2.0)),
+        )
+        self.assertNotAlmostEqual(left_depth, right_depth)
+        self.assertAlmostEqual(
+            down_depth(design.right_apex),
+            0.0,
+        )
 
     def test_vertical_stroke_matches_selected_b_recipe(self) -> None:
         source = _noto_vertical_stroke()
