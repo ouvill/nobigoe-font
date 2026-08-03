@@ -17,8 +17,10 @@ from nobigoe_font.brush import (
     _edit_terminal,
     _edit_horizontal_start,
     _horizontal_start_elements,
+    _vertical_design_scales,
     _vertical_end_elements,
     _terminal_elements,
+    _vertical_start_design,
     _vertical_start_elements,
     apply_brush_elements,
 )
@@ -69,22 +71,6 @@ def _noto_horizontal_stroke() -> pathops.Path:
     return outline
 
 
-def _selected_horizontal_start_b() -> pathops.Path:
-    outline = pathops.Path()
-    pen = outline.getPen()
-    pen.moveTo((841, 514))
-    pen.lineTo((778, 431))
-    pen.lineTo((191, 431))
-    pen.curveTo((146, 432), (102, 434), (58, 435))
-    pen.lineTo((86, 391))
-    pen.curveTo((136, 393), (184, 397), (236, 398))
-    pen.lineTo((928, 398))
-    pen.curveTo((944, 398), (956, 401), (959, 413))
-    pen.curveTo((914, 455), (841, 514), (841, 514))
-    pen.closePath()
-    return outline
-
-
 def _selected_uroko_b() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
@@ -116,16 +102,28 @@ def _noto_vertical_stroke() -> pathops.Path:
 def _selected_vertical_stroke_b() -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
-    pen.moveTo((449, 824))
-    pen.curveTo((458, 769), (462, 685), (462, 619))
+    pen.moveTo((445.9167388793148, 828.0832611206853))
+    pen.curveTo(
+        (455.29398557410025, 761.7836122842157),
+        (460, 694.906889112866),
+        (460, 627.9473775300144),
+    )
     pen.lineTo((462, 203))
     pen.curveTo((460, 73), (457, 29), (451, -57))
     pen.curveTo((451, -67), (462, -77), (475, -77))
     pen.curveTo((499, -77), (527, -60), (535, -44))
     pen.curveTo((531, 31), (529, 71), (527, 191))
-    pen.lineTo((527, 760))
-    pen.lineTo((544, 771))
-    pen.curveTo((562, 783), (562, 793), (449, 824))
+    pen.lineTo((528, 760.0832611206853))
+    pen.curveTo(
+        (528, 767.1248916810279),
+        (556.1665222413704, 772.9583694396574),
+        (556.1665222413704, 780),
+    )
+    pen.curveTo(
+        (556.1665222413704, 795.5559406896788),
+        (508.65278981321916, 828.0832611206853),
+        (445.9167388793148, 828.0832611206853),
+    )
     pen.closePath()
     return outline
 
@@ -861,7 +859,9 @@ class BrushElementTests(unittest.TestCase):
             ),
         )
 
-    def test_horizontal_start_matches_selected_b_normalized_recipe(self) -> None:
+    def test_horizontal_start_uses_aligned_silver_ratio_circle_arcs(
+        self,
+    ) -> None:
         source = _noto_horizontal_stroke()
         source_commands = _commands(source)
         elements = _horizontal_start_elements(list(source_commands))
@@ -880,19 +880,72 @@ class BrushElementTests(unittest.TestCase):
             ),
         )
         edited_commands = _commands(edited)
-        expected_commands = _commands(_selected_horizontal_start_b())
-        difference = pathops.op(
-            edited,
-            _selected_horizontal_start_b(),
-            pathops.PathOp.XOR,
-        )
+        top_body = replacement[0][1][0]
+        top_curve = replacement[1][1]
+        top_apex = top_curve[-1]
+        bottom_apex = replacement[2][1][0]
+        bottom_curve = replacement[3][1]
+        bottom_body = bottom_curve[-1]
+        silver_ratio = math.sqrt(2.0)
+        expanded_height = element.width * silver_ratio
+        extension = (expanded_height - element.width) / 2.0
+        apex_separation = element.width / silver_ratio
+        cap_length = math.hypot(expanded_height, apex_separation)
 
         self.assertEqual(
             tuple(operator for operator, _ in replacement),
             ("lineTo", "curveTo", "lineTo", "curveTo", "lineTo"),
         )
-        self.assertEqual(edited_commands, expected_commands)
-        self.assertFalse(difference.verbs)
+        self.assertAlmostEqual(top_apex[1], element.cap_start[1] + extension)
+        self.assertAlmostEqual(
+            bottom_apex[1],
+            element.cap_end[1] - extension,
+        )
+        self.assertAlmostEqual(bottom_apex[0] - top_apex[0], apex_separation)
+        self.assertAlmostEqual(top_apex[1] - bottom_apex[1], expanded_height)
+        self.assertAlmostEqual(
+            bottom_body[0] - bottom_apex[0],
+            silver_ratio * cap_length,
+        )
+        self.assertAlmostEqual(top_body[0], bottom_body[0])
+        self.assertAlmostEqual(top_curve[0][1], top_body[1])
+        self.assertAlmostEqual(bottom_curve[-2][1], bottom_body[1])
+
+        top_run = top_body[0] - top_apex[0]
+        top_radius = (top_run * top_run + extension * extension) / (2.0 * extension)
+        top_center = (top_body[0], top_body[1] + top_radius)
+        top_radius_vector = (
+            top_apex[0] - top_center[0],
+            top_apex[1] - top_center[1],
+        )
+        top_tangent = (
+            top_curve[1][0] - top_apex[0],
+            top_curve[1][1] - top_apex[1],
+        )
+        self.assertAlmostEqual(
+            top_radius_vector[0] * top_tangent[0]
+            + top_radius_vector[1] * top_tangent[1],
+            0.0,
+        )
+
+        bottom_run = bottom_body[0] - bottom_apex[0]
+        bottom_radius = (bottom_run * bottom_run + extension * extension) / (
+            2.0 * extension
+        )
+        bottom_center = (bottom_body[0], bottom_body[1] - bottom_radius)
+        bottom_radius_vector = (
+            bottom_apex[0] - bottom_center[0],
+            bottom_apex[1] - bottom_center[1],
+        )
+        bottom_tangent = (
+            bottom_curve[0][0] - bottom_apex[0],
+            bottom_curve[0][1] - bottom_apex[1],
+        )
+        self.assertAlmostEqual(
+            bottom_radius_vector[0] * bottom_tangent[0]
+            + bottom_radius_vector[1] * bottom_tangent[1],
+            0.0,
+        )
         self.assertEqual(
             edited_commands[: element.incoming_line_index],
             source_commands[: element.incoming_line_index],
@@ -1589,16 +1642,30 @@ class BrushElementTests(unittest.TestCase):
         self.assertEqual(starts[0].up_side.command_index, 6)
         self.assertEqual(result.adjusted_stroke_count, 1)
 
-    def test_short_exposed_vertical_start_uses_relative_side_length(self) -> None:
+    def test_short_exposed_vertical_start_clips_circle_at_contour_join(self) -> None:
         source = _short_vertical_start()
         commands = list(_commands(source))
 
         starts = _vertical_start_elements(commands)
         result = apply_brush_elements(source)
+        result_commands = _commands(result.path)
 
         self.assertEqual(len(starts), 1)
+        start = starts[0]
+        self.assertEqual(_vertical_design_scales(start, None)[0], 1.0)
         self.assertEqual(result.adjusted_stroke_count, 1)
-        self.assertIn(("lineTo", ((0.0, 0.0),)), _commands(result.path))
+        self.assertEqual(result_commands[-2][0], "curveTo")
+        join = result_commands[-2][1][-1]
+        self.assertAlmostEqual(
+            join[0] * start.axis[0] + join[1] * start.axis[1],
+            start.down_side.end[0] * start.axis[0]
+            + start.down_side.end[1] * start.axis[1],
+        )
+        self.assertNotAlmostEqual(
+            join[0] * start.across[0] + join[1] * start.across[1],
+            start.down_side.end[0] * start.across[0]
+            + start.down_side.end[1] * start.across[1],
+        )
 
     def test_segmented_vertical_starts_are_found_from_the_cap_marker(self) -> None:
         fixtures = {
@@ -1646,7 +1713,9 @@ class BrushElementTests(unittest.TestCase):
         self.assertEqual(starts[0].cap_command_count, 1)
         self.assertEqual(starts[0].post_move_cap_count, 0)
 
-    def test_short_complete_vertical_stroke_keeps_a_straight_body(self) -> None:
+    def test_short_complete_vertical_stroke_keeps_endpoint_curves_in_order(
+        self,
+    ) -> None:
         source = _short_complete_vertical_stroke()
         commands = list(_commands(source))
 
@@ -1670,8 +1739,12 @@ class BrushElementTests(unittest.TestCase):
             starts[0].side_command_indices,
             ends[0].side_command_indices,
         )
+        self.assertEqual(_vertical_design_scales(starts[0], ends[0])[0], 1.0)
         self.assertEqual(result.adjusted_stroke_count, 1)
-        self.assertGreaterEqual(math.dist(body_start, body_end), 0.99 * 40)
+        body_progress = (body_end[0] - body_start[0]) * starts[0].axis[0] + (
+            body_end[1] - body_start[1]
+        ) * starts[0].axis[1]
+        self.assertGreater(body_progress, 0.0)
 
     def test_vertical_start_requires_noto_control_point_relationship(self) -> None:
         source = _squat_vertical_start_lookalike()
@@ -1682,6 +1755,29 @@ class BrushElementTests(unittest.TestCase):
 
         self.assertEqual(starts, ())
         self.assertEqual(result.adjusted_stroke_count, 0)
+
+    def test_vertical_start_joins_each_side_independently(self) -> None:
+        start = _vertical_start_elements(list(_commands(_noto_vertical_stroke())))[0]
+        design = _vertical_start_design(start, 1.0)
+        basis = start.up_side.end
+
+        def down_depth(point: Point) -> float:
+            offset = point[0] - basis[0], point[1] - basis[1]
+            return offset[0] * start.axis[0] + offset[1] * start.axis[1]
+
+        left_depth = down_depth(design.left_body)
+        right_depth = down_depth(design.right_body)
+
+        self.assertAlmostEqual(left_depth, start.width * math.sqrt(5.0))
+        self.assertAlmostEqual(
+            right_depth,
+            start.width * (1.0 - 1.0 / math.sqrt(2.0)),
+        )
+        self.assertNotAlmostEqual(left_depth, right_depth)
+        self.assertAlmostEqual(
+            down_depth(design.right_apex),
+            0.0,
+        )
 
     def test_vertical_stroke_matches_selected_b_recipe(self) -> None:
         source = _noto_vertical_stroke()

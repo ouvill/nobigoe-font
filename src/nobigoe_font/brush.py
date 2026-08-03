@@ -34,6 +34,8 @@ _MIN_CLOSED_DOT_SIDE_TO_CAP_RATIO = 10.0
 _MIN_HOOK_OUTWARD_HORIZONTAL_RATIO = 0.75
 _MAX_HOOK_BASIS_DOT = 0.05
 _MAX_HORIZONTAL_STROKE_WIDTH = 80.0
+_HORIZONTAL_START_REFERENCE_WIDTH = 33.0
+_SILVER_RATIO = math.sqrt(2.0)
 
 
 @dataclass(frozen=True)
@@ -168,8 +170,10 @@ class _VerticalStartDesign:
     left_first_control: Point
     left_second_control: Point
     left_body: Point
-    right_top: Point
-    shoulder: Point
+    right_body: Point
+    right_first_control: Point
+    right_second_control: Point
+    right_apex: Point
     cap_first_control: Point
     cap_second_control: Point
 
@@ -524,22 +528,17 @@ def _vertical_design_scales(
         raise ValueError("Vertical design needs a start or end element")
     unit_scale = element.width / _VERTICAL_REFERENCE_WIDTH
 
-    # Keep a visible straight body between an exposed endpoint treatment and
-    # the next contour junction.  A fixed percentage alone leaves almost no
-    # stem on short components and when start and end share the same sides.
+    # Preserve the start's proportions.  On a short component its virtual
+    # circle is clipped where the contour reaches the next junction instead
+    # of being compressed along the stem axis.
+    start_scale = 1.0 if start is not None else 0.0
+
+    # The end still reserves a visible body because it has no analogous
+    # circle that can be cut at an intervening contour junction.
     def available_design_span(side: _LineSide) -> float:
         straight_body = min(element.width, 0.25 * side.length)
         return max(0.0, side.length - straight_body)
 
-    start_scale = (
-        min(
-            1.0,
-            available_design_span(element.down_side) / (200.0 * unit_scale),
-            available_design_span(element.up_side) / (20.0 * unit_scale),
-        )
-        if start is not None
-        else 0.0
-    )
     end_scale = (
         min(
             1.0,
@@ -555,24 +554,70 @@ def _vertical_design_scales(
             available_design_span(element.down_side) / (480.0 * unit_scale),
             available_design_span(element.up_side) / (260.0 * unit_scale),
         )
-        start_scale = min(start_scale, joint_scale)
         end_scale = min(end_scale, joint_scale)
     return start_scale, end_scale
+
+
+def _split_cubic_at_axis_depth(
+    start: Point,
+    first: Point,
+    second: Point,
+    end: Point,
+    axis: Point,
+    depth: float,
+) -> tuple[
+    tuple[Point, Point, Point, Point],
+    tuple[Point, Point, Point, Point],
+]:
+    start_depth = _dot(start, axis)
+    end_depth = _dot(end, axis)
+    if depth <= start_depth + _GEOMETRY_EPSILON:
+        return (start, start, start, start), (start, first, second, end)
+    if depth >= end_depth - _GEOMETRY_EPSILON:
+        return (start, first, second, end), (end, end, end, end)
+
+    lower = 0.0
+    upper = 1.0
+    for _ in range(32):
+        factor = (lower + upper) / 2.0
+        split = _split_cubic(start, first, second, end, factor)
+        split_depth = _dot(split[0][-1], axis)
+        if split_depth < depth:
+            lower = factor
+        else:
+            upper = factor
+    return _split_cubic(start, first, second, end, (lower + upper) / 2.0)
 
 
 def _vertical_start_design(
     element: _VerticalStartElement,
     axial_scale: float,
 ) -> _VerticalStartDesign:
-    # Source-space offsets reproduce the selected Genryu-based B recipe for
-    # Noto Serif JP U+4E28, normalized by its 68-unit source stem width.
-    def point(
-        anchor: Point,
-        across: float,
-        down: float,
-    ) -> Point:
+    # The two sides have different jobs.  The left join sits w√5 below
+    # the basis; the right brush placement uses its own short return and is
+    # deliberately not aligned to the left join.
+    width = _VERTICAL_REFERENCE_WIDTH
+    extension = width * (_SILVER_RATIO - 1.0) / 2.0
+    pressure = width * (1.0 - 1.0 / _SILVER_RATIO)
+    right_overhang = width * (_SILVER_RATIO - 1.0)
+    left_apex_down = -width / _SILVER_RATIO
+    left_body_down = width * math.sqrt(5.0)
+    left_run = left_body_down - left_apex_down
+    left_radius = (left_run * left_run + extension * extension) / (2.0 * extension)
+    left_handle = (
+        4.0
+        * left_radius
+        * extension
+        / (3.0 * (math.hypot(left_run, extension) + left_run))
+    )
+    left_tangent_down = (left_radius - extension) / left_radius
+    left_tangent_across = left_run / left_radius
+    cap_handle_ratio = 4.0 * (_SILVER_RATIO - 1.0) / 3.0
+    return_handle = pressure / (2.0 * _SILVER_RATIO)
+
+    def point(across: float, down: float) -> Point:
         return _vertical_design_point(
-            anchor,
+            element.up_side.end,
             element.axis,
             element.across,
             element.width,
@@ -581,17 +626,31 @@ def _vertical_start_design(
             axial_scale,
         )
 
-    left_anchor = element.down_side.start
-    right_anchor = element.up_side.end
+    left_apex_across = -width - extension
+    cap_left_basis = -width - pressure / 2.0
+    cap_left_control_across = cap_left_basis + cap_handle_ratio * (
+        right_overhang - cap_left_basis
+    )
     return _VerticalStartDesign(
-        left_apex=point(left_anchor, -11, -5),
-        left_first_control=point(left_anchor, -2, 50),
-        left_second_control=point(left_anchor, 2, 134),
-        left_body=point(left_anchor, 2, 200),
-        right_top=point(right_anchor, -1, 20),
-        shoulder=point(right_anchor, 16, 9),
-        cap_first_control=point(right_anchor, 34, -3),
-        cap_second_control=point(right_anchor, 34, -13),
+        left_apex=point(left_apex_across, left_apex_down),
+        left_first_control=point(
+            left_apex_across + left_handle * left_tangent_across,
+            left_apex_down + left_handle * left_tangent_down,
+        ),
+        left_second_control=point(
+            -width,
+            left_body_down - left_handle,
+        ),
+        left_body=point(-width, left_body_down),
+        right_body=point(0.0, pressure),
+        right_first_control=point(0.0, pressure - return_handle),
+        right_second_control=point(right_overhang, return_handle),
+        right_apex=point(right_overhang, 0.0),
+        cap_first_control=point(
+            right_overhang,
+            -cap_handle_ratio * right_overhang,
+        ),
+        cap_second_control=point(cap_left_control_across, left_apex_down),
     )
 
 
@@ -644,51 +703,43 @@ def _vertical_stroke_side_edits(
 
     down_replacement: list[Command] = []
     preserved_down_curve = False
+    clipped_start_curve = False
     if start_design is not None:
-        down_replacement.append(
-            (
-                "curveTo",
-                (
-                    start_design.left_first_control,
-                    start_design.left_second_control,
-                    start_design.left_body,
-                ),
-            )
+        if end_design is not None:
+            start_limit = _dot(end_design.left_body, element.axis)
+        elif down_operator == "curveTo":
+            start_limit = _dot(down_operands[-1], element.axis)
+        else:
+            start_limit = _dot(element.down_side.end, element.axis)
+
+        start_curve = (
+            start_design.left_apex,
+            start_design.left_first_control,
+            start_design.left_second_control,
+            start_design.left_body,
         )
-        down_current = start_design.left_body
-        if down_operator == "curveTo" and end_design is None:
-            target_depth = max(
-                0.0,
-                _dot(
-                    _subtract(start_design.left_body, element.down_side.start),
-                    element.axis,
-                ),
+        if start_limit < _dot(start_design.left_body, element.axis):
+            start_curve, _ = _split_cubic_at_axis_depth(
+                *start_curve,
+                element.axis,
+                start_limit,
             )
-            lower = 0.0
-            upper = 0.5
-            for _ in range(24):
-                factor = (lower + upper) / 2
-                split_point = _split_cubic(
-                    element.down_side.start,
-                    down_operands[0],
-                    down_operands[1],
-                    down_operands[2],
-                    factor,
-                )[0][-1]
-                depth = _dot(
-                    _subtract(split_point, element.down_side.start),
-                    element.axis,
-                )
-                if depth < target_depth:
-                    lower = factor
-                else:
-                    upper = factor
-            _, preserved = _split_cubic(
+            clipped_start_curve = True
+        down_replacement.append(("curveTo", start_curve[1:]))
+        down_current = start_curve[-1]
+
+        if (
+            down_operator == "curveTo"
+            and end_design is None
+            and not clipped_start_curve
+        ):
+            _, preserved = _split_cubic_at_axis_depth(
                 element.down_side.start,
                 down_operands[0],
                 down_operands[1],
                 down_operands[2],
-                (lower + upper) / 2,
+                element.axis,
+                _dot(start_design.left_body, element.axis),
             )
             join_offset = _subtract(start_design.left_body, preserved[0])
             down_replacement.append(
@@ -705,6 +756,7 @@ def _vertical_stroke_side_edits(
             preserved_down_curve = True
     else:
         down_current = element.down_side.start
+
     if end_design is not None:
         if math.dist(down_current, end_design.left_body) > _GEOMETRY_EPSILON:
             down_replacement.append(("lineTo", (end_design.left_body,)))
@@ -720,20 +772,21 @@ def _vertical_stroke_side_edits(
         )
     elif (
         not preserved_down_curve
+        and not clipped_start_curve
         and math.dist(down_current, element.down_side.end) > _GEOMETRY_EPSILON
     ):
         down_replacement.append(("lineTo", (element.down_side.end,)))
 
     up_replacement: list[Command] = []
     if up_operator == "curveTo" and start_design is not None and end_design is None:
-        endpoint_offset = _subtract(start_design.right_top, up_operands[2])
+        endpoint_offset = _subtract(start_design.right_body, up_operands[2])
         up_replacement.append(
             (
                 "curveTo",
                 (
                     up_operands[0],
                     _add(up_operands[1], endpoint_offset),
-                    start_design.right_top,
+                    start_design.right_body,
                 ),
             )
         )
@@ -753,7 +806,7 @@ def _vertical_stroke_side_edits(
         else:
             up_current = element.up_side.start
         up_target = (
-            start_design.right_top if start_design is not None else element.up_side.end
+            start_design.right_body if start_design is not None else element.up_side.end
         )
         if math.dist(up_current, up_target) > _GEOMETRY_EPSILON:
             up_replacement.append(("lineTo", (up_target,)))
@@ -776,7 +829,14 @@ def _edit_vertical_start_cap(
     design: _VerticalStartDesign,
 ) -> tuple[Command, ...]:
     return (
-        ("lineTo", (design.shoulder,)),
+        (
+            "curveTo",
+            (
+                design.right_first_control,
+                design.right_second_control,
+                design.right_apex,
+            ),
+        ),
         (
             "curveTo",
             (
@@ -940,48 +1000,81 @@ def _edit_horizontal_start(
     outgoing_end_override: Point | None = None,
 ) -> tuple[Command, ...]:
     outgoing_end = outgoing_end_override or element.outgoing_end
-    incoming_axis = (
-        _unit(_subtract(element.incoming_start, element.cap_start)) or element.axis
+    axis = element.axis
+    outward = element.incoming_outward
+    unit = element.width / _HORIZONTAL_START_REFERENCE_WIDTH
+    incoming_axis = _unit(_subtract(element.incoming_start, element.cap_start)) or axis
+
+    # Preserve design B's horizontal center while replacing its arbitrary
+    # apex and handle positions with a stroke-width-relative silver-ratio
+    # construction.
+    previous_top = _add(
+        _add(element.cap_start, _scale(incoming_axis, 10.0 * unit)),
+        _scale(outward, 4.0 * unit),
     )
-    unit = element.width / 33.0
+    previous_bottom = _add(
+        _add(element.cap_end, _scale(axis, 28.0 * unit)),
+        _scale(outward, -7.0 * unit),
+    )
+    midpoint_along = (_dot(previous_top, axis) + _dot(previous_bottom, axis)) / 2.0
 
-    def point(
-        anchor: Point,
-        axis: Point,
-        along: float,
-        outward: float,
-    ) -> Point:
-        return _add(
-            _add(anchor, _scale(axis, along * unit)),
-            _scale(element.incoming_outward, outward * unit),
+    expanded_height = _SILVER_RATIO * element.width
+    extension = (expanded_height - element.width) / 2.0
+    apex_separation = element.width / _SILVER_RATIO
+    top_along = midpoint_along - apex_separation / 2.0
+    bottom_along = midpoint_along + apex_separation / 2.0
+    top_base = _dot(element.cap_start, outward)
+    bottom_base = _dot(element.cap_end, outward)
+
+    def local(along: float, away: float) -> Point:
+        return _add(_scale(axis, along), _scale(outward, away))
+
+    top_apex = local(top_along, top_base + extension)
+    bottom_apex = local(bottom_along, bottom_base - extension)
+    cap_length = math.hypot(expanded_height, apex_separation)
+    bottom_run = _SILVER_RATIO * cap_length
+    shared_join_along = bottom_along + bottom_run
+    top_run = shared_join_along - top_along
+
+    def circular_arc(
+        apex_along: float,
+        base_away: float,
+        run: float,
+        side: float,
+    ) -> tuple[Point, Point, Point, Point]:
+        radius = (run * run + extension * extension) / (2.0 * extension)
+        handle = 4.0 * radius * extension / (3.0 * (math.hypot(run, extension) + run))
+        tangent_along = (radius - extension) / radius
+        tangent_away = run / radius
+        apex = local(apex_along, base_away + side * extension)
+        first_control = local(
+            apex_along + handle * tangent_along,
+            base_away + side * extension - side * handle * tangent_away,
         )
+        second_control = local(
+            apex_along + run - handle,
+            base_away,
+        )
+        body = local(apex_along + run, base_away)
+        return apex, first_control, second_control, body
 
-    # Selected design B uses the 33-unit Noto cap as its local basis.  Keep
-    # the upper and lower handles on their respective incoming/outgoing axes
-    # instead of deriving them from unrelated interpolation factors.
-    incoming_body = point(element.cap_start, incoming_axis, 143.0, 0.0)
-    new_cap_start = point(element.cap_start, incoming_axis, 10.0, 4.0)
-    new_cap_end = point(element.cap_end, element.axis, 28.0, -7.0)
-    outgoing_body = point(element.cap_end, element.axis, 178.0, 0.0)
+    top_apex, top_first, top_second, top_body = circular_arc(
+        top_along,
+        top_base,
+        top_run,
+        1.0,
+    )
+    bottom_apex, bottom_first, bottom_second, bottom_body = circular_arc(
+        bottom_along,
+        bottom_base,
+        bottom_run,
+        -1.0,
+    )
     return (
-        ("lineTo", (incoming_body,)),
-        (
-            "curveTo",
-            (
-                point(element.cap_start, incoming_axis, 98.0, 1.0),
-                point(element.cap_start, incoming_axis, 54.0, 3.0),
-                new_cap_start,
-            ),
-        ),
-        ("lineTo", (new_cap_end,)),
-        (
-            "curveTo",
-            (
-                point(element.cap_end, element.axis, 78.0, -5.0),
-                point(element.cap_end, element.axis, 126.0, -1.0),
-                outgoing_body,
-            ),
-        ),
+        ("lineTo", (top_body,)),
+        ("curveTo", (top_second, top_first, top_apex)),
+        ("lineTo", (bottom_apex,)),
+        ("curveTo", (bottom_first, bottom_second, bottom_body)),
         ("lineTo", (outgoing_end,)),
     )
 
