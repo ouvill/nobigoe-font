@@ -1,6 +1,7 @@
 """Build Nobigoe font families with extensible punctuation."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 
 from collections.abc import Mapping, Sequence
 import math
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path
+import statistics
 from tempfile import TemporaryDirectory
 
 from .profiles import (
@@ -16,7 +18,6 @@ from .profiles import (
     FontIdentity,
     KanaStyle,
     LatinBuildProfile,
-    NOTO_CHOON_STROKE_ADJUSTMENTS,
     SHIPPORI_COPYRIGHT,
     SHIPPORI_STROKE_ADJUSTMENTS,
 )
@@ -77,6 +78,34 @@ MANGA_WAVE_GLYPH_COUNT = 11
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 WAVE_STROKE_MODULATION = 0.3
 NEW_GLYPH_COUNT = 6
+
+CONNECTED_STROKE_REFERENCE_CODEPOINTS = tuple(
+    ord(character)
+    for character in "あいうえおかきくけこさしすせそたちつてとなにぬねの"
+    "はひふへほまみむめもやゆよらりるれろわをん"
+)
+
+
+@dataclass(frozen=True)
+class ConnectedStrokeWidths:
+    horizontal: float
+    vertical: float
+
+
+@dataclass(frozen=True)
+class OrientedStrokeScales:
+    horizontal: float
+    vertical: float
+
+
+@dataclass(frozen=True)
+class WaveStrokeModel:
+    default: OrientedStrokeScales
+    relaxed: OrientedStrokeScales
+    one_cycle: OrientedStrokeScales
+    manga: OrientedStrokeScales
+
+
 OVERLAP = 0
 
 
@@ -395,6 +424,57 @@ def stroke_band(outline: pathops.Path, axis: str, seam: float) -> tuple[int, int
     return inner_low, inner_high
 
 
+def connected_stroke_widths(
+    horizontal_outlines: Sequence[pathops.Path],
+    vertical_outlines: Sequence[pathops.Path],
+) -> ConnectedStrokeWidths:
+    if not horizontal_outlines or not vertical_outlines:
+        raise ValueError("Connected stroke references cannot be empty")
+    return ConnectedStrokeWidths(
+        statistics.median(
+            _font_geometry.optical_stroke_width(outline)
+            for outline in horizontal_outlines
+        ),
+        statistics.median(
+            _font_geometry.optical_stroke_width(outline)
+            for outline in vertical_outlines
+        ),
+    )
+
+
+def normalize_linear_stroke_width(
+    outline: pathops.Path,
+    axis: str,
+    seam: float,
+    advance: int,
+    target: float,
+) -> pathops.Path:
+    if not 0 < target < advance:
+        raise ValueError("Connected stroke width must be between zero and the advance")
+    low, high = stroke_band(outline, axis, seam)
+    width = high - low
+    center = (low + high) / 2
+    ideal_width = target * advance / (advance - target)
+    candidates: list[tuple[float, pathops.Path]] = []
+    for candidate_width in range(
+        max(1, math.floor(ideal_width) - 3),
+        math.ceil(ideal_width) + 4,
+    ):
+        scale = candidate_width / width
+        if axis == "horizontal":
+            transform = Transform(1, 0, 0, scale, 0, center * (1 - scale))
+        elif axis == "vertical":
+            transform = Transform(scale, 0, 0, 1, center * (1 - scale), 0)
+        else:
+            raise ValueError(f"Unsupported linear stroke axis {axis!r}")
+        candidate = _font_geometry.transform_path(outline, transform)
+        candidate_low, candidate_high = stroke_band(candidate, axis, seam)
+        actual_width = candidate_high - candidate_low
+        optical_width = advance * actual_width / (advance + actual_width)
+        candidates.append((abs(optical_width - target), candidate))
+    return min(candidates, key=lambda item: item[0])[1]
+
+
 def make_horizontal_parts(
     outline: pathops.Path, advance: int
 ) -> tuple[pathops.Path, pathops.Path, pathops.Path]:
@@ -428,30 +508,6 @@ def flatten_horizontal_centerline(outline: pathops.Path, advance: int) -> pathop
         outline,
         Transform(1, -slope, 0, 1, 0, slope * seam),
     )
-
-
-def adjust_linear_stroke_width(
-    outline: pathops.Path,
-    axis: str,
-    seam: float,
-    amount: float,
-) -> pathops.Path:
-    if amount == 0:
-        return outline
-    low, high = stroke_band(outline, axis, seam)
-    width = high - low
-    adjusted_width = width + amount
-    if adjusted_width <= 0:
-        raise ValueError("Linear stroke adjustment must retain a positive width")
-    scale = adjusted_width / width
-    center = (low + high) / 2
-    if axis == "horizontal":
-        transform = Transform(1, 0, 0, scale, 0, center * (1 - scale))
-    elif axis == "vertical":
-        transform = Transform(scale, 0, 0, 1, center * (1 - scale), 0)
-    else:
-        raise ValueError(f"Unsupported linear stroke axis {axis!r}")
-    return _font_geometry.transform_path(outline, transform)
 
 
 def make_vertical_parts(
@@ -495,6 +551,8 @@ def make_sine_wave_tile(
     end_margin: float = 0,
     sample_peak_position: float | None = None,
     sample_trough_position: float | None = None,
+    start_stroke_scale: float = 1,
+    end_stroke_scale: float | None = None,
 ) -> pathops.Path:
     if sample_peak_position is None:
         sample_peak_position = advance / 4
@@ -520,6 +578,11 @@ def make_sine_wave_tile(
     ) / 2
     crossing_thickness = sample_crossing_max - sample_crossing_min
     direction = -1 if inverted else 1
+    final_stroke_scale = (
+        start_stroke_scale if end_stroke_scale is None else end_stroke_scale
+    )
+    if start_stroke_scale <= 0 or final_stroke_scale <= 0:
+        raise ValueError("Wave stroke scales must be positive")
     final_half_waves = half_waves if end_half_waves is None else end_half_waves
     taper_length = advance * taper_fraction
     drawing_start = start_margin if taper_start else 0.0
@@ -578,7 +641,11 @@ def make_sine_wave_tile(
         return phase, phase_velocity
 
     def width_at(position: float) -> float:
-        scale = 1.0
+        progress = position / advance
+        stroke_scale = start_stroke_scale + (
+            final_stroke_scale - start_stroke_scale
+        ) * smoothstep(progress)
+        scale = stroke_scale
         if taper_start:
             progress = min(
                 1.0,
@@ -667,377 +734,428 @@ def make_sine_wave_tile(
     return tile
 
 
+def _wave_stroke_scale(
+    source: pathops.Path,
+    advance: int,
+    target: float,
+    *,
+    half_waves: float,
+    phase_offset_half_waves: float,
+    amplitude_scale: float = 1,
+) -> float:
+    lower, upper = 0.25, 4.0
+    for _ in range(24):
+        scale = (lower + upper) / 2
+        outline = make_sine_wave_tile(
+            source,
+            advance,
+            half_waves=half_waves,
+            phase_offset_half_waves=phase_offset_half_waves,
+            amplitude_scale=amplitude_scale,
+            terminal_phase_extension_half_waves=0,
+            start_stroke_scale=scale,
+        )
+        if _font_geometry.optical_stroke_width(outline) < target:
+            lower = scale
+        else:
+            upper = scale
+    return (lower + upper) / 2
+
+
+def _oriented_wave_stroke_scales(
+    source: pathops.Path,
+    advance: int,
+    widths: ConnectedStrokeWidths,
+    *,
+    half_waves: float,
+    phase_offset_half_waves: float,
+    amplitude_scale: float = 1,
+) -> OrientedStrokeScales:
+    return OrientedStrokeScales(
+        *(
+            _wave_stroke_scale(
+                source,
+                advance,
+                target,
+                half_waves=half_waves,
+                phase_offset_half_waves=phase_offset_half_waves,
+                amplitude_scale=amplitude_scale,
+            )
+            for target in (widths.horizontal, widths.vertical)
+        )
+    )
+
+
+def make_wave_stroke_model(
+    source: pathops.Path,
+    advance: int,
+    widths: ConnectedStrokeWidths,
+) -> WaveStrokeModel:
+    return WaveStrokeModel(
+        default=_oriented_wave_stroke_scales(
+            source,
+            advance,
+            widths,
+            half_waves=3,
+            phase_offset_half_waves=-0.5,
+        ),
+        relaxed=_oriented_wave_stroke_scales(
+            source,
+            advance,
+            widths,
+            half_waves=2.5,
+            phase_offset_half_waves=-0.25,
+        ),
+        one_cycle=_oriented_wave_stroke_scales(
+            source,
+            advance,
+            widths,
+            half_waves=2,
+            phase_offset_half_waves=-0.5,
+            amplitude_scale=1.2,
+        ),
+        manga=_oriented_wave_stroke_scales(
+            source,
+            advance,
+            widths,
+            half_waves=4,
+            phase_offset_half_waves=0,
+        ),
+    )
+
+
+def _vertical_wave_parts(
+    outlines: Sequence[pathops.Path],
+    advance: int,
+    vertical_origin: int,
+    center_y: float,
+) -> tuple[pathops.Path, ...]:
+    rotation = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + center_y,
+        vertical_origin,
+    )
+    return tuple(
+        _font_geometry.transform_path(outline, rotation) for outline in outlines
+    )
+
+
 def make_wave_parts(
-    source: pathops.Path, advance: int, vertical_origin: int
+    source: pathops.Path,
+    advance: int,
+    vertical_origin: int,
+    stroke_model: WaveStrokeModel | None = None,
 ) -> tuple[pathops.Path, ...]:
     source_x_min, _, source_x_max, _ = source.bounds
     start_margin = max(0.0, source_x_min)
     end_margin = max(0.0, advance - source_x_max)
-    parameters = {
-        "half_waves": 3,
-        "phase_offset_half_waves": -0.5,
-        "terminal_phase_extension_half_waves": 0,
-    }
-    horizontal = (
-        make_sine_wave_tile(
-            source,
-            advance,
-            taper_start=True,
-            start_margin=start_margin,
-            **parameters,
-        ),
-        make_sine_wave_tile(source, advance, **parameters),
-        make_sine_wave_tile(source, advance, inverted=True, **parameters),
-        make_sine_wave_tile(
-            source,
-            advance,
-            taper_end=True,
-            end_margin=end_margin,
-            **parameters,
-        ),
-        make_sine_wave_tile(
-            source,
-            advance,
-            inverted=True,
-            taper_end=True,
-            end_margin=end_margin,
-            **parameters,
-        ),
+
+    def variants(scale: float) -> tuple[pathops.Path, ...]:
+        def tile(
+            *,
+            inverted: bool = False,
+            taper_start: bool = False,
+            taper_end: bool = False,
+        ) -> pathops.Path:
+            return make_sine_wave_tile(
+                source,
+                advance,
+                half_waves=3,
+                phase_offset_half_waves=-0.5,
+                terminal_phase_extension_half_waves=0,
+                start_stroke_scale=scale,
+                inverted=inverted,
+                taper_start=taper_start,
+                taper_end=taper_end,
+                start_margin=start_margin,
+                end_margin=end_margin,
+            )
+
+        return (
+            tile(taper_start=True),
+            tile(),
+            tile(inverted=True),
+            tile(taper_end=True),
+            tile(inverted=True, taper_end=True),
+        )
+
+    scales = (
+        stroke_model.default if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    tile_center_y = (horizontal[1].bounds[1] + horizontal[1].bounds[3]) / 2
-    vertical_phase_flip = Transform(
-        0,
-        -1,
-        -1,
-        0,
-        advance / 2 + tile_center_y,
-        vertical_origin,
+    horizontal = variants(scales.horizontal)
+    vertical_source = (
+        horizontal
+        if scales.vertical == scales.horizontal
+        else variants(scales.vertical)
     )
-    vertical = tuple(
-        _font_geometry.transform_path(outline, vertical_phase_flip)
-        for outline in horizontal
+    center_y = (horizontal[1].bounds[1] + horizontal[1].bounds[3]) / 2
+    return horizontal + _vertical_wave_parts(
+        vertical_source, advance, vertical_origin, center_y
     )
-    return horizontal + vertical
 
 
 def make_manga_to_wave_transition_parts(
-    source: pathops.Path, advance: int, vertical_origin: int
+    source: pathops.Path,
+    advance: int,
+    vertical_origin: int,
+    stroke_model: WaveStrokeModel | None = None,
 ) -> tuple[pathops.Path, ...]:
     _, _, source_x_max, _ = source.bounds
     end_margin = max(0.0, advance - source_x_max)
-    horizontal_middle = make_sine_wave_tile(
-        source,
-        advance,
-        half_waves=4,
-        end_half_waves=3,
-        terminal_phase_extension_half_waves=0,
+
+    def variants(start_scale: float, end_scale: float) -> tuple[pathops.Path, ...]:
+        def transition(*, inverted: bool, taper_end: bool) -> pathops.Path:
+            return make_sine_wave_tile(
+                source,
+                advance,
+                inverted=inverted,
+                taper_end=taper_end,
+                end_margin=end_margin if taper_end else 0,
+                half_waves=4,
+                end_half_waves=3,
+                terminal_phase_extension_half_waves=0,
+                start_stroke_scale=start_scale,
+                end_stroke_scale=end_scale,
+            )
+
+        return (
+            transition(inverted=False, taper_end=False),
+            transition(inverted=False, taper_end=True),
+            transition(inverted=True, taper_end=False),
+            transition(inverted=True, taper_end=True),
+        )
+
+    manga_scales = (
+        stroke_model.manga if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    horizontal_end = make_sine_wave_tile(
-        source,
-        advance,
-        taper_end=True,
-        end_margin=end_margin,
-        half_waves=4,
-        end_half_waves=3,
-        terminal_phase_extension_half_waves=0,
+    wave_scales = (
+        stroke_model.default if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    horizontal_inverted_middle = make_sine_wave_tile(
-        source,
-        advance,
-        inverted=True,
-        half_waves=4,
-        end_half_waves=3,
-        terminal_phase_extension_half_waves=0,
+    horizontal = variants(manga_scales.horizontal, wave_scales.horizontal)
+    vertical_source = variants(manga_scales.vertical, wave_scales.vertical)
+    center_y = (horizontal[0].bounds[1] + horizontal[0].bounds[3]) / 2
+    return horizontal + _vertical_wave_parts(
+        vertical_source, advance, vertical_origin, center_y
     )
-    horizontal_inverted_end = make_sine_wave_tile(
-        source,
-        advance,
-        inverted=True,
-        taper_end=True,
-        end_margin=end_margin,
-        half_waves=4,
-        end_half_waves=3,
-        terminal_phase_extension_half_waves=0,
-    )
-    horizontal = (
-        horizontal_middle,
-        horizontal_end,
-        horizontal_inverted_middle,
-        horizontal_inverted_end,
-    )
-    tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
-    vertical_rotation = Transform(
-        0,
-        -1,
-        -1,
-        0,
-        advance / 2 + tile_center_y,
-        vertical_origin,
-    )
-    vertical = tuple(
-        _font_geometry.transform_path(outline, vertical_rotation)
-        for outline in horizontal
-    )
-    return horizontal + vertical
 
 
 def make_wave_to_manga_transition_parts(
-    source: pathops.Path, advance: int, vertical_origin: int
+    source: pathops.Path,
+    advance: int,
+    vertical_origin: int,
+    stroke_model: WaveStrokeModel | None = None,
 ) -> tuple[pathops.Path, ...]:
     _, _, source_x_max, _ = source.bounds
     end_margin = max(0.0, advance - source_x_max)
 
-    def transition(phase_offset: float, *, taper_end: bool) -> pathops.Path:
-        return make_sine_wave_tile(
-            source,
-            advance,
-            taper_end=taper_end,
-            end_margin=end_margin if taper_end else 0,
-            half_waves=3,
-            end_half_waves=4,
-            phase_offset_half_waves=phase_offset,
-            taper_fraction=1 / 6,
+    def variants(start_scale: float, end_scale: float) -> tuple[pathops.Path, ...]:
+        def transition(phase_offset: float, *, taper_end: bool) -> pathops.Path:
+            return make_sine_wave_tile(
+                source,
+                advance,
+                taper_end=taper_end,
+                end_margin=end_margin if taper_end else 0,
+                half_waves=3,
+                end_half_waves=4,
+                phase_offset_half_waves=phase_offset,
+                taper_fraction=1 / 6,
+                start_stroke_scale=start_scale,
+                end_stroke_scale=end_scale,
+            )
+
+        return (
+            transition(0.5, taper_end=False),
+            transition(0.5, taper_end=True),
+            transition(-0.5, taper_end=False),
+            transition(-0.5, taper_end=True),
         )
 
-    horizontal = (
-        transition(0.5, taper_end=False),
-        transition(0.5, taper_end=True),
-        transition(-0.5, taper_end=False),
-        transition(-0.5, taper_end=True),
+    wave_scales = (
+        stroke_model.default if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    tile_center_y = (horizontal[0].bounds[1] + horizontal[0].bounds[3]) / 2
-    vertical_rotation = Transform(
-        0,
-        -1,
-        -1,
-        0,
-        advance / 2 + tile_center_y,
-        vertical_origin,
+    manga_scales = (
+        stroke_model.manga if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    vertical = tuple(
-        _font_geometry.transform_path(outline, vertical_rotation)
-        for outline in horizontal
+    horizontal = variants(wave_scales.horizontal, manga_scales.horizontal)
+    vertical_source = variants(wave_scales.vertical, manga_scales.vertical)
+    center_y = (horizontal[0].bounds[1] + horizontal[0].bounds[3]) / 2
+    return horizontal + _vertical_wave_parts(
+        vertical_source, advance, vertical_origin, center_y
     )
-    return horizontal + vertical
 
 
 def make_relaxed_wave_parts(
-    source: pathops.Path, advance: int, vertical_origin: int
+    source: pathops.Path,
+    advance: int,
+    vertical_origin: int,
+    stroke_model: WaveStrokeModel | None = None,
 ) -> tuple[pathops.Path, ...]:
     source_x_min, _, source_x_max, _ = source.bounds
     start_margin = max(0.0, source_x_min)
     end_margin = max(0.0, advance - source_x_max)
-    parameters = {
-        "half_waves": 2.5,
-        "terminal_phase_extension_half_waves": 0,
-    }
     phase_offsets = (-0.25, 0.25, 0.75, 1.25)
-    horizontal_isolated = make_sine_wave_tile(
-        source,
-        advance,
-        taper_start=True,
-        taper_end=True,
-        start_margin=start_margin,
-        end_margin=end_margin,
-        phase_offset_half_waves=phase_offsets[0],
-        **parameters,
-    )
-    horizontal_start = make_sine_wave_tile(
-        source,
-        advance,
-        taper_start=True,
-        start_margin=start_margin,
-        phase_offset_half_waves=phase_offsets[0],
-        **parameters,
-    )
-    horizontal_middle = tuple(
-        make_sine_wave_tile(
-            source,
-            advance,
-            phase_offset_half_waves=phase_offset,
-            **parameters,
+
+    def variants(scale: float) -> tuple[pathops.Path, ...]:
+        def wave(
+            phase_offset: float,
+            *,
+            taper_start: bool = False,
+            taper_end: bool = False,
+        ) -> pathops.Path:
+            return make_sine_wave_tile(
+                source,
+                advance,
+                taper_start=taper_start,
+                taper_end=taper_end,
+                start_margin=start_margin if taper_start else 0,
+                end_margin=end_margin if taper_end else 0,
+                half_waves=2.5,
+                phase_offset_half_waves=phase_offset,
+                terminal_phase_extension_half_waves=0,
+                start_stroke_scale=scale,
+            )
+
+        return (
+            wave(phase_offsets[0], taper_start=True, taper_end=True),
+            wave(phase_offsets[0], taper_start=True),
+            *(wave(phase_offset) for phase_offset in phase_offsets),
+            *(wave(phase_offset, taper_end=True) for phase_offset in phase_offsets),
         )
-        for phase_offset in phase_offsets
+
+    scales = (
+        stroke_model.relaxed if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    horizontal_end = tuple(
-        make_sine_wave_tile(
-            source,
-            advance,
-            taper_end=True,
-            end_margin=end_margin,
-            phase_offset_half_waves=phase_offset,
-            **parameters,
-        )
-        for phase_offset in phase_offsets
+    horizontal = variants(scales.horizontal)
+    vertical_source = (
+        horizontal
+        if scales.vertical == scales.horizontal
+        else variants(scales.vertical)
     )
-    horizontal = (
-        horizontal_isolated,
-        horizontal_start,
-        *horizontal_middle,
-        *horizontal_end,
+    center_y = (horizontal[2].bounds[1] + horizontal[2].bounds[3]) / 2
+    return horizontal + _vertical_wave_parts(
+        vertical_source, advance, vertical_origin, center_y
     )
-    tile_center_y = (
-        horizontal_middle[0].bounds[1] + horizontal_middle[0].bounds[3]
-    ) / 2
-    vertical_rotation = Transform(
-        0,
-        -1,
-        -1,
-        0,
-        advance / 2 + tile_center_y,
-        vertical_origin,
-    )
-    vertical = tuple(
-        _font_geometry.transform_path(outline, vertical_rotation)
-        for outline in horizontal
-    )
-    return horizontal + vertical
 
 
 def make_one_cycle_wave_parts(
-    source: pathops.Path, advance: int, vertical_origin: int
+    source: pathops.Path,
+    advance: int,
+    vertical_origin: int,
+    stroke_model: WaveStrokeModel | None = None,
 ) -> tuple[pathops.Path, ...]:
     source_x_min, _, source_x_max, _ = source.bounds
     start_margin = max(0.0, source_x_min)
     end_margin = max(0.0, advance - source_x_max)
-    parameters = {
-        "half_waves": 2,
-        "amplitude_scale": 1.2,
-        "phase_offset_half_waves": -0.5,
-        "terminal_phase_extension_half_waves": 0,
-        "taper_fraction": 1 / 6,
-    }
-    horizontal_middle = make_sine_wave_tile(source, advance, **parameters)
-    horizontal = (
-        make_sine_wave_tile(
-            source,
-            advance,
-            taper_start=True,
-            taper_end=True,
-            start_margin=start_margin,
-            end_margin=end_margin,
-            **parameters,
-        ),
-        make_sine_wave_tile(
-            source,
-            advance,
-            taper_start=True,
-            start_margin=start_margin,
-            **parameters,
-        ),
-        horizontal_middle,
-        make_sine_wave_tile(
-            source,
-            advance,
-            taper_end=True,
-            end_margin=end_margin,
-            **parameters,
-        ),
+
+    def variants(scale: float) -> tuple[pathops.Path, ...]:
+        def wave(
+            *,
+            taper_start: bool = False,
+            taper_end: bool = False,
+        ) -> pathops.Path:
+            return make_sine_wave_tile(
+                source,
+                advance,
+                taper_start=taper_start,
+                taper_end=taper_end,
+                start_margin=start_margin if taper_start else 0,
+                end_margin=end_margin if taper_end else 0,
+                half_waves=2,
+                amplitude_scale=1.2,
+                phase_offset_half_waves=-0.5,
+                terminal_phase_extension_half_waves=0,
+                taper_fraction=1 / 6,
+                start_stroke_scale=scale,
+            )
+
+        return (
+            wave(taper_start=True, taper_end=True),
+            wave(taper_start=True),
+            wave(),
+            wave(taper_end=True),
+        )
+
+    scales = (
+        stroke_model.one_cycle
+        if stroke_model is not None
+        else OrientedStrokeScales(1, 1)
     )
-    tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
-    vertical_rotation = Transform(
-        0,
-        -1,
-        -1,
-        0,
-        advance / 2 + tile_center_y,
-        vertical_origin,
+    horizontal = variants(scales.horizontal)
+    vertical_source = (
+        horizontal
+        if scales.vertical == scales.horizontal
+        else variants(scales.vertical)
     )
-    vertical = tuple(
-        _font_geometry.transform_path(outline, vertical_rotation)
-        for outline in horizontal
+    center_y = (horizontal[2].bounds[1] + horizontal[2].bounds[3]) / 2
+    return horizontal + _vertical_wave_parts(
+        vertical_source, advance, vertical_origin, center_y
     )
-    return horizontal + vertical
 
 
 def make_manga_wave_parts(
-    source: pathops.Path, advance: int, vertical_origin: int
+    source: pathops.Path,
+    advance: int,
+    vertical_origin: int,
+    stroke_model: WaveStrokeModel | None = None,
 ) -> tuple[pathops.Path, tuple[pathops.Path, ...]]:
     source_x_min, _, source_x_max, _ = source.bounds
     start_margin = max(0.0, source_x_min)
     end_margin = max(0.0, advance - source_x_max)
-    parameters = {
-        "half_waves": 4,
-        "taper_fraction": 1 / 6,
-    }
-    horizontal_isolated = make_sine_wave_tile(
-        source,
-        advance,
-        taper_start=True,
-        taper_end=True,
-        start_margin=start_margin,
-        end_margin=end_margin,
-        **parameters,
-    )
-    horizontal_start = make_sine_wave_tile(
-        source,
-        advance,
-        taper_start=True,
-        start_margin=start_margin,
-        **parameters,
-    )
-    horizontal_middle = make_sine_wave_tile(source, advance, **parameters)
-    horizontal_end = make_sine_wave_tile(
-        source,
-        advance,
-        taper_end=True,
-        end_margin=end_margin,
-        **parameters,
-    )
-    horizontal_inverted_middle = make_sine_wave_tile(
-        source,
-        advance,
-        inverted=True,
-        half_waves=4,
-        taper_fraction=1 / 6,
-    )
-    horizontal_inverted_end = make_sine_wave_tile(
-        source,
-        advance,
-        inverted=True,
-        taper_end=True,
-        end_margin=end_margin,
-        half_waves=4,
-        taper_fraction=1 / 6,
-    )
-    tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
-    vertical_rotation = Transform(
-        0,
-        -1,
-        -1,
-        0,
-        advance / 2 + tile_center_y,
-        vertical_origin,
-    )
-    vertical = tuple(
-        _font_geometry.transform_path(outline, vertical_rotation)
-        for outline in (
-            horizontal_isolated,
-            horizontal_start,
-            horizontal_middle,
-            horizontal_end,
-            horizontal_inverted_middle,
-            horizontal_inverted_end,
+
+    def variants(scale: float) -> tuple[pathops.Path, ...]:
+        def wave(
+            *,
+            inverted: bool = False,
+            taper_start: bool = False,
+            taper_end: bool = False,
+        ) -> pathops.Path:
+            return make_sine_wave_tile(
+                source,
+                advance,
+                inverted=inverted,
+                taper_start=taper_start,
+                taper_end=taper_end,
+                start_margin=start_margin if taper_start else 0,
+                end_margin=end_margin if taper_end else 0,
+                half_waves=4,
+                taper_fraction=1 / 6,
+                start_stroke_scale=scale,
+            )
+
+        return (
+            wave(taper_start=True, taper_end=True),
+            wave(taper_start=True),
+            wave(),
+            wave(taper_end=True),
+            wave(inverted=True),
+            wave(inverted=True, taper_end=True),
         )
+
+    scales = (
+        stroke_model.manga if stroke_model is not None else OrientedStrokeScales(1, 1)
     )
-    added = (
-        horizontal_start,
-        horizontal_middle,
-        horizontal_end,
-        horizontal_inverted_middle,
-        horizontal_inverted_end,
-        *vertical,
+    horizontal = variants(scales.horizontal)
+    vertical_source = (
+        horizontal
+        if scales.vertical == scales.horizontal
+        else variants(scales.vertical)
     )
-    return horizontal_isolated, added
+    center_y = (horizontal[2].bounds[1] + horizontal[2].bounds[3]) / 2
+    vertical = _vertical_wave_parts(vertical_source, advance, vertical_origin, center_y)
+    added = (*horizontal[1:], *vertical)
+    return horizontal[0], added
 
 
 def add_linear_extension(
     font: TTFont,
     base: str,
     names: list[str],
+    stroke_widths: ConnectedStrokeWidths,
     *,
     flatten_horizontal: bool = False,
-    stroke_adjustment: float = 0,
 ) -> tuple[str, list[str]]:
     vertical = _font_operations.find_vertical_glyph(font, base)
     advance = font["hmtx"].metrics[base][0]
@@ -1047,20 +1165,22 @@ def add_linear_extension(
     horizontal_outline = _font_geometry.glyph_path(font, base)
     if flatten_horizontal:
         horizontal_outline = flatten_horizontal_centerline(horizontal_outline, advance)
-    horizontal_outline = adjust_linear_stroke_width(
+    horizontal_outline = normalize_linear_stroke_width(
         horizontal_outline,
         "horizontal",
         advance / 2,
-        stroke_adjustment,
+        advance,
+        stroke_widths.horizontal,
     )
     horizontal_parts = make_horizontal_parts(horizontal_outline, advance)
     _, _, _, vertical_y_max = _font_geometry.bounds(font, vertical)
     vertical_origin = round(font["vmtx"].metrics[vertical][1] + vertical_y_max)
-    vertical_outline = adjust_linear_stroke_width(
+    vertical_outline = normalize_linear_stroke_width(
         _font_geometry.glyph_path(font, vertical),
         "vertical",
         advance * 0.4,
-        stroke_adjustment,
+        advance,
+        stroke_widths.vertical,
     )
     vertical_parts = make_vertical_parts(vertical_outline, advance, vertical_origin)
     _font_operations.append_glyphs(
@@ -1523,6 +1643,16 @@ def build(
         for pair in _mark_positioning.KOBURI_HEART_MARK_PAIRS
         if pair not in native_heart_outputs
     ]
+    reference_names = [
+        cmap[codepoint] for codepoint in CONNECTED_STROKE_REFERENCE_CODEPOINTS
+    ]
+    reference_vertical_names = [
+        _font_operations.vertical_glyph_or_self(font, name) for name in reference_names
+    ]
+    stroke_widths = connected_stroke_widths(
+        [_font_geometry.glyph_path(font, name) for name in reference_names],
+        [_font_geometry.glyph_path(font, name) for name in reference_vertical_names],
+    )
 
     allocated_names = _font_operations.allocate_cid_names(
         font,
@@ -1550,12 +1680,8 @@ def build(
             font,
             base,
             names,
+            stroke_widths,
             flatten_horizontal=codepoint == 0x30FC,
-            stroke_adjustment=(
-                NOTO_CHOON_STROKE_ADJUSTMENTS[identity.weight_class]
-                if base_type == "noto" and codepoint == 0x30FC
-                else 0
-            ),
         )
         extensions.append((prefix, base, vertical, names))
 
@@ -1565,10 +1691,12 @@ def build(
     wave_vertical_origin = round(
         font["vmtx"].metrics[wave_vertical][1] + wave_vertical_y_max
     )
+    wave_outline = _font_geometry.glyph_path(font, wave_base)
+    wave_stroke_model = make_wave_stroke_model(wave_outline, 1000, stroke_widths)
     wave_start = len(linear_codepoints) * NEW_GLYPH_COUNT
     wave_names = allocated_names[wave_start : wave_start + WAVE_GLYPH_COUNT]
     wave_parts = make_wave_parts(
-        _font_geometry.glyph_path(font, wave_base), 1000, wave_vertical_origin
+        wave_outline, 1000, wave_vertical_origin, wave_stroke_model
     )
     _font_operations.append_glyphs(
         font,
@@ -1585,9 +1713,7 @@ def build(
         relaxed_wave_start : relaxed_wave_start + RELAXED_WAVE_GLYPH_COUNT
     ]
     relaxed_wave_parts = make_relaxed_wave_parts(
-        _font_geometry.glyph_path(font, wave_base),
-        1000,
-        wave_vertical_origin,
+        wave_outline, 1000, wave_vertical_origin, wave_stroke_model
     )
     _font_operations.append_glyphs(
         font,
@@ -1603,9 +1729,7 @@ def build(
         one_cycle_wave_start : one_cycle_wave_start + ONE_CYCLE_WAVE_GLYPH_COUNT
     ]
     one_cycle_wave_parts = make_one_cycle_wave_parts(
-        _font_geometry.glyph_path(font, wave_base),
-        1000,
-        wave_vertical_origin,
+        wave_outline, 1000, wave_vertical_origin, wave_stroke_model
     )
     _font_operations.append_glyphs(
         font,
@@ -1639,9 +1763,7 @@ def build(
         transition_start : transition_start + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
     ]
     transition_parts = make_manga_to_wave_transition_parts(
-        _font_geometry.glyph_path(font, wave_base),
-        1000,
-        manga_wave_vertical_origin,
+        wave_outline, 1000, manga_wave_vertical_origin, wave_stroke_model
     )
     _font_operations.append_glyphs(
         font,
@@ -1658,9 +1780,7 @@ def build(
         + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
     ]
     reverse_transition_parts = make_wave_to_manga_transition_parts(
-        _font_geometry.glyph_path(font, wave_base),
-        1000,
-        manga_wave_vertical_origin,
+        wave_outline, 1000, manga_wave_vertical_origin, wave_stroke_model
     )
     _font_operations.append_glyphs(
         font,
@@ -1677,9 +1797,7 @@ def build(
         manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     ]
     manga_wave_isolated, manga_wave_parts = make_manga_wave_parts(
-        _font_geometry.glyph_path(font, wave_base),
-        1000,
-        manga_wave_vertical_origin,
+        wave_outline, 1000, manga_wave_vertical_origin, wave_stroke_model
     )
     _font_operations.replace_glyph(
         font,

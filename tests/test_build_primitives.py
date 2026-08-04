@@ -29,7 +29,8 @@ from nobigoe_font.features import (
 )
 from nobigoe_font.pipeline import (
     COMBINING_MARK_INPUTS,
-    adjust_linear_stroke_width,
+    ConnectedStrokeWidths,
+    connected_stroke_widths,
     _apply_novel_style,
     _novel_hiragana_mappings,
     _novel_katakana_mappings,
@@ -40,11 +41,15 @@ from nobigoe_font.pipeline import (
     mark_ligature_rules,
     make_manga_wave_parts,
     make_manga_to_wave_transition_parts,
+    make_horizontal_parts,
     make_wave_to_manga_transition_parts,
     make_one_cycle_wave_parts,
     make_sine_wave_tile,
+    make_wave_stroke_model,
+    normalize_linear_stroke_width,
     stroke_band,
     make_relaxed_wave_parts,
+    make_vertical_parts,
     make_wave_parts,
 )
 from nobigoe_font.metadata import rename_font
@@ -81,6 +86,7 @@ from nobigoe_font.geometry import (
     centered_transform,
     mark_placement_transform,
     glyph_path,
+    optical_stroke_width,
     transform_path,
 )
 
@@ -303,16 +309,21 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         self.assertEqual(adjusted.bounds[0::2], (71.0, 131.0))
 
-    def test_linear_stroke_adjustment_thins_across_its_axis_and_stays_centered(
-        self,
-    ) -> None:
+    def test_linear_stroke_normalization_matches_optical_target(self) -> None:
         outline = rectangle_path()
+        target = 80
 
-        horizontal = adjust_linear_stroke_width(outline, "horizontal", 500, -40)
-        vertical = adjust_linear_stroke_width(outline, "vertical", 300, -80)
+        horizontal = normalize_linear_stroke_width(
+            outline, "horizontal", 500, 1000, target
+        )
+        vertical = normalize_linear_stroke_width(outline, "vertical", 300, 1000, target)
+        horizontal_middle = make_horizontal_parts(horizontal, 1000)[1]
+        vertical_middle = make_vertical_parts(vertical, 1000, 880)[1]
 
-        self.assertEqual(horizontal.bounds, (100.0, 120.0, 900.0, 480.0))
-        self.assertEqual(vertical.bounds, (140.0, 100.0, 860.0, 500.0))
+        self.assertAlmostEqual(optical_stroke_width(horizontal_middle), target, delta=1)
+        self.assertAlmostEqual(optical_stroke_width(vertical_middle), target, delta=1)
+        self.assertEqual(sum(horizontal.bounds[1::2]), sum(outline.bounds[1::2]))
+        self.assertEqual(sum(vertical.bounds[0::2]), sum(outline.bounds[0::2]))
 
     def test_wave_stroke_matches_source_phase_weight(self) -> None:
         source = wave_source_path()
@@ -327,6 +338,65 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertAlmostEqual(peak_width, 50, delta=2)
         self.assertAlmostEqual(crossing_width, 56, delta=2)
         self.assertAlmostEqual(trough_width, 50, delta=2)
+
+    def test_connected_stroke_widths_use_orientation_medians(self) -> None:
+        outline = rectangle_path()
+        base_width = optical_stroke_width(outline)
+        horizontal = [
+            transform_path(outline, Transform(scale, 0, 0, scale, 0, 0))
+            for scale in (0.5, 1, 1.5)
+        ]
+        vertical = [
+            transform_path(outline, Transform(scale, 0, 0, scale, 0, 0))
+            for scale in (0.75, 1.25, 1.75)
+        ]
+
+        widths = connected_stroke_widths(horizontal, vertical)
+
+        self.assertAlmostEqual(widths.horizontal, base_width)
+        self.assertAlmostEqual(widths.vertical, base_width * 1.25)
+
+    def test_wave_stroke_model_matches_hiragana_targets_across_frequencies(
+        self,
+    ) -> None:
+        source = wave_source_path()
+        targets = ConnectedStrokeWidths(horizontal=80, vertical=70)
+        model = make_wave_stroke_model(source, 1000, targets)
+        default = make_wave_parts(source, 1000, 880, model)
+        relaxed = make_relaxed_wave_parts(source, 1000, 880, model)
+        one_cycle = make_one_cycle_wave_parts(source, 1000, 880, model)
+        _, manga = make_manga_wave_parts(source, 1000, 880, model)
+
+        for outline in (default[1], relaxed[2], one_cycle[2], manga[1]):
+            self.assertAlmostEqual(
+                optical_stroke_width(outline), targets.horizontal, delta=0.01
+            )
+        for outline in (default[6], relaxed[12], one_cycle[6], manga[7]):
+            self.assertAlmostEqual(
+                optical_stroke_width(outline), targets.vertical, delta=0.01
+            )
+
+    def test_frequency_transitions_preserve_scaled_boundary_widths(self) -> None:
+        source = wave_source_path()
+        model = make_wave_stroke_model(
+            source,
+            1000,
+            ConnectedStrokeWidths(horizontal=80, vertical=70),
+        )
+        wave_middle = make_wave_parts(source, 1000, 880, model)[1]
+        _, manga_parts = make_manga_wave_parts(source, 1000, 880, model)
+        manga_middle = manga_parts[1]
+        forward = make_manga_to_wave_transition_parts(source, 1000, 880, model)[0]
+        reverse = make_wave_to_manga_transition_parts(source, 1000, 880, model)[0]
+
+        def width_at(outline: pathops.Path, position: float) -> int:
+            low, high = stroke_band(outline, "horizontal", position)
+            return high - low
+
+        self.assertEqual(width_at(manga_middle, 999), width_at(forward, 1))
+        self.assertEqual(width_at(forward, 999), width_at(wave_middle, 1))
+        self.assertEqual(width_at(wave_middle, 999), width_at(reverse, 1))
+        self.assertEqual(width_at(reverse, 999), width_at(manga_middle, 1))
 
     def test_joined_waves_use_constant_period_with_half_wave_offset(self) -> None:
         start, middle, inverted, end, inverted_end = make_wave_parts(

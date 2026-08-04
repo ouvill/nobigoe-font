@@ -54,6 +54,7 @@ from .operations import (
     vertical_glyph_or_self,
 )
 from .pipeline import (
+    CONNECTED_STROKE_REFERENCE_CODEPOINTS,
     MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT,
     WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT,
     MANGA_WAVE_GLYPH_COUNT,
@@ -61,7 +62,7 @@ from .pipeline import (
     ONE_CYCLE_WAVE_GLYPH_COUNT,
     RELAXED_WAVE_GLYPH_COUNT,
     WAVE_GLYPH_COUNT,
-    adjust_linear_stroke_width,
+    connected_stroke_widths,
     flatten_horizontal_centerline,
     make_horizontal_parts,
     make_manga_wave_parts,
@@ -71,9 +72,10 @@ from .pipeline import (
     make_relaxed_wave_parts,
     make_vertical_parts,
     make_wave_parts,
+    make_wave_stroke_model,
+    normalize_linear_stroke_width,
 )
 from .profiles import (
-    NOTO_CHOON_STROKE_ADJUSTMENTS,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_STROKE_ADJUSTMENTS,
 )
@@ -633,6 +635,26 @@ def _append_symbols(
     model: _DeltaModel,
     vsindex: int,
 ) -> None:
+    reference_names = [
+        cmap[codepoint] for codepoint in CONNECTED_STROKE_REFERENCE_CODEPOINTS
+    ]
+    reference_vertical_names = [vertical_sources[name] for name in reference_names]
+    stroke_widths = {
+        weight: connected_stroke_widths(
+            [paths[weight][name] for name in reference_names],
+            [paths[weight][name] for name in reference_vertical_names],
+        )
+        for weight in _WEIGHTS
+    }
+    wave_base = cmap[0x301C]
+    wave_stroke_models = {
+        weight: make_wave_stroke_model(
+            paths[weight][wave_base],
+            1000,
+            stroke_widths[weight],
+        )
+        for weight in _WEIGHTS
+    }
     allocated = allocate_cid_names(
         font,
         2 * NEW_GLYPH_COUNT
@@ -650,46 +672,54 @@ def _append_symbols(
         vertical = vertical_sources[base]
         names = allocated[offset : offset + NEW_GLYPH_COUNT]
         offset += NEW_GLYPH_COUNT
-        masters = []
-        if codepoint == 0x30FC:
-            horizontal_masters = []
-            vertical_masters = []
-            for weight in _WEIGHTS:
-                horizontal_outline = adjust_linear_stroke_width(
-                    flatten_horizontal_centerline(paths[weight][base], 1000),
-                    "horizontal",
-                    500,
-                    NOTO_CHOON_STROKE_ADJUSTMENTS[weight],
+        horizontal_masters = []
+        vertical_masters = []
+        for weight in _WEIGHTS:
+            horizontal_outline = paths[weight][base]
+            if codepoint == 0x30FC:
+                horizontal_outline = flatten_horizontal_centerline(
+                    horizontal_outline, 1000
                 )
+            horizontal_outline = normalize_linear_stroke_width(
+                horizontal_outline,
+                "horizontal",
+                500,
+                1000,
+                stroke_widths[weight].horizontal,
+            )
+            vertical_outline = normalize_linear_stroke_width(
+                paths[weight][vertical],
+                "vertical",
+                400,
+                1000,
+                stroke_widths[weight].vertical,
+            )
+            if codepoint == 0x30FC:
                 horizontal_masters.append(
                     _split_horizontal_parts(horizontal_outline, 1000)
                 )
                 vertical_masters.append(
                     _split_vertical_parts(
-                        adjust_linear_stroke_width(
-                            paths[weight][vertical],
-                            "vertical",
-                            400,
-                            NOTO_CHOON_STROKE_ADJUSTMENTS[weight],
-                        ),
+                        vertical_outline,
                         1000,
                         _SYMBOL_VERTICAL_ORIGIN,
                     )
                 )
+            else:
+                horizontal_masters.append(
+                    make_horizontal_parts(horizontal_outline, 1000)
+                )
+                vertical_masters.append(
+                    make_vertical_parts(vertical_outline, 1000, _SYMBOL_VERTICAL_ORIGIN)
+                )
+        if codepoint == 0x30FC:
             vertical_masters = _normalize_vertical_parts(vertical_masters)
-            masters = [
-                horizontal + vertical_parts
-                for horizontal, vertical_parts in zip(
-                    horizontal_masters, vertical_masters, strict=True
-                )
-            ]
-        else:
-            for weight in _WEIGHTS:
-                horizontal = make_horizontal_parts(paths[weight][base], 1000)
-                vertical_parts = make_vertical_parts(
-                    paths[weight][vertical], 1000, _SYMBOL_VERTICAL_ORIGIN
-                )
-                masters.append(horizontal + vertical_parts)
+        masters = [
+            horizontal + vertical_parts
+            for horizontal, vertical_parts in zip(
+                horizontal_masters, vertical_masters, strict=True
+            )
+        ]
         _append_glyphs(
             font,
             top,
@@ -701,14 +731,18 @@ def _append_symbols(
         )
         extensions.append((prefix, base, vertical, names))
 
-    wave_base = cmap[0x301C]
     wave_vertical = vertical_sources[wave_base]
     wave_names = allocated[offset : offset + WAVE_GLYPH_COUNT]
     offset += WAVE_GLYPH_COUNT
     wave_masters = []
     for weight in _WEIGHTS:
         wave_masters.append(
-            make_wave_parts(paths[weight][wave_base], 1000, _SYMBOL_VERTICAL_ORIGIN)
+            make_wave_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
+            )
         )
     _append_glyphs(
         font,
@@ -730,6 +764,7 @@ def _append_symbols(
                 paths[weight][wave_base],
                 1000,
                 _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
             )
         )
     _append_glyphs(
@@ -751,6 +786,7 @@ def _append_symbols(
                 paths[weight][wave_base],
                 1000,
                 _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
             )
         )
     _append_glyphs(
@@ -786,6 +822,7 @@ def _append_symbols(
                 paths[weight][wave_base],
                 1000,
                 _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
             )
         )
     _append_glyphs(
@@ -809,6 +846,7 @@ def _append_symbols(
                 paths[weight][wave_base],
                 1000,
                 _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
             )
         )
     _append_glyphs(
@@ -826,7 +864,10 @@ def _append_symbols(
     manga_masters = []
     for weight in _WEIGHTS:
         isolated, parts = make_manga_wave_parts(
-            paths[weight][wave_base], 1000, _SYMBOL_VERTICAL_ORIGIN
+            paths[weight][wave_base],
+            1000,
+            _SYMBOL_VERTICAL_ORIGIN,
+            wave_stroke_models[weight],
         )
         manga_isolated.append(isolated)
         manga_masters.append(parts)
@@ -1344,6 +1385,7 @@ def build_variable_marks(
         0x309B,
         0x309C,
         0x30FC,
+        *CONNECTED_STROKE_REFERENCE_CODEPOINTS,
         *(base for base, _ in KOBURI_HEART_MARK_PAIRS),
         *(base for base, _ in MANGA_MARK_PAIRS if base not in MANGA_MISSING_SMALL_KANA),
     }
@@ -1376,6 +1418,7 @@ def build_variable_marks(
         *(cmap[base] for base, _ in generated if base in cmap),
     }
     names.update(cmap[codepoint] for codepoint in (0x2015, 0x301C, 0x3030, 0x30FC))
+    names.update(cmap[codepoint] for codepoint in CONNECTED_STROKE_REFERENCE_CODEPOINTS)
     vertical_sources = {name: vertical_glyph_or_self(font, name) for name in names}
     names.update(vertical_sources.values())
     names.update(cmap[base] for base, _ in KOBURI_HEART_MARK_PAIRS)
