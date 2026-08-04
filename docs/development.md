@@ -196,7 +196,7 @@ done
 
 `--static-weight <Weight>`を指定すると、両可変フォントは通常どおり生成したうえで、NobigoeとNovelの指定固定ウェイトだけを実体化します。省略時は両ファミリーの固定7ウェイトをすべて生成します。
 
-`nobigoe-build-essential`は、既定で`dist/NobigoeVariableMarks-VF.otf`を入力し、`ー`、`―`、`〜`、`～`、`〰`だけをUnicodeへ割り当てた`dist/NobigoeEssential-VF.otf`を生成します。`liga`、`calt`、`ss04`、`ss05`、`vert`、`vrt2`から5文字に到達する字形だけを閉包として保持し、ウェイト軸200–900と7つの名前付きインスタンスを引き継ぎます。入力と出力は`--source`と`--output`で変更できます。
+`nobigoe-build-essential`は、既定で`dist/NobigoeVariableMarks-VF.otf`を入力し、`ー`、`―`、`〜`、`～`、`〰`だけをUnicodeへ割り当てた`dist/NobigoeEssential-VF.otf`を生成します。`calt`、`ss04`、`ss05`、`vert`、`vrt2`から5文字に到達する字形だけを閉包として保持し、ウェイト軸200–900と7つの名前付きインスタンスを引き継ぎます。入力と出力は`--source`と`--output`で変更できます。
 
 生成順序は、`NotoSerifJP-VF.otf`、のびごえ共通字形・OpenType機能の可変カスタマイズ、カスタマイズ済みNobigoe CFF2からのNovel三次ベジェpathマスター生成、標準7位置を格納したNovel CFF2、両可変正本からの固定ウェイト実体化、固定版専用処理です。符号化済み仮名、縦組字形、既存の濁点・半濁点付き`ccmp`出力はUnicode上の基字を所有者として一度だけ同じNovel変形を受けます。濁点・半濁点、感嘆符・疑問符合字、連結記号とGSUBはNobigoe可変正本からNovel可変正本へ継承し、Novelかなに対応する生成済み濁点・半濁点結合字形は7位置の三次ベジェ輪郭として再合成します。漢字字面調整と欧文取り込みは実体化後に行うため、Noto固定フォントから字形や機能を別に再生成しません。
 

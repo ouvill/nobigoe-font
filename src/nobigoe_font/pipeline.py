@@ -71,8 +71,9 @@ from fontTools.varLib.instancer import instantiateVariableFont
 WAVE_GLYPH_COUNT = 10
 RELAXED_WAVE_GLYPH_COUNT = 20
 ONE_CYCLE_WAVE_GLYPH_COUNT = 8
-WAVE_SELECTOR_GLYPH_COUNT = 1
-MANGA_WAVE_GLYPH_COUNT = 7
+MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT = 8
+WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT = 8
+MANGA_WAVE_GLYPH_COUNT = 11
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 WAVE_STROKE_MODULATION = 0.3
 NEW_GLYPH_COUNT = 6
@@ -486,6 +487,7 @@ def make_sine_wave_tile(
     taper_end: bool = False,
     half_waves: float = 3,
     phase_offset_half_waves: float = 0,
+    end_half_waves: float | None = None,
     amplitude_scale: float = 1,
     terminal_phase_extension_half_waves: float = (WAVE_TERMINAL_EXTENSION_HALF_WAVES),
     taper_fraction: float = 1 / 4,
@@ -518,7 +520,7 @@ def make_sine_wave_tile(
     ) / 2
     crossing_thickness = sample_crossing_max - sample_crossing_min
     direction = -1 if inverted else 1
-    normal_phase_velocity = half_waves * math.pi / advance
+    final_half_waves = half_waves if end_half_waves is None else end_half_waves
     taper_length = advance * taper_fraction
     drawing_start = start_margin if taper_start else 0.0
     drawing_end = advance - end_margin if taper_end else float(advance)
@@ -537,8 +539,17 @@ def make_sine_wave_tile(
         return 30 * progress**2 * (progress - 1) ** 2
 
     def phase_at(position: float) -> tuple[float, float]:
-        phase = phase_offset_half_waves * math.pi + normal_phase_velocity * position
-        phase_velocity = normal_phase_velocity
+        progress = position / advance
+        transition_integral = progress**3 - progress**4 / 2
+        phase = phase_offset_half_waves * math.pi + math.pi * (
+            half_waves * progress
+            + (final_half_waves - half_waves) * transition_integral
+        )
+        phase_velocity = (
+            math.pi
+            / advance
+            * (half_waves + (final_half_waves - half_waves) * smoothstep(progress))
+        )
         correction_start = taper_length
         correction_end = advance - taper_length
         correction_length = correction_end - correction_start
@@ -709,6 +720,107 @@ def make_wave_parts(
     return horizontal + vertical
 
 
+def make_manga_to_wave_transition_parts(
+    source: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, ...]:
+    _, _, source_x_max, _ = source.bounds
+    end_margin = max(0.0, advance - source_x_max)
+    horizontal_middle = make_sine_wave_tile(
+        source,
+        advance,
+        half_waves=4,
+        end_half_waves=3,
+        terminal_phase_extension_half_waves=0,
+    )
+    horizontal_end = make_sine_wave_tile(
+        source,
+        advance,
+        taper_end=True,
+        end_margin=end_margin,
+        half_waves=4,
+        end_half_waves=3,
+        terminal_phase_extension_half_waves=0,
+    )
+    horizontal_inverted_middle = make_sine_wave_tile(
+        source,
+        advance,
+        inverted=True,
+        half_waves=4,
+        end_half_waves=3,
+        terminal_phase_extension_half_waves=0,
+    )
+    horizontal_inverted_end = make_sine_wave_tile(
+        source,
+        advance,
+        inverted=True,
+        taper_end=True,
+        end_margin=end_margin,
+        half_waves=4,
+        end_half_waves=3,
+        terminal_phase_extension_half_waves=0,
+    )
+    horizontal = (
+        horizontal_middle,
+        horizontal_end,
+        horizontal_inverted_middle,
+        horizontal_inverted_end,
+    )
+    tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
+    vertical_rotation = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + tile_center_y,
+        vertical_origin,
+    )
+    vertical = tuple(
+        _font_geometry.transform_path(outline, vertical_rotation)
+        for outline in horizontal
+    )
+    return horizontal + vertical
+
+
+def make_wave_to_manga_transition_parts(
+    source: pathops.Path, advance: int, vertical_origin: int
+) -> tuple[pathops.Path, ...]:
+    _, _, source_x_max, _ = source.bounds
+    end_margin = max(0.0, advance - source_x_max)
+
+    def transition(phase_offset: float, *, taper_end: bool) -> pathops.Path:
+        return make_sine_wave_tile(
+            source,
+            advance,
+            taper_end=taper_end,
+            end_margin=end_margin if taper_end else 0,
+            half_waves=3,
+            end_half_waves=4,
+            phase_offset_half_waves=phase_offset,
+            taper_fraction=1 / 6,
+        )
+
+    horizontal = (
+        transition(0.5, taper_end=False),
+        transition(0.5, taper_end=True),
+        transition(-0.5, taper_end=False),
+        transition(-0.5, taper_end=True),
+    )
+    tile_center_y = (horizontal[0].bounds[1] + horizontal[0].bounds[3]) / 2
+    vertical_rotation = Transform(
+        0,
+        -1,
+        -1,
+        0,
+        advance / 2 + tile_center_y,
+        vertical_origin,
+    )
+    vertical = tuple(
+        _font_geometry.transform_path(outline, vertical_rotation)
+        for outline in horizontal
+    )
+    return horizontal + vertical
+
+
 def make_relaxed_wave_parts(
     source: pathops.Path, advance: int, vertical_origin: int
 ) -> tuple[pathops.Path, ...]:
@@ -872,6 +984,22 @@ def make_manga_wave_parts(
         end_margin=end_margin,
         **parameters,
     )
+    horizontal_inverted_middle = make_sine_wave_tile(
+        source,
+        advance,
+        inverted=True,
+        half_waves=4,
+        taper_fraction=1 / 6,
+    )
+    horizontal_inverted_end = make_sine_wave_tile(
+        source,
+        advance,
+        inverted=True,
+        taper_end=True,
+        end_margin=end_margin,
+        half_waves=4,
+        taper_fraction=1 / 6,
+    )
     tile_center_y = (horizontal_middle.bounds[1] + horizontal_middle.bounds[3]) / 2
     vertical_rotation = Transform(
         0,
@@ -888,16 +1016,17 @@ def make_manga_wave_parts(
             horizontal_start,
             horizontal_middle,
             horizontal_end,
+            horizontal_inverted_middle,
+            horizontal_inverted_end,
         )
     )
     added = (
         horizontal_start,
         horizontal_middle,
         horizontal_end,
-        vertical[0],
-        vertical[1],
-        vertical[2],
-        vertical[3],
+        horizontal_inverted_middle,
+        horizontal_inverted_end,
+        *vertical,
     )
     return horizontal_isolated, added
 
@@ -1401,7 +1530,8 @@ def build(
         + WAVE_GLYPH_COUNT
         + RELAXED_WAVE_GLYPH_COUNT
         + ONE_CYCLE_WAVE_GLYPH_COUNT
-        + WAVE_SELECTOR_GLYPH_COUNT
+        + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+        + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT
         + len(MANGA_PUNCTUATION_SEQUENCES)
         + PUNCTUATION_ROTATED_COUNT
@@ -1492,22 +1622,10 @@ def build(
         one_cycle_wave_names,
     )
 
-    wave_selector_start = one_cycle_wave_start + ONE_CYCLE_WAVE_GLYPH_COUNT
-    wave_selector_seed = allocated_names[wave_selector_start]
-    _font_operations.append_glyphs(
-        font,
-        [_font_geometry.glyph_path(font, wave_base)],
-        [wave_selector_seed],
-        wave_base,
-        wave_vertical_origin,
-        add_stem_hints=False,
-    )
     relaxed_wave = (
         "relaxed_wave",
         wave_base,
         wave_vertical,
-        font.getBestCmap()[0x3030],
-        wave_selector_seed,
         relaxed_wave_names,
     )
 
@@ -1516,7 +1634,45 @@ def build(
     manga_wave_vertical_origin = round(
         font["vmtx"].metrics[manga_wave_base][1] + manga_wave_y_max
     )
-    manga_wave_start = wave_selector_start + WAVE_SELECTOR_GLYPH_COUNT
+    transition_start = one_cycle_wave_start + ONE_CYCLE_WAVE_GLYPH_COUNT
+    transition_names = allocated_names[
+        transition_start : transition_start + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+    ]
+    transition_parts = make_manga_to_wave_transition_parts(
+        _font_geometry.glyph_path(font, wave_base),
+        1000,
+        manga_wave_vertical_origin,
+    )
+    _font_operations.append_glyphs(
+        font,
+        list(transition_parts),
+        transition_names,
+        wave_base,
+        manga_wave_vertical_origin,
+        add_stem_hints=False,
+    )
+    manga_to_wave_transition = ("manga_to_wave", transition_names)
+    reverse_transition_start = transition_start + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+    reverse_transition_names = allocated_names[
+        reverse_transition_start : reverse_transition_start
+        + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
+    ]
+    reverse_transition_parts = make_wave_to_manga_transition_parts(
+        _font_geometry.glyph_path(font, wave_base),
+        1000,
+        manga_wave_vertical_origin,
+    )
+    _font_operations.append_glyphs(
+        font,
+        list(reverse_transition_parts),
+        reverse_transition_names,
+        manga_wave_base,
+        manga_wave_vertical_origin,
+        add_stem_hints=False,
+    )
+    wave_to_manga_transition = ("wave_to_manga", reverse_transition_names)
+
+    manga_wave_start = reverse_transition_start + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
     manga_wave_names = allocated_names[
         manga_wave_start : manga_wave_start + MANGA_WAVE_GLYPH_COUNT
     ]
@@ -1980,6 +2136,8 @@ def build(
             relaxed_wave,
             manga_wave,
             one_cycle_wave,
+            manga_to_wave_transition,
+            wave_to_manga_transition,
             punctuation_variants,
             kana_marks,
             spacing_marks,

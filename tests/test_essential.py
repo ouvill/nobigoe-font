@@ -49,7 +49,6 @@ def _source_font(path: Path, omitted_codepoint: int | None = None) -> None:
         "choon.end",
         "wave.relaxed",
         "wave.compact",
-        "manga.wave",
         "bar.vert",
         "wave.vert",
         "manga.vert",
@@ -82,7 +81,6 @@ def _source_font(path: Path, omitted_codepoint: int | None = None) -> None:
           sub manga manga' by manga.end;
           sub choon choon' by choon.end;
         } calt;
-        feature liga { sub manga wave by manga.wave; } liga;
         feature ss04 { sub wave by wave.relaxed; } ss04;
         feature ss05 { sub wave by wave.compact; } ss05;
         feature vert {
@@ -123,7 +121,6 @@ class EssentialBuildTests(unittest.TestCase):
                     "choon.end",
                     "wave.relaxed",
                     "wave.compact",
-                    "manga.wave",
                     "bar.vert",
                     "wave.vert",
                     "manga.vert",

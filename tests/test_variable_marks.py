@@ -199,8 +199,6 @@ class VariableSymbolTests(unittest.TestCase):
             "relaxed",
             "wave",
             "wave.v",
-            "manga",
-            "seed",
             [f"relaxed{i}" for i in range(20)],
         )
         one_cycle = (
@@ -209,7 +207,12 @@ class VariableSymbolTests(unittest.TestCase):
             "wave.v",
             [f"one-cycle{i}" for i in range(8)],
         )
-        manga = ("manga", "manga", [f"manga{i}" for i in range(7)])
+        manga = ("manga", "manga", [f"manga{i}" for i in range(11)])
+        transition = ("transition", [f"transition{i}" for i in range(8)])
+        reverse_transition = (
+            "reverse-transition",
+            [f"reverse-transition{i}" for i in range(8)],
+        )
         glyph_order = [
             ".notdef",
             "choon",
@@ -218,39 +221,50 @@ class VariableSymbolTests(unittest.TestCase):
             "dash.v",
             "wave",
             "wave.v",
-            "seed",
             "manga",
             *(name for extension in extensions for name in extension[3]),
             *wave[3],
-            *relaxed[5],
+            *relaxed[3],
             *manga[2],
             *one_cycle[3],
+            *transition[1],
+            *reverse_transition[1],
         ]
         font = TTFont()
         font.setGlyphOrder(glyph_order)
 
         addOpenTypeFeaturesFromString(
             font,
-            symbol_feature_source(extensions, wave, relaxed, manga, one_cycle),
+            symbol_feature_source(
+                extensions,
+                wave,
+                relaxed,
+                manga,
+                one_cycle,
+                transition,
+                reverse_transition,
+            ),
             tables={"GSUB"},
         )
 
         feature_tags = {
             record.FeatureTag for record in font["GSUB"].table.FeatureList.FeatureRecord
         }
-        self.assertEqual(
-            feature_tags, {"liga", "ss04", "ss05", "calt", "vert", "vrt2"}
-        )
+        self.assertEqual(feature_tags, {"ss04", "ss05", "calt", "vert", "vrt2"})
         self.assertEqual(feature_ligatures(font, "ccmp"), {})
-        self.assertEqual(
-            feature_ligatures(font, "liga"), {("manga", "wave"): "seed"}
-        )
+        self.assertEqual(feature_ligatures(font, "liga"), {})
         expected_vertical = {
             "choon0": "choon3",
             "wave0": "wave5",
             "one-cycle0": "one-cycle4",
-            "manga": "manga3",
-            "manga0": "manga4",
+            "manga": "manga5",
+            "manga0": "manga6",
+            "manga3": "manga9",
+            "manga4": "manga10",
+            "transition0": "transition4",
+            "transition3": "transition7",
+            "reverse-transition0": "reverse-transition4",
+            "reverse-transition3": "reverse-transition7",
         }
         for tag in ("vert", "vrt2"):
             substitutions = feature_single_substitutions(font, tag)
@@ -410,22 +424,14 @@ class VariablePunctuationTests(unittest.TestCase):
         for sequence in ("!?", "?!"):
             source = make_original_punctuation_ligature(sequence, 400)
             source_bodies = sorted(
-                (
-                    contour
-                    for contour in source.contours
-                    if contour.bounds[3] >= 140
-                ),
+                (contour for contour in source.contours if contour.bounds[3] >= 140),
                 key=lambda contour: contour.bounds[0],
             )
             expected = source_bodies[1].bounds[0] - source_bodies[0].bounds[2]
 
             rotated = rotate_punctuation_outline(source)
             rotated_bodies = sorted(
-                (
-                    contour
-                    for contour in rotated.contours
-                    if contour.bounds[3] >= 140
-                ),
+                (contour for contour in rotated.contours if contour.bounds[3] >= 140),
                 key=lambda contour: contour.bounds[0],
             )
             actual = rotated_bodies[1].bounds[0] - rotated_bodies[0].bounds[2]
@@ -870,8 +876,7 @@ class VariableBuildCliTests(unittest.TestCase):
                 call(
                     Path("novel.otf"),
                     cached,
-                    Path("static")
-                    / default_output_path(novel_identity, "noto").name,
+                    Path("static") / default_output_path(novel_identity, "noto").name,
                     novel_identity,
                     latin_build_profile("libertinus", "Regular"),
                     True,

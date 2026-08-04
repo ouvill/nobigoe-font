@@ -23,9 +23,9 @@ from nobigoe_font.features import (
     contextual_extension_rules,
     feature_source,
     merge_features,
+    mixed_wave_scan_rules,
     phased_wave_rules,
     repeated_glyph_rules,
-    selected_run_rules,
 )
 from nobigoe_font.pipeline import (
     COMBINING_MARK_INPUTS,
@@ -39,6 +39,8 @@ from nobigoe_font.pipeline import (
     SPACING_MARK_INPUTS,
     mark_ligature_rules,
     make_manga_wave_parts,
+    make_manga_to_wave_transition_parts,
+    make_wave_to_manga_transition_parts,
     make_one_cycle_wave_parts,
     make_sine_wave_tile,
     stroke_band,
@@ -92,6 +94,7 @@ def rectangle_path() -> pathops.Path:
     pen.lineTo((100, 500))
     pen.closePath()
     return path
+
 
 def wave_source_path() -> pathops.Path:
     path = pathops.Path()
@@ -220,9 +223,7 @@ class StaticInstanceTests(unittest.TestCase):
             "CFF ": SimpleNamespace(
                 cff=SimpleNamespace(
                     topDictIndex=[
-                        SimpleNamespace(
-                            FDArray=[SimpleNamespace(Private=private)]
-                        )
+                        SimpleNamespace(FDArray=[SimpleNamespace(Private=private)])
                     ]
                 )
             )
@@ -338,20 +339,13 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         def terminal_y(path: pathops.Path, position: float) -> list[float]:
             return [
-                y
-                for _, points in path
-                for x, y in points
-                if abs(x - position) < 1e-6
+                y for _, points in path for x, y in points if abs(x - position) < 1e-6
             ]
 
         self.assertAlmostEqual(center_at(middle, 250), 428.0, delta=2)
         self.assertAlmostEqual(center_at(middle, 750), 322.0, delta=2)
-        self.assertAlmostEqual(
-            center_at(start, 250), center_at(middle, 250), delta=2
-        )
-        self.assertAlmostEqual(
-            center_at(end, 750), center_at(middle, 750), delta=2
-        )
+        self.assertAlmostEqual(center_at(start, 250), center_at(middle, 250), delta=2)
+        self.assertAlmostEqual(center_at(end, 750), center_at(middle, 750), delta=2)
         self.assertAlmostEqual(center_at(start, 1000), center_at(inverted, 0))
         start_terminal = terminal_y(start, 50)
         end_terminal = terminal_y(inverted_end, 950)
@@ -359,6 +353,88 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertTrue(end_terminal)
         for y in start_terminal + end_terminal:
             self.assertAlmostEqual(y, 308.2, delta=1)
+
+    def test_manga_to_wave_transition_preserves_centerline_and_tangent(self) -> None:
+        source = wave_source_path()
+        _, manga_parts = make_manga_wave_parts(source, 1000, 880)
+        manga_middle = manga_parts[1]
+        transition_middle, *_ = make_manga_to_wave_transition_parts(source, 1000, 880)
+        wave_middle = make_wave_parts(source, 1000, 880)[1]
+
+        def center_at(path: pathops.Path, position: float) -> float:
+            low, high = stroke_band(path, "horizontal", position)
+            return (low + high) / 2
+
+        delta = 5
+        manga_slope = (
+            center_at(manga_middle, 1000) - center_at(manga_middle, 1000 - delta)
+        ) / delta
+        transition_start_slope = (
+            center_at(transition_middle, delta) - center_at(transition_middle, 0)
+        ) / delta
+        transition_end_slope = (
+            center_at(transition_middle, 1000)
+            - center_at(transition_middle, 1000 - delta)
+        ) / delta
+        wave_slope = (center_at(wave_middle, delta) - center_at(wave_middle, 0)) / delta
+
+        self.assertAlmostEqual(
+            center_at(manga_middle, 1000),
+            center_at(transition_middle, 0),
+            delta=0.1,
+        )
+        self.assertAlmostEqual(manga_slope, transition_start_slope, delta=0.02)
+        self.assertAlmostEqual(
+            center_at(transition_middle, 1000),
+            center_at(wave_middle, 0),
+            delta=0.1,
+        )
+        self.assertAlmostEqual(transition_end_slope, wave_slope, delta=0.02)
+
+    def test_wave_to_manga_transition_preserves_centerline_and_tangent(self) -> None:
+        source = wave_source_path()
+        wave_middle = make_wave_parts(source, 1000, 880)[1]
+        rising_transition, _, falling_transition, *_ = (
+            make_wave_to_manga_transition_parts(source, 1000, 880)
+        )
+        _, manga_parts = make_manga_wave_parts(source, 1000, 880)
+        manga_middle = manga_parts[1]
+        manga_inverted_middle = manga_parts[3]
+
+        def center_at(path: pathops.Path, position: float) -> float:
+            low, high = stroke_band(path, "horizontal", position)
+            return (low + high) / 2
+
+        delta = 5
+        for preceding, transition, following in (
+            (wave_middle, rising_transition, manga_middle),
+            (
+                make_wave_parts(source, 1000, 880)[2],
+                falling_transition,
+                manga_inverted_middle,
+            ),
+        ):
+            preceding_slope = (
+                center_at(preceding, 1000) - center_at(preceding, 1000 - delta)
+            ) / delta
+            transition_start_slope = (
+                center_at(transition, delta) - center_at(transition, 0)
+            ) / delta
+            transition_end_slope = (
+                center_at(transition, 1000) - center_at(transition, 1000 - delta)
+            ) / delta
+            following_slope = (
+                center_at(following, delta) - center_at(following, 0)
+            ) / delta
+
+            self.assertAlmostEqual(
+                center_at(preceding, 1000), center_at(transition, 0), delta=0.1
+            )
+            self.assertAlmostEqual(preceding_slope, transition_start_slope, delta=0.02)
+            self.assertAlmostEqual(
+                center_at(transition, 1000), center_at(following, 0), delta=0.1
+            )
+            self.assertAlmostEqual(transition_end_slope, following_slope, delta=0.02)
 
     def test_one_cycle_wave_uses_taller_amplitude_and_shorter_taper(self) -> None:
         _, start, middle, _, *_ = make_one_cycle_wave_parts(
@@ -423,17 +499,19 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(one_cycle[6].bounds[1::2], (-120, 880))
         self.assertEqual(one_cycle[7].bounds[1], -20)
 
-        manga_isolated, manga_parts = make_manga_wave_parts(
-            rectangle_path(), 1000, 880
-        )
+        manga_isolated, manga_parts = make_manga_wave_parts(rectangle_path(), 1000, 880)
         (
             manga_start,
             manga_middle,
             manga_end,
+            manga_inverted_middle,
+            manga_inverted_end,
             manga_vertical_isolated,
             manga_vertical_start,
             manga_vertical_middle,
             manga_vertical_end,
+            manga_vertical_inverted_middle,
+            manga_vertical_inverted_end,
         ) = manga_parts
 
         self.assertEqual(manga_isolated.bounds[0::2], (100, 900))
@@ -444,6 +522,10 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(manga_vertical_start.bounds[3], 780)
         self.assertEqual(manga_vertical_end.bounds[1], -20)
         self.assertEqual(manga_vertical_middle.bounds[1::2], (-120, 880))
+        self.assertEqual(manga_inverted_middle.bounds[0::2], (0, 1000))
+        self.assertEqual(manga_inverted_end.bounds[2], 900)
+        self.assertEqual(manga_vertical_inverted_middle.bounds[1::2], (-120, 880))
+        self.assertEqual(manga_vertical_inverted_end.bounds[1], -20)
 
     def test_exclamation_sequences_use_shippori_upright_pua_ligatures(
         self,
@@ -539,15 +621,11 @@ class TrueTypeBuildTests(unittest.TestCase):
         output = "choon.dakuten"
         vertical_output = f"{output}.vert"
         wave_names = [f"wave.{index}" for index in range(10)]
-        relaxed_wave_names = [
-            f"wave-relaxed.{index}" for index in range(20)
-        ]
-        one_cycle_wave_names = [
-            f"wave-one-cycle.{index}" for index in range(8)
-        ]
-        relaxed_wave_selector = "manga-wave.base"
-        relaxed_wave_seed = "wave-relaxed.seed"
-        manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
+        relaxed_wave_names = [f"wave-relaxed.{index}" for index in range(20)]
+        one_cycle_wave_names = [f"wave-one-cycle.{index}" for index in range(8)]
+        transition_names = [f"wave-transition.{index}" for index in range(8)]
+        reverse_transition_names = [f"manga-transition.{index}" for index in range(8)]
+        manga_wave_names = [f"manga-wave.{index}" for index in range(11)]
         punctuation_variants = [
             ("!", ("exclamation", "exclamation.a1")),
             ("?", ("question", "question.a1")),
@@ -566,8 +644,8 @@ class TrueTypeBuildTests(unittest.TestCase):
                     *wave_names,
                     *relaxed_wave_names,
                     *one_cycle_wave_names,
-                    relaxed_wave_selector,
-                    relaxed_wave_seed,
+                    *transition_names,
+                    *reverse_transition_names,
                     "manga-wave.base",
                     *manga_wave_names,
                     *(name for _, names in punctuation_variants for name in names),
@@ -589,8 +667,6 @@ class TrueTypeBuildTests(unittest.TestCase):
                 "wave-relaxed",
                 "wave.base",
                 "wave.vert",
-                relaxed_wave_selector,
-                relaxed_wave_seed,
                 relaxed_wave_names,
             ),
             ("manga-wave", "manga-wave.base", manga_wave_names),
@@ -600,6 +676,8 @@ class TrueTypeBuildTests(unittest.TestCase):
                 "wave.vert",
                 one_cycle_wave_names,
             ),
+            ("wave-transition", transition_names),
+            ("manga-transition", reverse_transition_names),
             punctuation_variants,
             mark_ligature_rules(
                 font.getBestCmap(),
@@ -630,14 +708,8 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertNotIn((base, spacing_mark), ccmp)
         self.assertEqual(liga[(base, spacing_mark)], output)
         self.assertNotIn(
-            (relaxed_wave_selector, "wave.base"),
-            feature_ligatures(font, "ccmp"),
-        )
-        self.assertEqual(
-            feature_ligatures(font, "liga")[
-                (relaxed_wave_selector, "wave.base")
-            ],
-            relaxed_wave_seed,
+            ("manga-wave.base", "wave.base"),
+            feature_ligatures(font, "liga"),
         )
         self.assertEqual(
             feature_single_substitutions(font, "vert")[output],
@@ -711,15 +783,11 @@ class TrueTypeBuildTests(unittest.TestCase):
         ]
         vertical_maps = list(zip(outputs, vertical_outputs, strict=True))
         wave_names = [f"wave.{index}" for index in range(10)]
-        relaxed_wave_names = [
-            f"wave-relaxed.{index}" for index in range(20)
-        ]
-        one_cycle_wave_names = [
-            f"wave-one-cycle.{index}" for index in range(8)
-        ]
-        relaxed_wave_selector = "manga-wave.base"
-        relaxed_wave_seed = "wave-relaxed.seed"
-        manga_wave_names = [f"manga-wave.{index}" for index in range(7)]
+        relaxed_wave_names = [f"wave-relaxed.{index}" for index in range(20)]
+        one_cycle_wave_names = [f"wave-one-cycle.{index}" for index in range(8)]
+        transition_names = [f"wave-transition.{index}" for index in range(8)]
+        reverse_transition_names = [f"manga-transition.{index}" for index in range(8)]
+        manga_wave_names = [f"manga-wave.{index}" for index in range(11)]
         glyph_order = list(
             dict.fromkeys(
                 [
@@ -732,8 +800,8 @@ class TrueTypeBuildTests(unittest.TestCase):
                     *wave_names,
                     *relaxed_wave_names,
                     *one_cycle_wave_names,
-                    relaxed_wave_selector,
-                    relaxed_wave_seed,
+                    *transition_names,
+                    *reverse_transition_names,
                     "manga-wave.base",
                     *manga_wave_names,
                     *(name for _, names in punctuation_variants for name in names),
@@ -748,8 +816,6 @@ class TrueTypeBuildTests(unittest.TestCase):
                 "wave-relaxed",
                 "wave.base",
                 "wave.vert",
-                relaxed_wave_selector,
-                relaxed_wave_seed,
                 relaxed_wave_names,
             ),
             ("manga-wave", "manga-wave.base", manga_wave_names),
@@ -759,6 +825,8 @@ class TrueTypeBuildTests(unittest.TestCase):
                 "wave.vert",
                 one_cycle_wave_names,
             ),
+            ("wave-transition", transition_names),
+            ("manga-transition", reverse_transition_names),
             punctuation_variants,
             [],
             [],
@@ -897,6 +965,8 @@ class TrueTypeBuildTests(unittest.TestCase):
             "wave.end-a",
             "wave.end-b",
             *expected[0x3030],
+            "manga-wave.inverted-middle",
+            "manga-wave.inverted-end",
             "wave-relaxed.isolated",
             "wave-relaxed.start",
             "wave-relaxed.middle-0",
@@ -907,7 +977,14 @@ class TrueTypeBuildTests(unittest.TestCase):
             "wave-relaxed.end-1",
             "wave-relaxed.end-2",
             "wave-relaxed.end-3",
-            "wave-relaxed.seed",
+            "manga-to-wave.middle",
+            "manga-to-wave.end",
+            "manga-to-wave.inverted-middle",
+            "manga-to-wave.inverted-end",
+            "wave-to-manga.rising-middle",
+            "wave-to-manga.rising-end",
+            "wave-to-manga.falling-middle",
+            "wave-to-manga.falling-end",
             "wave-one-cycle.isolated",
             "wave-one-cycle.start",
             "wave-one-cycle.middle",
@@ -955,9 +1032,6 @@ class TrueTypeBuildTests(unittest.TestCase):
 
         calt_source = (
             "languagesystem DFLT dflt;\n"
-            "feature liga {\n"
-            "  sub manga-wave wave by wave-relaxed.seed;\n"
-            "} liga;\n"
             "feature ss04 {\n"
             + repeated_glyph_rules(
                 "wave_relaxed_style", "wave", "wave-relaxed.isolated"
@@ -969,11 +1043,36 @@ class TrueTypeBuildTests(unittest.TestCase):
             )
             + "} ss05;\n"
             "feature calt {\n"
-            + selected_run_rules(
-                "wave_relaxed_selector",
+            + mixed_wave_scan_rules(
+                "mixed_wave_h",
+                "manga-wave",
+                [
+                    "manga-wave.start",
+                    "manga-wave.middle",
+                    "manga-wave.end",
+                    "manga-wave.inverted-middle",
+                    "manga-wave.inverted-end",
+                ],
                 "wave",
-                "wave-relaxed.seed",
-                "wave-relaxed.isolated",
+                [
+                    "wave.start",
+                    "wave.middle-a",
+                    "wave.middle-b",
+                    "wave.end-a",
+                    "wave.end-b",
+                ],
+                [
+                    "manga-to-wave.middle",
+                    "manga-to-wave.end",
+                    "manga-to-wave.inverted-middle",
+                    "manga-to-wave.inverted-end",
+                ],
+                [
+                    "wave-to-manga.rising-middle",
+                    "wave-to-manga.rising-end",
+                    "wave-to-manga.falling-middle",
+                    "wave-to-manga.falling-end",
+                ],
             )
             + contextual_extension_rules(
                 "choon_h",
@@ -1112,9 +1211,7 @@ class TrueTypeBuildTests(unittest.TestCase):
                     capture_output=True,
                     text=True,
                 )
-                actual_glyphs = [
-                    record["g"] for record in json.loads(shaped.stdout)
-                ]
+                actual_glyphs = [record["g"] for record in json.loads(shaped.stdout)]
                 with self.subTest(relaxed_length=length):
                     self.assertEqual(actual_glyphs, expected_glyphs)
 
@@ -1153,35 +1250,101 @@ class TrueTypeBuildTests(unittest.TestCase):
                     ):
                         self.assertEqual(actual_glyphs, expected_glyphs)
 
-            for selector_codepoint in (0x301C, 0xFF5E):
-                for length in range(1, 7):
-                    selector_expected = relaxed_sequences[length + 1]
-                    shaped = subprocess.run(
-                        [
-                            "hb-shape",
-                            "--output-format=json",
-                            "--features=calt=1,liga=1,ss04=0",
-                            str(path),
-                            "〰" + chr(selector_codepoint) * length,
-                        ],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                    )
-                    actual_glyphs = [
-                        record["g"] for record in json.loads(shaped.stdout)
-                    ]
-                    with self.subTest(
-                        selector_codepoint=selector_codepoint,
-                        selector_length=length,
-                    ):
-                        self.assertEqual(actual_glyphs, selector_expected)
+            for wave_codepoint in (0x301C, 0xFF5E):
+                for manga_length in range(1, 4):
+                    for wave_length in range(1, 5):
+                        manga_expected = [
+                            "manga-wave.start",
+                            *(["manga-wave.middle"] * (manga_length - 1)),
+                        ]
+                        if wave_length == 1:
+                            wave_expected = ["manga-to-wave.end"]
+                        else:
+                            remaining = wave_length - 1
+                            wave_expected = [
+                                "manga-to-wave.middle",
+                                *(
+                                    (
+                                        "wave.middle-a"
+                                        if index % 2 == 0
+                                        else "wave.middle-b"
+                                    )
+                                    for index in range(remaining - 1)
+                                ),
+                                ("wave.end-a" if remaining % 2 == 1 else "wave.end-b"),
+                            ]
+                        shaped = subprocess.run(
+                            [
+                                "hb-shape",
+                                "--output-format=json",
+                                "--features=calt=1,ss04=0,ss05=0",
+                                str(path),
+                                "〰" * manga_length + chr(wave_codepoint) * wave_length,
+                            ],
+                            check=True,
+                            capture_output=True,
+                            text=True,
+                        )
+                        actual_glyphs = [
+                            record["g"] for record in json.loads(shaped.stdout)
+                        ]
+                        with self.subTest(
+                            wave_codepoint=wave_codepoint,
+                            manga_length=manga_length,
+                            wave_length=wave_length,
+                        ):
+                            self.assertEqual(
+                                actual_glyphs, manga_expected + wave_expected
+                            )
 
-            shaped_without_liga = subprocess.run(
+            reverse_expected = {
+                "〜〰": ["wave.start", "wave-to-manga.rising-end"],
+                "〜〜〰〰": [
+                    "wave.start",
+                    "wave.middle-b",
+                    "wave-to-manga.falling-middle",
+                    "manga-wave.inverted-end",
+                ],
+                "〜〰〜〰〜": [
+                    "wave.start",
+                    "wave-to-manga.rising-middle",
+                    "manga-to-wave.middle",
+                    "wave-to-manga.falling-middle",
+                    "manga-to-wave.inverted-end",
+                ],
+                "〰〰〜〜〰〰〜〜": [
+                    "manga-wave.start",
+                    "manga-wave.middle",
+                    "manga-to-wave.middle",
+                    "wave.middle-a",
+                    "wave-to-manga.rising-middle",
+                    "manga-wave.middle",
+                    "manga-to-wave.middle",
+                    "wave.end-a",
+                ],
+            }
+            for text, expected_glyphs in reverse_expected.items():
+                shaped = subprocess.run(
+                    [
+                        "hb-shape",
+                        "--output-format=json",
+                        "--features=calt=1,ss04=0,ss05=0",
+                        str(path),
+                        text,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                actual_glyphs = [record["g"] for record in json.loads(shaped.stdout)]
+                with self.subTest(mixed_text=text):
+                    self.assertEqual(actual_glyphs, expected_glyphs)
+
+            shaped_without_calt = subprocess.run(
                 [
                     "hb-shape",
                     "--output-format=json",
-                    "--features=calt=1,liga=0,ss04=0",
+                    "--features=calt=0,ss04=0,ss05=0",
                     str(path),
                     "〰〜〜",
                 ],
@@ -1190,8 +1353,8 @@ class TrueTypeBuildTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(
-                [record["g"] for record in json.loads(shaped_without_liga.stdout)],
-                ["manga-wave", "wave.start", "wave.end-b"],
+                [record["g"] for record in json.loads(shaped_without_calt.stdout)],
+                ["manga-wave", "wave", "wave"],
             )
 
             shaped_tilde = subprocess.run(

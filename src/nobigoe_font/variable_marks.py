@@ -54,16 +54,19 @@ from .operations import (
     vertical_glyph_or_self,
 )
 from .pipeline import (
+    MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT,
+    WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT,
     MANGA_WAVE_GLYPH_COUNT,
     NEW_GLYPH_COUNT,
     ONE_CYCLE_WAVE_GLYPH_COUNT,
     RELAXED_WAVE_GLYPH_COUNT,
     WAVE_GLYPH_COUNT,
-    WAVE_SELECTOR_GLYPH_COUNT,
     adjust_linear_stroke_width,
     flatten_horizontal_centerline,
     make_horizontal_parts,
     make_manga_wave_parts,
+    make_manga_to_wave_transition_parts,
+    make_wave_to_manga_transition_parts,
     make_one_cycle_wave_parts,
     make_relaxed_wave_parts,
     make_vertical_parts,
@@ -636,7 +639,8 @@ def _append_symbols(
         + WAVE_GLYPH_COUNT
         + RELAXED_WAVE_GLYPH_COUNT
         + ONE_CYCLE_WAVE_GLYPH_COUNT
-        + WAVE_SELECTOR_GLYPH_COUNT
+        + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+        + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT,
     )
     extensions = []
@@ -765,27 +769,58 @@ def _append_symbols(
         one_cycle_names,
     )
 
-    selector_seed = allocated[offset]
-    offset += WAVE_SELECTOR_GLYPH_COUNT
+    relaxed_wave = (
+        "relaxed_wave",
+        wave_base,
+        wave_vertical,
+        relaxed_names,
+    )
+
+    manga_base = cmap[0x3030]
+    transition_names = allocated[offset : offset + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT]
+    offset += MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+    transition_masters = []
+    for weight in _WEIGHTS:
+        transition_masters.append(
+            make_manga_to_wave_transition_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+            )
+        )
     _append_glyphs(
         font,
         top,
-        [(selector_seed, [paths[weight][wave_base] for weight in _WEIGHTS])],
+        _named_master_outlines(transition_names, transition_masters),
         model,
         vsindex,
         wave_base,
         _SYMBOL_VERTICAL_ORIGIN,
     )
-    relaxed_wave = (
-        "relaxed_wave",
-        wave_base,
-        wave_vertical,
-        cmap[0x3030],
-        selector_seed,
-        relaxed_names,
+    manga_to_wave_transition = ("manga_to_wave", transition_names)
+    reverse_transition_names = allocated[
+        offset : offset + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
+    ]
+    offset += WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
+    reverse_transition_masters = []
+    for weight in _WEIGHTS:
+        reverse_transition_masters.append(
+            make_wave_to_manga_transition_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        _named_master_outlines(reverse_transition_names, reverse_transition_masters),
+        model,
+        vsindex,
+        manga_base,
+        _SYMBOL_VERTICAL_ORIGIN,
     )
-
-    manga_base = cmap[0x3030]
+    wave_to_manga_transition = ("wave_to_manga", reverse_transition_names)
     manga_names = allocated[offset : offset + MANGA_WAVE_GLYPH_COUNT]
     manga_isolated = []
     manga_masters = []
@@ -817,7 +852,13 @@ def _append_symbols(
     merge_features(
         font,
         symbol_feature_source(
-            extensions, wave, relaxed_wave, manga_wave, one_cycle_wave
+            extensions,
+            wave,
+            relaxed_wave,
+            manga_wave,
+            one_cycle_wave,
+            manga_to_wave_transition,
+            wave_to_manga_transition,
         ),
     )
 
@@ -1334,9 +1375,7 @@ def build_variable_marks(
         cmap[0x309A],
         *(cmap[base] for base, _ in generated if base in cmap),
     }
-    names.update(
-        cmap[codepoint] for codepoint in (0x2015, 0x301C, 0x3030, 0x30FC)
-    )
+    names.update(cmap[codepoint] for codepoint in (0x2015, 0x301C, 0x3030, 0x30FC))
     vertical_sources = {name: vertical_glyph_or_self(font, name) for name in names}
     names.update(vertical_sources.values())
     names.update(cmap[base] for base, _ in KOBURI_HEART_MARK_PAIRS)
