@@ -15,7 +15,6 @@ ESSENTIAL_CODEPOINTS: frozenset[int] = frozenset(
     (0x2015, 0x301C, 0x3030, 0x30FC, 0xFF5E)
 )
 ESSENTIAL_LAYOUT_FEATURES: tuple[str, ...] = (
-    "liga",
     "calt",
     "ss04",
     "ss05",

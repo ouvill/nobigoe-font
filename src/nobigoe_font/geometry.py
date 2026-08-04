@@ -6,6 +6,8 @@ import math
 
 import pathops
 from fontTools.misc.transform import Transform
+from fontTools.pens.areaPen import AreaPen
+from fontTools.pens.perimeterPen import PerimeterPen
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.filterPen import DecomposingFilterPen
 from fontTools.pens.transformPen import TransformPen
@@ -75,6 +77,24 @@ def transform_path(outline: pathops.Path, transform: Transform) -> pathops.Path:
     transformed = pathops.Path()
     outline.draw(TransformPen(transformed.getPen(), transform))
     return transformed
+
+
+def optical_stroke_width(outline: pathops.Path) -> float:
+    """Return the outline's area-to-perimeter optical stroke width."""
+    area_pen = AreaPen()
+    perimeter_pen = PerimeterPen(None, tolerance=0.01)
+    outline.draw(area_pen)
+    outline.draw(perimeter_pen)
+    area = abs(area_pen.value)
+    perimeter = perimeter_pen.value
+    if (
+        not math.isfinite(area)
+        or not math.isfinite(perimeter)
+        or area <= 0
+        or perimeter <= 0
+    ):
+        raise ValueError("Cannot measure an empty or invalid outline")
+    return 2 * area / perimeter
 
 
 def adjust_outline_weight(outline: pathops.Path, amount: float) -> pathops.Path:

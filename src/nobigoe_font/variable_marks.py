@@ -54,23 +54,33 @@ from .operations import (
     vertical_glyph_or_self,
 )
 from .pipeline import (
+    CONNECTED_STROKE_REFERENCE_CODEPOINTS,
+    OVERLAP,
+    LINEAR_WAVE_TRANSITION_GLYPH_COUNT,
+    LINEAR_MANGA_TRANSITION_GLYPH_COUNT,
+    MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT,
+    WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT,
     MANGA_WAVE_GLYPH_COUNT,
     NEW_GLYPH_COUNT,
     ONE_CYCLE_WAVE_GLYPH_COUNT,
     RELAXED_WAVE_GLYPH_COUNT,
     WAVE_GLYPH_COUNT,
-    WAVE_SELECTOR_GLYPH_COUNT,
-    adjust_linear_stroke_width,
+    connected_stroke_widths,
     flatten_horizontal_centerline,
     make_horizontal_parts,
+    make_linear_wave_transition_parts,
+    make_linear_manga_transition_parts,
     make_manga_wave_parts,
+    make_manga_to_wave_transition_parts,
+    make_wave_to_manga_transition_parts,
     make_one_cycle_wave_parts,
     make_relaxed_wave_parts,
     make_vertical_parts,
     make_wave_parts,
+    make_wave_stroke_model,
+    normalize_linear_stroke_width,
 )
 from .profiles import (
-    NOTO_CHOON_STROKE_ADJUSTMENTS,
     NOTO_WEIGHT_CLASSES,
     SHIPPORI_STROKE_ADJUSTMENTS,
 )
@@ -531,9 +541,9 @@ def _split_horizontal_parts(
     seam = advance / 2
     start_cap, end_cap = _split_caps(outline, "horizontal", seam)
     y_min, y_max = _cap_cut_span(start_cap, "horizontal")
-    start_bar = geometry.rectangle(seam, y_min, advance, y_max)
-    middle = geometry.rectangle(0, y_min, advance, y_max)
-    end_bar = geometry.rectangle(0, y_min, seam, y_max)
+    start_bar = geometry.rectangle(seam, y_min, advance + OVERLAP, y_max)
+    middle = geometry.rectangle(-OVERLAP, y_min, advance + OVERLAP, y_max)
+    end_bar = geometry.rectangle(-OVERLAP, y_min, seam, y_max)
     return (
         _overlaid_path(start_cap, start_bar),
         middle,
@@ -549,9 +559,9 @@ def _split_vertical_parts(
     x_min, x_max = _cap_cut_span(bottom_cap, "vertical")
     cell_top = vertical_origin
     cell_bottom = vertical_origin - advance
-    start_bar = geometry.rectangle(x_min, cell_bottom, x_max, seam)
-    middle = geometry.rectangle(x_min, cell_bottom, x_max, cell_top)
-    end_bar = geometry.rectangle(x_min, seam, x_max, cell_top)
+    start_bar = geometry.rectangle(x_min, cell_bottom - OVERLAP, x_max, seam)
+    middle = geometry.rectangle(x_min, cell_bottom - OVERLAP, x_max, cell_top + OVERLAP)
+    end_bar = geometry.rectangle(x_min, seam, x_max, cell_top + OVERLAP)
     return (
         _overlaid_path(top_cap, start_bar),
         middle,
@@ -630,62 +640,95 @@ def _append_symbols(
     model: _DeltaModel,
     vsindex: int,
 ) -> None:
+    reference_names = [
+        cmap[codepoint] for codepoint in CONNECTED_STROKE_REFERENCE_CODEPOINTS
+    ]
+    reference_vertical_names = [vertical_sources[name] for name in reference_names]
+    stroke_widths = {
+        weight: connected_stroke_widths(
+            [paths[weight][name] for name in reference_names],
+            [paths[weight][name] for name in reference_vertical_names],
+        )
+        for weight in _WEIGHTS
+    }
+    wave_base = cmap[0x301C]
+    wave_stroke_models = {
+        weight: make_wave_stroke_model(
+            paths[weight][wave_base],
+            1000,
+            stroke_widths[weight],
+        )
+        for weight in _WEIGHTS
+    }
     allocated = allocate_cid_names(
         font,
         2 * NEW_GLYPH_COUNT
         + WAVE_GLYPH_COUNT
         + RELAXED_WAVE_GLYPH_COUNT
         + ONE_CYCLE_WAVE_GLYPH_COUNT
-        + WAVE_SELECTOR_GLYPH_COUNT
+        + 2 * LINEAR_WAVE_TRANSITION_GLYPH_COUNT
+        + 2 * LINEAR_MANGA_TRANSITION_GLYPH_COUNT
+        + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+        + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
         + MANGA_WAVE_GLYPH_COUNT,
     )
     extensions = []
+    linear_masters = []
     offset = 0
     for prefix, codepoint in (("choon", 0x30FC), ("dash", 0x2015)):
         base = cmap[codepoint]
         vertical = vertical_sources[base]
         names = allocated[offset : offset + NEW_GLYPH_COUNT]
         offset += NEW_GLYPH_COUNT
-        masters = []
-        if codepoint == 0x30FC:
-            horizontal_masters = []
-            vertical_masters = []
-            for weight in _WEIGHTS:
-                horizontal_outline = adjust_linear_stroke_width(
-                    flatten_horizontal_centerline(paths[weight][base], 1000),
-                    "horizontal",
-                    500,
-                    NOTO_CHOON_STROKE_ADJUSTMENTS[weight],
+        horizontal_masters = []
+        vertical_masters = []
+        for weight in _WEIGHTS:
+            horizontal_outline = paths[weight][base]
+            if codepoint == 0x30FC:
+                horizontal_outline = flatten_horizontal_centerline(
+                    horizontal_outline, 1000
                 )
+            horizontal_outline = normalize_linear_stroke_width(
+                horizontal_outline,
+                "horizontal",
+                500,
+                1000,
+                stroke_widths[weight].horizontal,
+            )
+            vertical_outline = normalize_linear_stroke_width(
+                paths[weight][vertical],
+                "vertical",
+                400,
+                1000,
+                stroke_widths[weight].vertical,
+            )
+            if codepoint == 0x30FC:
                 horizontal_masters.append(
                     _split_horizontal_parts(horizontal_outline, 1000)
                 )
                 vertical_masters.append(
                     _split_vertical_parts(
-                        adjust_linear_stroke_width(
-                            paths[weight][vertical],
-                            "vertical",
-                            400,
-                            NOTO_CHOON_STROKE_ADJUSTMENTS[weight],
-                        ),
+                        vertical_outline,
                         1000,
                         _SYMBOL_VERTICAL_ORIGIN,
                     )
                 )
+            else:
+                horizontal_masters.append(
+                    make_horizontal_parts(horizontal_outline, 1000)
+                )
+                vertical_masters.append(
+                    make_vertical_parts(vertical_outline, 1000, _SYMBOL_VERTICAL_ORIGIN)
+                )
+        if codepoint == 0x30FC:
             vertical_masters = _normalize_vertical_parts(vertical_masters)
-            masters = [
-                horizontal + vertical_parts
-                for horizontal, vertical_parts in zip(
-                    horizontal_masters, vertical_masters, strict=True
-                )
-            ]
-        else:
-            for weight in _WEIGHTS:
-                horizontal = make_horizontal_parts(paths[weight][base], 1000)
-                vertical_parts = make_vertical_parts(
-                    paths[weight][vertical], 1000, _SYMBOL_VERTICAL_ORIGIN
-                )
-                masters.append(horizontal + vertical_parts)
+        masters = [
+            horizontal + vertical_parts
+            for horizontal, vertical_parts in zip(
+                horizontal_masters, vertical_masters, strict=True
+            )
+        ]
+        linear_masters.append(masters)
         _append_glyphs(
             font,
             top,
@@ -697,14 +740,18 @@ def _append_symbols(
         )
         extensions.append((prefix, base, vertical, names))
 
-    wave_base = cmap[0x301C]
     wave_vertical = vertical_sources[wave_base]
     wave_names = allocated[offset : offset + WAVE_GLYPH_COUNT]
     offset += WAVE_GLYPH_COUNT
     wave_masters = []
     for weight in _WEIGHTS:
         wave_masters.append(
-            make_wave_parts(paths[weight][wave_base], 1000, _SYMBOL_VERTICAL_ORIGIN)
+            make_wave_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
+            )
         )
     _append_glyphs(
         font,
@@ -726,6 +773,7 @@ def _append_symbols(
                 paths[weight][wave_base],
                 1000,
                 _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
             )
         )
     _append_glyphs(
@@ -747,6 +795,7 @@ def _append_symbols(
                 paths[weight][wave_base],
                 1000,
                 _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
             )
         )
     _append_glyphs(
@@ -765,33 +814,94 @@ def _append_symbols(
         one_cycle_names,
     )
 
-    selector_seed = allocated[offset]
-    offset += WAVE_SELECTOR_GLYPH_COUNT
+    relaxed_wave = (
+        "relaxed_wave",
+        wave_base,
+        wave_vertical,
+        relaxed_names,
+    )
+
+    linear_wave_transitions = []
+    for index, (prefix, base, _, _) in enumerate(extensions):
+        names = allocated[offset : offset + LINEAR_WAVE_TRANSITION_GLYPH_COUNT]
+        offset += LINEAR_WAVE_TRANSITION_GLYPH_COUNT
+        transition_masters = [
+            make_linear_wave_transition_parts(
+                linear_masters[index][weight_index],
+                wave_masters[weight_index],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+            )
+            for weight_index in range(len(_WEIGHTS))
+        ]
+        _append_glyphs(
+            font,
+            top,
+            _named_master_outlines(names, transition_masters),
+            model,
+            vsindex,
+            base,
+            _SYMBOL_VERTICAL_ORIGIN,
+        )
+        linear_wave_transitions.append((f"{prefix}_wave", names))
+
+    manga_base = cmap[0x3030]
+    transition_names = allocated[offset : offset + MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT]
+    offset += MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT
+    transition_masters = []
+    for weight in _WEIGHTS:
+        transition_masters.append(
+            make_manga_to_wave_transition_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
+            )
+        )
     _append_glyphs(
         font,
         top,
-        [(selector_seed, [paths[weight][wave_base] for weight in _WEIGHTS])],
+        _named_master_outlines(transition_names, transition_masters),
         model,
         vsindex,
         wave_base,
         _SYMBOL_VERTICAL_ORIGIN,
     )
-    relaxed_wave = (
-        "relaxed_wave",
-        wave_base,
-        wave_vertical,
-        cmap[0x3030],
-        selector_seed,
-        relaxed_names,
+    manga_to_wave_transition = ("manga_to_wave", transition_names)
+    reverse_transition_names = allocated[
+        offset : offset + WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
+    ]
+    offset += WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT
+    reverse_transition_masters = []
+    for weight in _WEIGHTS:
+        reverse_transition_masters.append(
+            make_wave_to_manga_transition_parts(
+                paths[weight][wave_base],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+                wave_stroke_models[weight],
+            )
+        )
+    _append_glyphs(
+        font,
+        top,
+        _named_master_outlines(reverse_transition_names, reverse_transition_masters),
+        model,
+        vsindex,
+        manga_base,
+        _SYMBOL_VERTICAL_ORIGIN,
     )
-
-    manga_base = cmap[0x3030]
+    wave_to_manga_transition = ("wave_to_manga", reverse_transition_names)
     manga_names = allocated[offset : offset + MANGA_WAVE_GLYPH_COUNT]
+    offset += MANGA_WAVE_GLYPH_COUNT
     manga_isolated = []
     manga_masters = []
     for weight in _WEIGHTS:
         isolated, parts = make_manga_wave_parts(
-            paths[weight][wave_base], 1000, _SYMBOL_VERTICAL_ORIGIN
+            paths[weight][wave_base],
+            1000,
+            _SYMBOL_VERTICAL_ORIGIN,
+            wave_stroke_models[weight],
         )
         manga_isolated.append(isolated)
         manga_masters.append(parts)
@@ -814,10 +924,41 @@ def _append_symbols(
         _SYMBOL_VERTICAL_ORIGIN,
     )
     manga_wave = ("manga_wave", manga_base, manga_names)
+    linear_manga_transitions = []
+    for index, (prefix, base, _, _) in enumerate(extensions):
+        names = allocated[offset : offset + LINEAR_MANGA_TRANSITION_GLYPH_COUNT]
+        offset += LINEAR_MANGA_TRANSITION_GLYPH_COUNT
+        transition_masters = [
+            make_linear_manga_transition_parts(
+                linear_masters[index][weight_index],
+                manga_masters[weight_index],
+                1000,
+                _SYMBOL_VERTICAL_ORIGIN,
+            )
+            for weight_index in range(len(_WEIGHTS))
+        ]
+        _append_glyphs(
+            font,
+            top,
+            _named_master_outlines(names, transition_masters),
+            model,
+            vsindex,
+            base,
+            _SYMBOL_VERTICAL_ORIGIN,
+        )
+        linear_manga_transitions.append((f"{prefix}_manga", names))
     merge_features(
         font,
         symbol_feature_source(
-            extensions, wave, relaxed_wave, manga_wave, one_cycle_wave
+            extensions,
+            wave,
+            relaxed_wave,
+            manga_wave,
+            one_cycle_wave,
+            manga_to_wave_transition,
+            wave_to_manga_transition,
+            linear_wave_transitions,
+            linear_manga_transitions,
         ),
     )
 
@@ -1303,6 +1444,7 @@ def build_variable_marks(
         0x309B,
         0x309C,
         0x30FC,
+        *CONNECTED_STROKE_REFERENCE_CODEPOINTS,
         *(base for base, _ in KOBURI_HEART_MARK_PAIRS),
         *(base for base, _ in MANGA_MARK_PAIRS if base not in MANGA_MISSING_SMALL_KANA),
     }
@@ -1334,9 +1476,8 @@ def build_variable_marks(
         cmap[0x309A],
         *(cmap[base] for base, _ in generated if base in cmap),
     }
-    names.update(
-        cmap[codepoint] for codepoint in (0x2015, 0x301C, 0x3030, 0x30FC)
-    )
+    names.update(cmap[codepoint] for codepoint in (0x2015, 0x301C, 0x3030, 0x30FC))
+    names.update(cmap[codepoint] for codepoint in CONNECTED_STROKE_REFERENCE_CODEPOINTS)
     vertical_sources = {name: vertical_glyph_or_self(font, name) for name in names}
     names.update(vertical_sources.values())
     names.update(cmap[base] for base, _ in KOBURI_HEART_MARK_PAIRS)
