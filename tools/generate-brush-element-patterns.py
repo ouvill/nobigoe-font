@@ -6,6 +6,7 @@ import math
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, TypeAlias
 
 import pathops
 from fontTools.misc.transform import Transform
@@ -16,6 +17,18 @@ from fontTools.ttLib import TTFont
 
 from nobigoe_font import geometry
 from nobigoe_font.brush import BrushElementStyle, apply_brush_elements
+
+Point: TypeAlias = tuple[float, float]
+_SILVER_RATIO = math.sqrt(2.0)
+_GOLDEN_FALL_ANGLE = math.radians(36.0)
+_GOLDEN_RISE_ANGLE = math.pi / 2.0 - _GOLDEN_FALL_ANGLE
+_VERTICAL_START_STEM_WIDTH = 68.0
+
+
+class _TriangularCapPen(Protocol):
+    def lineTo(self, point: Point) -> None: ...
+
+    def curveTo(self, first: Point, second: Point, end: Point) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -58,8 +71,8 @@ PATTERNS = (
     ),
     Pattern(
         "d",
-        "D 穏健構造",
-        "接線を連続させ、張り出しと角の変化を抑える。",
+        "D 比率円弧",
+        "線幅由来の比率と円弧半径で骨格を組み立てる。",
     ),
     Pattern("genryu", "源流明朝", "実輪郭の参照形"),
 )
@@ -198,7 +211,7 @@ def _load_selection(path: Path) -> dict[str, str]:
             raise ValueError(f"Unknown choice {choice!r} for {element!r} in {path}")
         normalized_choice = choice.lower()
         if normalized_choice not in {"a", "b", "c"} and not (
-            element == "end" and normalized_choice == "d"
+            element in {"end", "uroko", "fold"} and normalized_choice == "d"
         ):
             raise ValueError(f"Unknown choice {choice!r} for {element!r} in {path}")
         selected[element] = normalized_choice
@@ -257,6 +270,108 @@ def _split_cubic(
     )
 
 
+def _draw_rounded_corner(
+    pen: _TriangularCapPen,
+    *,
+    vertex: Point,
+    incoming: Point,
+    outgoing: Point,
+    radius: float,
+) -> None:
+    """Replace one sharp vertex with tangent cubic circular-arc segments."""
+
+    incoming_length = math.hypot(*incoming)
+    outgoing_length = math.hypot(*outgoing)
+    if incoming_length == 0 or outgoing_length == 0:
+        raise ValueError("Rounded-corner directions must be nonzero")
+    incoming_unit = (
+        incoming[0] / incoming_length,
+        incoming[1] / incoming_length,
+    )
+    outgoing_unit = (
+        outgoing[0] / outgoing_length,
+        outgoing[1] / outgoing_length,
+    )
+    dot = max(
+        -1.0,
+        min(
+            1.0,
+            incoming_unit[0] * outgoing_unit[0] + incoming_unit[1] * outgoing_unit[1],
+        ),
+    )
+    cross = incoming_unit[0] * outgoing_unit[1] - incoming_unit[1] * outgoing_unit[0]
+    turn = math.atan2(cross, dot)
+    angle = abs(turn)
+    if angle == 0.0 or angle == math.pi:
+        raise ValueError("Rounded-corner directions must form a proper angle")
+    tangent_distance = radius * math.tan(angle / 2.0)
+    start = (
+        vertex[0] - tangent_distance * incoming_unit[0],
+        vertex[1] - tangent_distance * incoming_unit[1],
+    )
+    end = (
+        vertex[0] + tangent_distance * outgoing_unit[0],
+        vertex[1] + tangent_distance * outgoing_unit[1],
+    )
+    turn_sign = math.copysign(1.0, turn)
+    center = (
+        start[0] - turn_sign * radius * incoming_unit[1],
+        start[1] + turn_sign * radius * incoming_unit[0],
+    )
+    radial = (start[0] - center[0], start[1] - center[1])
+    tangent = incoming_unit
+    segment_count = math.ceil(angle / (math.pi / 2.0))
+    segment_turn = turn / segment_count
+    handle = 4.0 * radius * math.tan(abs(segment_turn) / 4.0) / 3.0
+
+    pen.lineTo(start)
+    for index in range(segment_count):
+        cosine = math.cos(segment_turn)
+        sine = math.sin(segment_turn)
+        next_radial = (
+            radial[0] * cosine - radial[1] * sine,
+            radial[0] * sine + radial[1] * cosine,
+        )
+        next_tangent = (
+            tangent[0] * cosine - tangent[1] * sine,
+            tangent[0] * sine + tangent[1] * cosine,
+        )
+        segment_end = (
+            end
+            if index + 1 == segment_count
+            else (center[0] + next_radial[0], center[1] + next_radial[1])
+        )
+        first = (
+            center[0] + radial[0] + handle * tangent[0],
+            center[1] + radial[1] + handle * tangent[1],
+        )
+        second = (
+            segment_end[0] - handle * next_tangent[0],
+            segment_end[1] - handle * next_tangent[1],
+        )
+        pen.curveTo(first, second, segment_end)
+        radial = next_radial
+        tangent = next_tangent
+
+
+def _draw_vertical_start_right_return(
+    pen: _TriangularCapPen,
+    *,
+    apex: Point,
+    stem_x: float,
+    stroke_width: float,
+) -> None:
+    """Draw the short outer return shared with the vertical-stroke start."""
+    pressure = stroke_width * (1.0 - 1.0 / _SILVER_RATIO)
+    handle = pressure / (2.0 * _SILVER_RATIO)
+    body = (stem_x, apex[1] - pressure)
+    pen.curveTo(
+        (apex[0], apex[1] - handle),
+        (stem_x, body[1] + handle),
+        body,
+    )
+
+
 def _prototype_start(variant: str) -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
@@ -280,10 +395,11 @@ def _prototype_start(variant: str) -> pathops.Path:
             (556.1665222413704, 795.5559406896788),
             (556.1665222413704, 780),
         )
-        pen.curveTo(
-            (556.1665222413704, 772.9583694396574),
-            (528, 767.1248916810279),
-            (528, 760.0832611206853),
+        _draw_vertical_start_right_return(
+            pen,
+            apex=(556.1665222413704, 780),
+            stem_x=528,
+            stroke_width=_VERTICAL_START_STEM_WIDTH,
         )
         pen.lineTo((528, 540))
     else:
@@ -312,16 +428,15 @@ def _prototype_end(variant: str) -> pathops.Path:
 
     if variant == "d":
         width = 68.0
-        ratio = math.sqrt(2.0)
-        pressure = width * (1.0 - 1.0 / ratio)
+        pressure = width * (1.0 - 1.0 / _SILVER_RATIO)
         total_extension = pressure / 3.0
-        left_extension = total_extension * ratio / (1.0 + ratio)
-        right_extension = total_extension / (1.0 + ratio)
+        left_extension = total_extension * _SILVER_RATIO / (1.0 + _SILVER_RATIO)
+        right_extension = total_extension / (1.0 + _SILVER_RATIO)
         left_height = pressure
-        right_height = pressure * ratio
-        left_run = width * (3.0 * ratio - 2.0)
+        right_height = pressure * _SILVER_RATIO
+        left_run = width * (3.0 * _SILVER_RATIO - 2.0)
         right_run = 2.0 * width
-        kappa = 4.0 * (ratio - 1.0) / 3.0
+        kappa = 4.0 * (_SILVER_RATIO - 1.0) / 3.0
 
         left_stem_x = 460.0
         right_stem_x = left_stem_x + width
@@ -336,7 +451,7 @@ def _prototype_end(variant: str) -> pathops.Path:
         )
         cap_width = width + total_extension
         bottom = (
-            left_outer[0] + cap_width / (1.0 + ratio),
+            left_outer[0] + cap_width / (1.0 + _SILVER_RATIO),
             baseline_y,
         )
         left_body = (left_stem_x, left_outer[1] + left_run)
@@ -424,6 +539,57 @@ def _prototype_uroko(variant: str) -> pathops.Path:
         pen.curveTo((882, 482), (941, 438), (941, 413))
         pen.curveTo((941, 401), (926, 398), (911, 398))
         pen.lineTo((750, 398))
+    elif variant == "d":
+        top_y = 431.0
+        bottom_y = 398.0
+        stroke_width = top_y - bottom_y
+        radius = stroke_width / 2.0
+        root = (764.0, top_y)
+        triangle_height = (1.0 + _SILVER_RATIO) * stroke_width
+        rise_direction = (
+            math.cos(_GOLDEN_RISE_ANGLE),
+            math.sin(_GOLDEN_RISE_ANGLE),
+        )
+        fall_direction = (
+            math.cos(_GOLDEN_FALL_ANGLE),
+            -math.sin(_GOLDEN_FALL_ANGLE),
+        )
+        apex = (
+            root[0] + triangle_height / math.tan(_GOLDEN_RISE_ANGLE),
+            top_y + triangle_height,
+        )
+        right_base = (
+            apex[0] + triangle_height / math.tan(_GOLDEN_FALL_ANGLE),
+            top_y,
+        )
+        right_vertex = (
+            right_base[0] + stroke_width / math.tan(_GOLDEN_FALL_ANGLE),
+            bottom_y,
+        )
+
+        pen.moveTo((750, top_y))
+        _draw_rounded_corner(
+            pen,
+            vertex=root,
+            incoming=(1.0, 0.0),
+            outgoing=rise_direction,
+            radius=radius,
+        )
+        _draw_rounded_corner(
+            pen,
+            vertex=apex,
+            incoming=rise_direction,
+            outgoing=fall_direction,
+            radius=radius,
+        )
+        _draw_rounded_corner(
+            pen,
+            vertex=right_vertex,
+            incoming=fall_direction,
+            outgoing=(-1.0, 0.0),
+            radius=radius,
+        )
+        pen.lineTo((750, bottom_y))
     else:
         pen.moveTo((785, 468))
         pen.lineTo((750, 431))
@@ -654,6 +820,65 @@ def _prototype_fold(variant: str) -> pathops.Path:
         pen.lineTo((767, 480))
         pen.lineTo((767, 657))
         pen.lineTo((640, 657))
+    elif variant == "d":
+        top_y = 687.0
+        bottom_y = 657.0
+        stroke_width = top_y - bottom_y
+        radius = stroke_width / 2.0
+        root = (755.0, top_y)
+        triangle_height = 51.0
+        fall_angle = _GOLDEN_FALL_ANGLE
+        rise_angle = _GOLDEN_RISE_ANGLE
+        rise_direction = (math.cos(rise_angle), math.sin(rise_angle))
+        fall_direction = (math.cos(fall_angle), -math.sin(fall_angle))
+        apex = (
+            root[0] + triangle_height / math.tan(rise_angle),
+            top_y + triangle_height,
+        )
+        turn_y = (top_y + bottom_y) / 2.0
+        stem_left_x = 767.0
+        stem_right_x = 832.0
+        stem_width = stem_right_x - stem_left_x
+        right_vertex = (
+            apex[0] + (apex[1] - turn_y) / math.tan(fall_angle),
+            turn_y,
+        )
+        outer_turn = math.pi / 2.0 - fall_angle
+        corner_tangent = radius * math.tan(outer_turn / 2.0)
+        outer_apex = (right_vertex[0], right_vertex[1] - corner_tangent)
+
+        pen.moveTo((640, top_y))
+        _draw_rounded_corner(
+            pen,
+            vertex=root,
+            incoming=(1.0, 0.0),
+            outgoing=rise_direction,
+            radius=radius,
+        )
+        _draw_rounded_corner(
+            pen,
+            vertex=apex,
+            incoming=rise_direction,
+            outgoing=fall_direction,
+            radius=radius,
+        )
+        _draw_rounded_corner(
+            pen,
+            vertex=right_vertex,
+            incoming=fall_direction,
+            outgoing=(0.0, -1.0),
+            radius=radius,
+        )
+        _draw_vertical_start_right_return(
+            pen,
+            apex=outer_apex,
+            stem_x=stem_right_x,
+            stroke_width=stem_width,
+        )
+        pen.lineTo((stem_right_x, 480))
+        pen.lineTo((stem_left_x, 480))
+        pen.lineTo((stem_left_x, bottom_y))
+        pen.lineTo((640, bottom_y))
     else:
         pen.moveTo((640, 690))
         pen.lineTo((736, 690))
@@ -1065,7 +1290,7 @@ def _page(
         confirmed_choice = selection.get(element_key)
         cards: list[str] = []
         for pattern in PATTERNS:
-            if pattern.key == "d" and element_key != "end":
+            if pattern.key == "d" and element_key not in {"end", "uroko", "fold"}:
                 continue
             outline = _pattern_outline(
                 pattern,
@@ -1077,7 +1302,7 @@ def _page(
             )
             choice = pattern.key.upper()
             selectable = pattern.key in {"a", "b", "c"} or (
-                element_key == "end" and pattern.key == "d"
+                element_key in {"end", "uroko", "fold"} and pattern.key == "d"
             )
             filename = _design_filename(element_key, pattern.key)
             _write_editable_svg(
@@ -1125,6 +1350,12 @@ def _page(
             )
             if element_key == "uroko" and pattern.key == "b":
                 note = "右斜めへ立ち上がる起点と天頂だけへ" "小さな丸みを加えた確定案。"
+            if element_key == "uroko" and pattern.key == "d":
+                card_label = "D 黄金角円弧"
+                note = (
+                    "骨格高を横画幅の(1+√2)倍に保ち、上り54°・下り36°の"
+                    "補角骨格を起点・頂部・右端ともR=w/2で丸める。"
+                )
             if element_key == "start" and pattern.key == "b":
                 note = (
                     "左辺は白銀比から求めた仮想円弧で長く収束し、"
@@ -1148,6 +1379,12 @@ def _page(
                 note = (
                     "側面を三次smoothstep、底部を四分楕円として接線を連続させ、"
                     "張り出しを白銀比圧力の3分の1へ抑えた静かな留め。"
+                )
+            if element_key == "fold" and pattern.key == "d":
+                card_label = "D 黄金角＋起筆"
+                note = (
+                    "上り54°・下り36°の斜辺を横画中央上の外角まで伸ばし、"
+                    "R=w/2の円弧と縦画起筆Bの筆置き曲線で縦画へ戻す。"
                 )
             if element_key == "horizontal-start" and pattern.key == "b":
                 note = (
@@ -1183,13 +1420,13 @@ def _page(
 *{{box-sizing:border-box}}body{{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans JP",sans-serif}}
 main{{max-width:1640px;margin:auto;padding:48px 36px 80px}}h1{{font:700 38px/1.2 serif;margin:0 0 12px}}.lead{{max-width:900px;font-size:17px;line-height:1.8;margin:0 0 52px}}
 section{{border-top:1px solid var(--line);padding:34px 0 46px}}section>header{{display:grid;grid-template-columns:120px 120px 1fr;align-items:baseline;gap:12px;margin-bottom:20px}}h2{{font:700 28px serif;margin:0}}.eyebrow{{font:700 11px monospace;letter-spacing:.14em;color:var(--accent)}}section header p{{margin:0;line-height:1.6}}
-        .cards{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}}#end .cards{{grid-template-columns:repeat(6,minmax(0,1fr))}}.card{{background:var(--card);border:1px solid var(--line);padding:16px;min-width:0}}.card.selected{{border:3px solid var(--accent);padding:14px}}h3{{margin:0 0 10px;font-size:16px}}svg{{display:block;width:100%;height:360px;background:#fff;border:1px solid #eee}}svg path{{fill:var(--ink)}}.card p{{font-size:13px;line-height:1.6;min-height:42px;margin:10px 0;color:#554d43}}.choice{{display:inline-block;padding:4px 8px;background:var(--accent);color:white;font:700 12px monospace;margin-left:8px}}.pick{{display:block;border-top:1px solid var(--line);padding-top:10px;font-weight:700;cursor:pointer}}.pick input{{margin-right:8px}}.selection{{position:sticky;top:12px;z-index:2;display:flex;gap:14px;align-items:center;background:#171512;color:#fff;padding:12px 16px;margin:0 0 36px;font:700 13px/1.5 monospace}}.selection output{{flex:1}}button{{font:inherit;cursor:pointer}}.combination-cards .card p{{min-height:0}}
+        .cards{{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}}#end .cards,#uroko .cards,#fold .cards{{grid-template-columns:repeat(6,minmax(0,1fr))}}.card{{background:var(--card);border:1px solid var(--line);padding:16px;min-width:0}}.card.selected{{border:3px solid var(--accent);padding:14px}}h3{{margin:0 0 10px;font-size:16px}}svg{{display:block;width:100%;height:360px;background:#fff;border:1px solid #eee}}svg path{{fill:var(--ink)}}.card p{{font-size:13px;line-height:1.6;min-height:42px;margin:10px 0;color:#554d43}}.choice{{display:inline-block;padding:4px 8px;background:var(--accent);color:white;font:700 12px monospace;margin-left:8px}}.pick{{display:block;border-top:1px solid var(--line);padding-top:10px;font-weight:700;cursor:pointer}}.pick input{{margin-right:8px}}.selection{{position:sticky;top:12px;z-index:2;display:flex;gap:14px;align-items:center;background:#171512;color:#fff;padding:12px 16px;margin:0 0 36px;font:700 13px/1.5 monospace}}.selection output{{flex:1}}button{{font:inherit;cursor:pointer}}.combination-cards .card p{{min-height:0}}
 svg{{overflow:hidden}}
 .handles line{{stroke:#3478a8;stroke-width:.8;vector-effect:non-scaling-stroke}}.handles .anchor{{fill:#1677b8;stroke:white;stroke-width:.6;vector-effect:non-scaling-stroke}}.handles .control{{fill:#d4422f;stroke:white;stroke-width:.6;vector-effect:non-scaling-stroke}}.hide-handles .handles{{display:none}}.topology{{font-family:monospace;color:var(--accent)!important;min-height:0!important}}#nodes{{border:1px solid #fff;background:transparent!important}}
 .card-actions{{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}}.card-actions .pick{{border:0;padding:0}}.card-actions a,.upload{{display:block;padding:7px 9px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer}}.upload input{{display:block;width:100%;margin-top:6px;font-size:10px}}.card.custom{{outline:3px dashed #3478a8;outline-offset:-7px}}.card.custom .topology{{color:#3478a8!important}}
-        @media(max-width:1000px){{.cards,#end .cards{{grid-template-columns:repeat(2,1fr)}}section>header{{grid-template-columns:1fr}}}}@media(max-width:600px){{main{{padding:24px 14px}}.cards,#end .cards{{grid-template-columns:1fr}}}}
+        @media(max-width:1000px){{.cards,#end .cards,#uroko .cards,#fold .cards{{grid-template-columns:repeat(2,1fr)}}section>header{{grid-template-columns:1fr}}}}@media(max-width:600px){{main{{padding:24px 14px}}.cards,#end .cards,#uroko .cards,#fold .cards{{grid-template-columns:1fr}}}}
 </style></head><body><main><h1>漢字毛筆エレメント デザインパターン</h1>
-        <p class="lead">フォント全体をビルドせず、コードで定義したエレメント単体の輪郭トポロジーをSVGで比較します。A / B / Cは比率違いではなく、輪郭セグメントとオンカーブ点・オフカーブ制御点の構成自体が異なります。終筆Dは、角のない穏やかな別構造を追加比較します。書き出したSVGと保管済みSVGは判断・指示用の参考データであり、コードへ再入力しません。Inkscapeで試作した輪郭は、同じカードのファイル入力へ読み込むとその場だけでプレビューできます。<span class="choice">確定選択はselection.jsonから読込</span></p>
+        <p class="lead">フォント全体をビルドせず、コードで定義したエレメント単体の輪郭トポロジーをSVGで比較します。A / B / Cは比率違いではなく、輪郭セグメントとオンカーブ点・オフカーブ制御点の構成自体が異なります。終筆・ウロコ・折れのDは、角や張りを抑えた穏やかな別構造を追加比較します。書き出したSVGと保管済みSVGは判断・指示用の参考データであり、コードへ再入力しません。Inkscapeで試作した輪郭は、同じカードのファイル入力へ読み込むとその場だけでプレビューできます。<span class="choice">確定選択はselection.jsonから読込</span></p>
 <div class="selection"><output id="selection">{initial_selection}</output><button id="nodes" type="button">制御点を隠す</button><button id="copy" type="button">選択をコピー</button><button id="save" type="button">選択JSONを保存</button></div>
 {"".join(sections)}</main><script>
 const labels={json.dumps(labels, ensure_ascii=False)};
