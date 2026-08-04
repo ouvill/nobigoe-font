@@ -91,6 +91,51 @@ def repeated_glyph_rules(prefix: str, base: str, replacement: str) -> str:
 """
 
 
+def linear_wave_transition_rules(
+    prefix: str,
+    linear_base: str,
+    linear_names: Sequence[str],
+    wave_base: str,
+    wave_start: str,
+    wave_middles: Sequence[str],
+    wave_ends: Sequence[str],
+    transition_names: Sequence[str],
+) -> str:
+    linear_start, linear_middle, linear_end = linear_names
+    (
+        line_to_wave,
+        line_to_wave_end,
+        line_wave_line,
+        wave_to_line_start,
+        *wave_to_line,
+    ) = transition_names
+    if len(wave_middles) != len(wave_ends) or len(wave_middles) != len(wave_to_line):
+        raise ValueError("Wave transition phases must have matching lengths")
+    wave_to_line_rules = "".join(
+        f"    sub {wave_end}' [{linear_base} {linear_start}] by {transition};\n"
+        for wave_end, transition in zip(wave_ends, wave_to_line, strict=True)
+    )
+    reverse_transitions = " ".join((line_wave_line, wave_to_line_start, *wave_to_line))
+    return f"""
+  lookup {prefix}_line_terminal {{
+    sub {linear_base}' [{wave_base} {wave_start}] by {linear_start};
+    sub {linear_end}' [{wave_base} {wave_start}] by {linear_middle};
+  }} {prefix}_line_terminal;
+  lookup {prefix}_line_to_wave {{
+    sub [{linear_start} {linear_middle}] {wave_base}' [{linear_base} {linear_start}] by {line_wave_line};
+    sub [{linear_start} {linear_middle}] {wave_base}' by {line_to_wave_end};
+    sub [{linear_start} {linear_middle}] {wave_start}' by {line_to_wave};
+  }} {prefix}_line_to_wave;
+  lookup {prefix}_wave_terminal {{
+    sub {wave_base}' [{linear_base} {linear_start}] by {wave_to_line_start};
+{wave_to_line_rules}  }} {prefix}_wave_terminal;
+  lookup {prefix}_wave_to_line {{
+    sub [{reverse_transitions}] {linear_base}' by {linear_end};
+    sub [{reverse_transitions}] {linear_start}' by {linear_middle};
+  }} {prefix}_wave_to_line;
+"""
+
+
 def mixed_wave_scan_rules(
     prefix: str,
     manga_base: str,
@@ -177,6 +222,8 @@ def _symbol_feature_rules(
     manga_wave: tuple[str, str, list[str]],
     manga_to_wave_transition: tuple[str, list[str]],
     wave_to_manga_transition: tuple[str, list[str]],
+    linear_wave_transitions: list[tuple[str, list[str]]],
+    linear_manga_transitions: list[tuple[str, list[str]]],
 ) -> tuple[str, str, str, str, str]:
     calt_rules: list[str] = []
     vert_rules: list[str] = []
@@ -474,6 +521,116 @@ def _symbol_feature_rules(
         )
         + manga_wave_vertical_maps
     )
+
+    def append_linear_transition_family_rules(
+        transitions: list[tuple[str, list[str]]],
+        horizontal_base: str,
+        horizontal_start: str,
+        horizontal_middles: Sequence[str],
+        horizontal_ends: Sequence[str],
+        vertical_base: str,
+        vertical_start: str,
+        vertical_middles: Sequence[str],
+        vertical_ends: Sequence[str],
+    ) -> None:
+        if len(transitions) != len(extensions):
+            raise ValueError("Each linear extension requires transition glyphs")
+        half_count = 4 + len(horizontal_middles)
+        if (
+            len(horizontal_middles) != len(horizontal_ends)
+            or len(vertical_middles) != len(vertical_ends)
+            or len(vertical_middles) != len(horizontal_middles)
+        ):
+            raise ValueError("Linear transition phase counts must match")
+        for (
+            (
+                extension_prefix,
+                extension_base,
+                extension_vertical,
+                extension_names,
+            ),
+            (transition_prefix, transition_names),
+        ) in zip(extensions, transitions, strict=True):
+            if len(transition_names) != 2 * half_count:
+                raise ValueError("Linear transition glyph count does not match phases")
+            horizontal_linear = extension_names[:3]
+            vertical_linear = extension_names[3:]
+            horizontal_transitions = transition_names[:half_count]
+            vertical_transitions = transition_names[half_count:]
+            family_prefix = f"{transition_prefix}_{extension_prefix}"
+            calt_rules.append(
+                linear_wave_transition_rules(
+                    f"{family_prefix}_h",
+                    extension_base,
+                    horizontal_linear,
+                    horizontal_base,
+                    horizontal_start,
+                    horizontal_middles,
+                    horizontal_ends,
+                    horizontal_transitions,
+                )
+            )
+            calt_rules.append(
+                linear_wave_transition_rules(
+                    f"{family_prefix}_v",
+                    extension_vertical,
+                    vertical_linear,
+                    vertical_base,
+                    vertical_start,
+                    vertical_middles,
+                    vertical_ends,
+                    vertical_transitions,
+                )
+            )
+            for rules, suffix in (
+                (vert_rules, "vert"),
+                (vrt2_rules, "vrt2"),
+            ):
+                rules.append(
+                    linear_wave_transition_rules(
+                        f"{family_prefix}_{suffix}",
+                        extension_base,
+                        vertical_linear,
+                        horizontal_base,
+                        vertical_start,
+                        vertical_middles,
+                        vertical_ends,
+                        vertical_transitions,
+                    )
+                )
+            transition_vertical_maps = "".join(
+                f"  sub {horizontal} by {vertical};\n"
+                for horizontal, vertical in zip(
+                    horizontal_transitions,
+                    vertical_transitions,
+                    strict=True,
+                )
+            )
+            vert_rules.append(transition_vertical_maps)
+            vrt2_rules.append(transition_vertical_maps)
+
+    append_linear_transition_family_rules(
+        linear_wave_transitions,
+        wave_base,
+        horizontal_wave_names[0],
+        horizontal_wave_names[1:3],
+        horizontal_wave_names[3:5],
+        wave_vertical,
+        vertical_wave_names[0],
+        vertical_wave_names[1:3],
+        vertical_wave_names[3:5],
+    )
+    append_linear_transition_family_rules(
+        linear_manga_transitions,
+        manga_wave_base,
+        manga_wave_start,
+        (manga_wave_middle,),
+        (manga_wave_end,),
+        manga_wave_vertical_isolated,
+        manga_wave_vertical_start,
+        (manga_wave_vertical_middle,),
+        (manga_wave_vertical_end,),
+    )
     return (
         ss04_rules,
         ss05_rules,
@@ -491,6 +648,8 @@ def symbol_feature_source(
     one_cycle_wave: tuple[str, str, str, list[str]],
     manga_to_wave_transition: tuple[str, list[str]],
     wave_to_manga_transition: tuple[str, list[str]],
+    linear_wave_transitions: list[tuple[str, list[str]]],
+    linear_manga_transitions: list[tuple[str, list[str]]],
 ) -> str:
     ss04, ss05, calt, vert, vrt2 = _symbol_feature_rules(
         extensions,
@@ -500,6 +659,8 @@ def symbol_feature_source(
         manga_wave,
         manga_to_wave_transition,
         wave_to_manga_transition,
+        linear_wave_transitions,
+        linear_manga_transitions,
     )
     return (
         "languagesystem DFLT dflt;\n\n"
@@ -556,6 +717,8 @@ def feature_source(
     manga_to_wave_transition: tuple[str, list[str]],
     wave_to_manga_transition: tuple[str, list[str]],
     punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
+    linear_wave_transitions: list[tuple[str, list[str]]],
+    linear_manga_transitions: list[tuple[str, list[str]]],
     kana_marks: list[tuple[str, str, str]],
     spacing_marks: Sequence[tuple[str, str, str]],
     kana_vertical_maps: list[tuple[str, str]],
@@ -575,8 +738,9 @@ def feature_source(
         manga_wave,
         manga_to_wave_transition,
         wave_to_manga_transition,
+        linear_wave_transitions,
+        linear_manga_transitions,
     )
-
     kana_vertical_rules = "".join(
         f"  sub {horizontal} by {vertical};\n"
         for horizontal, vertical in kana_vertical_maps

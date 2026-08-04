@@ -158,6 +158,9 @@ class VariableSymbolTests(unittest.TestCase):
                 ),
             )
             self.assertJoined(parts, "horizontal")
+            self.assertGreaterEqual(parts[0].bounds[2], 1008)
+            self.assertEqual(parts[1].bounds[0::2], (-8, 1008))
+            self.assertLessEqual(parts[2].bounds[0], -8)
         for source, parts in zip(vertical_sources, vertical, strict=True):
             low, high = _split_caps(source, "vertical", 400)
             self.assertSameFill(
@@ -177,6 +180,9 @@ class VariableSymbolTests(unittest.TestCase):
                 ),
             )
             self.assertJoined(parts, "vertical")
+            self.assertLessEqual(parts[0].bounds[1], -128)
+            self.assertEqual(parts[1].bounds[1::2], (-128, 888))
+            self.assertGreaterEqual(parts[2].bounds[3], 888)
 
         for parts_by_master in (horizontal, vertical):
             for index, contour_count in enumerate((2, 1, 2)):
@@ -213,6 +219,20 @@ class VariableSymbolTests(unittest.TestCase):
             "reverse-transition",
             [f"reverse-transition{i}" for i in range(8)],
         )
+        linear_transitions = [
+            (
+                f"{prefix}-transition",
+                [f"{prefix}-transition{index}" for index in range(12)],
+            )
+            for prefix in ("choon", "dash")
+        ]
+        linear_manga_transitions = [
+            (
+                f"{prefix}-manga-transition",
+                [f"{prefix}-manga-transition{index}" for index in range(10)],
+            )
+            for prefix in ("choon", "dash")
+        ]
         glyph_order = [
             ".notdef",
             "choon",
@@ -229,6 +249,16 @@ class VariableSymbolTests(unittest.TestCase):
             *one_cycle[3],
             *transition[1],
             *reverse_transition[1],
+            *(
+                name
+                for _, transition_names in linear_transitions
+                for name in transition_names
+            ),
+            *(
+                name
+                for _, transition_names in linear_manga_transitions
+                for name in transition_names
+            ),
         ]
         font = TTFont()
         font.setGlyphOrder(glyph_order)
@@ -243,6 +273,8 @@ class VariableSymbolTests(unittest.TestCase):
                 one_cycle,
                 transition,
                 reverse_transition,
+                linear_transitions,
+                linear_manga_transitions,
             ),
             tables={"GSUB"},
         )
@@ -265,6 +297,10 @@ class VariableSymbolTests(unittest.TestCase):
             "transition3": "transition7",
             "reverse-transition0": "reverse-transition4",
             "reverse-transition3": "reverse-transition7",
+            "choon-transition0": "choon-transition6",
+            "choon-transition5": "choon-transition11",
+            "choon-manga-transition0": "choon-manga-transition5",
+            "choon-manga-transition4": "choon-manga-transition9",
         }
         for tag in ("vert", "vrt2"):
             substitutions = feature_single_substitutions(font, tag)
