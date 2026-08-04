@@ -493,6 +493,20 @@ def _vertical_start_command_indices(
     return frozenset(indices)
 
 
+def _vertical_end_command_indices(
+    element: _VerticalEndElement,
+) -> frozenset[int]:
+    return frozenset(
+        (
+            *element.side_command_indices,
+            *range(
+                element.first_cap_index,
+                element.first_cap_index + element.cap_command_count,
+            ),
+        )
+    )
+
+
 def _terminal_command_indices(element: _TerminalElement) -> frozenset[int]:
     return frozenset(
         (
@@ -730,23 +744,25 @@ def _vertical_start_design(
     )
 
 
-def _vertical_end_design(
-    element: _VerticalEndElement,
+def _vertical_end_design_from_basis(
+    basis: Point,
+    axis: Point,
+    across: Point,
+    width: float,
     axial_scale: float,
     profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE,
 ) -> _VerticalEndDesign:
     dimensions = _vertical_end_dimensions(profile)
-    width = _VERTICAL_REFERENCE_WIDTH
-    basis = element.down_side.end
+    reference_width = _VERTICAL_REFERENCE_WIDTH
 
-    def point(across: float, down: float) -> Point:
+    def point(across_units: float, down_units: float) -> Point:
         return _vertical_design_point(
             basis,
-            element.axis,
-            element.across,
-            element.width,
+            axis,
             across,
-            down,
+            width,
+            across_units,
+            down_units,
             axial_scale,
         )
 
@@ -767,7 +783,7 @@ def _vertical_end_design(
         )
 
     left_outer_across = -dimensions.left_extension
-    right_outer_across = width + dimensions.right_extension
+    right_outer_across = reference_width + dimensions.right_extension
     bottom_across = left_outer_across + dimensions.left_cap_span
     left_body_control_height = dimensions.left_outer_height + dimensions.left_run / 2.0
     right_body_control_height = (
@@ -806,7 +822,7 @@ def _vertical_end_design(
             0.0,
         ),
         second_cap_second_control=point(
-            width,
+            reference_width,
             -dimensions.left_outer_height,
         ),
         right_bottom=point(
@@ -820,11 +836,29 @@ def _vertical_end_design(
             dimensions.right_outer_height,
             -1.0,
         ),
-        right_second_control=point(width, -right_body_control_height),
+        right_second_control=point(
+            reference_width,
+            -right_body_control_height,
+        ),
         right_body=point(
-            width,
+            reference_width,
             -(dimensions.right_outer_height + dimensions.right_run),
         ),
+    )
+
+
+def _vertical_end_design(
+    element: _VerticalEndElement,
+    axial_scale: float,
+    profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE,
+) -> _VerticalEndDesign:
+    return _vertical_end_design_from_basis(
+        element.down_side.end,
+        element.axis,
+        element.across,
+        element.width,
+        axial_scale,
+        profile,
     )
 
 
@@ -1524,25 +1558,43 @@ def _match_vertical_end_curve(
             _dot(offset, pair.axis) / pair.width,
         )
 
-    # Noto preserves this line-and-cubic progression across weights even
-    # though the body width varies substantially. Match the short lead and
-    # both controls against the curve end before accepting the adjacent sides.
+    # Noto uses two line-and-cubic cap constructions for this stroke ending.
+    # The compact form keeps its second control near the far side.  The deeper
+    # form, used by glyphs such as U+6669, brings that control inward while
+    # extending the curve farther down the stem.  Match both in the local
+    # width-relative basis instead of treating the second form as a lookalike.
     line_end = normalized(line_operands[-1])
     first_control, second_control, cap_end = (
         normalized(point) for point in curve_operands
     )
-    if (
-        cap_end[0] <= _GEOMETRY_EPSILON
-        or cap_end[1] >= -_GEOMETRY_EPSILON
-        or not 0.12 <= line_end[0] / cap_end[0] <= 0.32
-        or abs(line_end[1]) > 0.12
-        or not 0.40 <= first_control[0] / cap_end[0] <= 0.75
-        or abs(first_control[1]) > 0.12
-        or not 0.85 <= second_control[0] / cap_end[0] <= 1.15
-        or not 0.35 <= second_control[1] / cap_end[1] <= 0.85
-        or not 0.85 <= cap_end[0] <= 1.15
-        or not -0.65 <= cap_end[1] <= -0.20
-    ):
+    if cap_end[0] <= _GEOMETRY_EPSILON or cap_end[1] >= -_GEOMETRY_EPSILON:
+        return None
+
+    line_ratio = line_end[0] / cap_end[0]
+    first_x_ratio = first_control[0] / cap_end[0]
+    second_x_ratio = second_control[0] / cap_end[0]
+    second_y_ratio = second_control[1] / cap_end[1]
+    compact_cap = (
+        0.10 <= line_ratio <= 0.32
+        and abs(line_end[1]) <= 0.12
+        and 0.40 <= first_x_ratio <= 0.80
+        and abs(first_control[1]) <= 0.12
+        and 0.85 <= second_x_ratio <= 1.15
+        and 0.35 <= second_y_ratio <= 0.85
+        and 0.85 <= cap_end[0] <= 1.15
+        and -0.65 <= cap_end[1] <= -0.20
+    )
+    deep_cap = (
+        0.08 <= line_ratio <= 0.25
+        and abs(line_end[1]) <= 0.16
+        and 0.38 <= first_x_ratio <= 0.55
+        and abs(first_control[1]) <= 0.16
+        and 0.68 <= second_x_ratio <= 0.80
+        and 0.45 <= second_y_ratio <= 0.70
+        and 0.85 <= cap_end[0] <= 1.15
+        and -0.85 <= cap_end[1] <= -0.28
+    )
+    if not compact_cap and not deep_cap:
         return None
 
     return _VerticalEndElement(
@@ -1576,7 +1628,26 @@ def _vertical_end_elements(
             )
             if element is not None:
                 elements.append(element)
-    return tuple(elements)
+    ranked = sorted(
+        enumerate(elements),
+        key=lambda item: (
+            -min(item[1].down_side.length, item[1].up_side.length) / item[1].width,
+            item[0],
+        ),
+    )
+    used_commands: set[int] = set()
+    selected_positions: set[int] = set()
+    for position, element in ranked:
+        command_indices = _vertical_end_command_indices(element)
+        if used_commands.intersection(command_indices):
+            continue
+        used_commands.update(command_indices)
+        selected_positions.add(position)
+    return tuple(
+        element
+        for position, element in enumerate(elements)
+        if position in selected_positions
+    )
 
 
 def _fold_elements(commands: list[Command]) -> tuple[_FoldElement, ...]:
@@ -1997,13 +2068,30 @@ def _box_local_point(
     )
 
 
-def _box_command_edits(element: _BoxElement) -> tuple[_CommandEdit, ...]:
+def _box_command_edits(
+    element: _BoxElement,
+    vertical_end_profile: VerticalEndProfile = DEFAULT_VERTICAL_END_PROFILE,
+) -> tuple[_CommandEdit, ...]:
     left = element.left
     right = element.right
     left_unit_scale = left.width / 67.0
     left_length = math.dist(left.side_start, left.outer_bottom)
     top_scale = min(1.0, 0.45 * left_length / (107.0 * left_unit_scale))
-    bottom_scale = min(1.0, 0.45 * left_length / (220.0 * left_unit_scale))
+    end_dimensions = _vertical_end_dimensions(vertical_end_profile)
+    left_end_depth = end_dimensions.left_outer_height + end_dimensions.left_run
+    end_unit_scale = left.width / _VERTICAL_REFERENCE_WIDTH
+    bottom_scale = min(
+        1.0,
+        0.45 * left_length / (left_end_depth * end_unit_scale),
+    )
+    left_end_design = _vertical_end_design_from_basis(
+        left.outer_bottom,
+        left.axis,
+        left.across,
+        left.width,
+        bottom_scale,
+        vertical_end_profile,
+    )
 
     def top_point(x: float, y: float) -> Point:
         return _box_local_point(
@@ -2017,19 +2105,6 @@ def _box_command_edits(element: _BoxElement) -> tuple[_CommandEdit, ...]:
             top_scale,
         )
 
-    def bottom_point(x: float, y: float) -> Point:
-        return _box_local_point(
-            left.outer_bottom,
-            left.axis,
-            left.across,
-            left.width,
-            67.0,
-            x - 158.0,
-            -40.0 - y,
-            bottom_scale,
-        )
-
-    left_inner_bottom = bottom_point(225, 50)
     top_horizontal_end = _add(
         left.top_inner,
         _scale(left.across, 10.0 * left_unit_scale),
@@ -2061,42 +2136,29 @@ def _box_command_edits(element: _BoxElement) -> tuple[_CommandEdit, ...]:
         _CommandEdit(
             left.side_index,
             1,
-            (("lineTo", (bottom_point(158, 180),)),),
+            (
+                ("lineTo", (left_end_design.left_body,)),
+                (
+                    "curveTo",
+                    (
+                        left_end_design.left_first_control,
+                        left_end_design.left_second_control,
+                        left_end_design.left_bottom,
+                    ),
+                ),
+            ),
         ),
         _CommandEdit(
             left.bottom_line_index,
             2,
             (
+                *_edit_vertical_end_cap(left_end_design),
                 (
                     "curveTo",
                     (
-                        bottom_point(158, 100),
-                        bottom_point(155, 48),
-                        bottom_point(151, -20),
-                    ),
-                ),
-                (
-                    "curveTo",
-                    (
-                        bottom_point(151, -30),
-                        bottom_point(162, -40),
-                        bottom_point(175, -40),
-                    ),
-                ),
-                (
-                    "curveTo",
-                    (
-                        bottom_point(204, -40),
-                        bottom_point(225, -23),
-                        bottom_point(229, -9),
-                    ),
-                ),
-                (
-                    "curveTo",
-                    (
-                        bottom_point(227, 7),
-                        bottom_point(225, 18),
-                        left_inner_bottom,
+                        left_end_design.right_first_control,
+                        left_end_design.right_second_control,
+                        left_end_design.right_body,
                     ),
                 ),
             ),
@@ -2115,7 +2177,7 @@ def _box_command_edits(element: _BoxElement) -> tuple[_CommandEdit, ...]:
             _CommandEdit(
                 left.contour_start,
                 1,
-                (("moveTo", (left_inner_bottom,)),),
+                (("moveTo", (left_end_design.right_body,)),),
             )
         )
     right_unit_scale = right.width / 68.0
@@ -3148,7 +3210,7 @@ def apply_brush_elements(
             )
         )
     for element in box_elements:
-        edits.extend(_box_command_edits(element))
+        edits.extend(_box_command_edits(element, style.vertical_end_profile))
     uroko_designs = {element: _uroko_design(element) for element in uroko_elements}
     uroko_preceding_lines = {
         element.preceding_line_index: uroko_designs[element][0]

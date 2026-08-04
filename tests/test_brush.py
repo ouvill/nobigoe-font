@@ -14,13 +14,16 @@ from nobigoe_font.brush import (
     _CommandEdit,
     _apply_command_edits,
     _box_elements,
-    _edit_terminal,
     _edit_horizontal_start,
+    _edit_terminal,
+    _edit_vertical_end_cap,
     _horizontal_start_elements,
-    _vertical_design_scales,
-    _vertical_end_elements,
-    _vertical_end_design,
     _terminal_elements,
+    _vertical_design_scales,
+    _vertical_end_design,
+    _vertical_end_design_from_basis,
+    _vertical_end_dimensions,
+    _vertical_end_elements,
     _vertical_start_design,
     _vertical_start_elements,
     apply_brush_elements,
@@ -390,11 +393,7 @@ def _selected_left_sweep_body() -> pathops.Path:
     return outline
 
 
-def _synthetic_box_corners(
-    *,
-    selected: bool = False,
-    counter: bool = True,
-) -> pathops.Path:
+def _synthetic_box_corners(*, counter: bool = True) -> pathops.Path:
     outline = pathops.Path()
     pen = outline.getPen()
     if counter:
@@ -405,38 +404,19 @@ def _synthetic_box_corners(
         pen.closePath()
     pen.moveTo((225, 82))
     pen.lineTo((778, 82))
-    if selected:
-        pen.lineTo((778, 45))
-        pen.curveTo((777, 32), (777, 16), (776, -7))
-        pen.curveTo((776, -17), (782, -27), (788, -27))
-        pen.curveTo((812, -27), (843, -12), (849, -4))
-        pen.curveTo((847, 74), (846, 134), (845, 234))
-        pen.lineTo((845, 638))
-    else:
-        pen.lineTo((778, -27))
-        pen.lineTo((788, -27))
-        pen.curveTo((812, -27), (844, -12), (846, -6))
-        pen.lineTo((846, 638))
+    pen.lineTo((778, -27))
+    pen.lineTo((788, -27))
+    pen.curveTo((812, -27), (844, -12), (846, -6))
+    pen.lineTo((846, 638))
     pen.lineTo((900, 662))
     pen.lineTo((807, 735))
     pen.lineTo((766, 687))
-    if selected:
-        pen.lineTo((242, 687))
-        pen.lineTo((151.5, 727))
-        pen.curveTo((156, 704), (158, 657), (158, 620))
-        pen.lineTo((158, 180))
-        pen.curveTo((158, 100), (155, 48), (151, -20))
-        pen.curveTo((151, -30), (162, -40), (175, -40))
-        pen.curveTo((204, -40), (225, -23), (229, -9))
-        pen.curveTo((227, 7), (225, 18), (225, 50))
-        pen.lineTo((225, 82))
-    else:
-        pen.lineTo((232, 687))
-        pen.lineTo((158, 722))
-        pen.lineTo((158, -40))
-        pen.lineTo((170, -40))
-        pen.curveTo((200, -40), (225, -23), (225, -14))
-        pen.lineTo((225, 82))
+    pen.lineTo((232, 687))
+    pen.lineTo((158, 722))
+    pen.lineTo((158, -40))
+    pen.lineTo((170, -40))
+    pen.curveTo((200, -40), (225, -23), (225, -14))
+    pen.lineTo((225, 82))
     pen.closePath()
     return outline
 
@@ -732,6 +712,33 @@ def _vertical_end_lookalike() -> pathops.Path:
     pen.lineTo((13, 0))
     pen.curveTo((15, 0), (65, 25), (65, 25))
     pen.lineTo((65, 400))
+    pen.closePath()
+    return outline
+
+
+def _deep_vertical_end() -> pathops.Path:
+    outline = pathops.Path()
+    pen = outline.getPen()
+    pen.moveTo((0, 400))
+    pen.lineTo((0, 0))
+    pen.lineTo((15, 0))
+    pen.curveTo((45, 5), (73, 27), (100, 50))
+    pen.lineTo((100, 400))
+    pen.closePath()
+    return outline
+
+
+def _overlapping_vertical_ends() -> pathops.Path:
+    outline = pathops.Path()
+    pen = outline.getPen()
+    pen.moveTo((334, 110))
+    pen.lineTo((334, 486))
+    pen.lineTo((344, 478))
+    pen.curveTo((367, 494), (389, 512), (410, 533))
+    pen.lineTo((410, 247))
+    pen.lineTo((419, 247))
+    pen.curveTo((448, 247), (469, 264), (469, 270))
+    pen.lineTo((469, 301))
     pen.closePath()
     return outline
 
@@ -1388,22 +1395,101 @@ class BrushElementTests(unittest.TestCase):
                 self.assertEqual(_commands(result.path), source_commands)
                 self.assertEqual(_commands(source), source_commands)
 
-    def test_box_corners_match_selected_b_recipes(self) -> None:
+    def test_box_left_bottom_uses_the_vertical_end_shape(self) -> None:
         source = _synthetic_box_corners()
         source_commands = _commands(source)
+        boxes = _box_elements(list(source_commands))
 
-        result = apply_brush_elements(source)
-        difference = pathops.op(
-            result.path,
-            _synthetic_box_corners(selected=True),
-            pathops.PathOp.XOR,
-        )
+        self.assertEqual(len(boxes), 1)
+        left = boxes[0].left
+        for profile in ("traditional", "silver"):
+            with self.subTest(profile=profile):
+                dimensions = _vertical_end_dimensions(profile)
+                left_depth = dimensions.left_outer_height + dimensions.left_run
+                scale = min(
+                    1.0,
+                    0.45
+                    * math.dist(left.side_start, left.outer_bottom)
+                    / (left_depth * left.width / 68.0),
+                )
+                design = _vertical_end_design_from_basis(
+                    left.outer_bottom,
+                    left.axis,
+                    left.across,
+                    left.width,
+                    scale,
+                    profile,
+                )
+                expected_cap = _edit_vertical_end_cap(design)
 
-        self.assertEqual(result.adjusted_corner_count, 3)
-        self.assertEqual(result.adjusted_stroke_count, 0)
-        self.assertEqual(result.adjusted_uroko_count, 0)
-        self.assertEqual(result.adjusted_terminal_count, 0)
-        self.assertFalse(difference.verbs)
+                result = apply_brush_elements(
+                    source,
+                    BrushElementStyle(vertical_end_profile=profile),
+                )
+                result_commands = _commands(result.path)
+
+                def commands_match(index: int) -> bool:
+                    actual = result_commands[index : index + len(expected_cap)]
+                    return len(actual) == len(expected_cap) and all(
+                        actual_operator == expected_operator
+                        and len(actual_operands) == len(expected_operands)
+                        and all(
+                            math.isclose(
+                                actual_coordinate,
+                                expected_coordinate,
+                                abs_tol=1e-4,
+                            )
+                            for actual_point, expected_point in zip(
+                                actual_operands, expected_operands
+                            )
+                            for actual_coordinate, expected_coordinate in zip(
+                                actual_point, expected_point
+                            )
+                        )
+                        for (
+                            actual_operator,
+                            actual_operands,
+                        ), (
+                            expected_operator,
+                            expected_operands,
+                        ) in zip(actual, expected_cap)
+                    )
+
+                cap_index = next(
+                    index
+                    for index in range(len(result_commands) - 1)
+                    if commands_match(index)
+                )
+
+                for actual, expected in zip(
+                    result_commands[cap_index - 1][1][-1],
+                    design.left_bottom,
+                ):
+                    self.assertAlmostEqual(actual, expected, places=4)
+                right_return = result_commands[cap_index + 2]
+                self.assertEqual(right_return[0], "curveTo")
+                for actual_point, expected_point in zip(
+                    right_return[1],
+                    (
+                        design.right_first_control,
+                        design.right_second_control,
+                        design.right_body,
+                    ),
+                ):
+                    for actual, expected in zip(actual_point, expected_point):
+                        self.assertAlmostEqual(actual, expected, places=4)
+                # Keep the complete return even when the following horizontal
+                # edge doubles back through it; the overlap is intentional.
+                following = result_commands[cap_index + 3]
+                self.assertEqual(following[0], "lineTo")
+                self.assertGreater(
+                    design.right_body[1],
+                    following[1][-1][1],
+                )
+                self.assertEqual(result.adjusted_corner_count, 3)
+                self.assertEqual(result.adjusted_stroke_count, 0)
+                self.assertEqual(result.adjusted_uroko_count, 0)
+                self.assertEqual(result.adjusted_terminal_count, 0)
         self.assertEqual(_commands(source), source_commands)
 
     def test_box_corners_require_an_enclosed_counter(self) -> None:
@@ -1624,6 +1710,33 @@ class BrushElementTests(unittest.TestCase):
         self.assertLess(
             min(ends[0].down_side.length, ends[0].up_side.length) / ends[0].width,
             1.2,
+        )
+        self.assertEqual(result.adjusted_stroke_count, 1)
+
+    def test_deep_vertical_end_is_found_from_its_inset_second_control(
+        self,
+    ) -> None:
+        source = _deep_vertical_end()
+        commands = list(_commands(source))
+
+        ends = _vertical_end_elements(commands)
+        result = apply_brush_elements(source)
+
+        self.assertEqual(len(ends), 1)
+        self.assertEqual(result.adjusted_stroke_count, 1)
+        self.assertNotEqual(_commands(result.path), _commands(source))
+
+    def test_overlapping_vertical_ends_prefer_the_longer_stem(self) -> None:
+        source = _overlapping_vertical_ends()
+        commands = list(_commands(source))
+
+        ends = _vertical_end_elements(commands)
+        result = apply_brush_elements(source)
+
+        self.assertEqual(len(ends), 1)
+        self.assertGreater(
+            min(ends[0].down_side.length, ends[0].up_side.length) / ends[0].width,
+            3.0,
         )
         self.assertEqual(result.adjusted_stroke_count, 1)
 
