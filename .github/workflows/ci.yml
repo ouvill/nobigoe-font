@@ -139,6 +139,33 @@ jobs:
               subsetter.subset(font)
               font.save(f"/tmp/diagnostic-{label}.otf")
               font.close()
+
+          source_lookup_count = len(TTFont(".cache/font-sources/NotoSerifJP-VF.otf")["GSUB"].table.LookupList.Lookup)
+          generated = TTFont("/tmp/NobigoeVariableMarks-VF.otf")
+          lookup_count = len(generated["GSUB"].table.LookupList.Lookup)
+          custom_lookup_limit = lookup_count - source_lookup_count - 8
+          feature_records = generated["GSUB"].table.FeatureList.FeatureRecord
+          vert_features = [
+              record.Feature for record in feature_records if record.FeatureTag == "vert"
+          ]
+          vrt2_features = [
+              record.Feature for record in feature_records if record.FeatureTag == "vrt2"
+          ]
+          for vert, vrt2 in zip(vert_features, vrt2_features, strict=True):
+              source_indices = [
+                  index for index in vrt2.LookupListIndex if index >= custom_lookup_limit
+              ]
+              vrt2.LookupListIndex = source_indices
+              vrt2.LookupCount = len(source_indices)
+          generated.save("/tmp/diagnostic-vrt2-source-lookups.otf")
+          for vert, vrt2 in zip(vert_features, vrt2_features, strict=True):
+              shared_indices = [
+                  index for index in vert.LookupListIndex if index < custom_lookup_limit
+              ]
+              vrt2.LookupListIndex = shared_indices + vrt2.LookupListIndex
+              vrt2.LookupCount = len(vrt2.LookupListIndex)
+          generated.save("/tmp/diagnostic-vrt2-shared-lookups.otf")
+          generated.close()
           PY
 
       - name: Validate representative fonts
