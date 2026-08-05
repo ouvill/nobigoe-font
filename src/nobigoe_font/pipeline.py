@@ -86,7 +86,6 @@ MANGA_WAVE_GLYPH_COUNT = 11
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 LINEAR_WAVE_TRANSITION_SEGMENTS = 24
 LINEAR_WAVE_TRANSITION_SPAN_RATIO = 0.7
-LINEAR_WAVE_TRANSITION_ENDPOINT_EASING_RATIO = 0.2
 WAVE_STROKE_MODULATION = 0.3
 NEW_GLYPH_COUNT = 6
 
@@ -599,42 +598,29 @@ def _blend_connected_outlines(
     def smoothstep(progress: float) -> float:
         return progress * progress * (3 - 2 * progress)
 
-    def linear_with_eased_ends(progress: float) -> float:
-        progress = max(0.0, min(1.0, progress))
-        easing = LINEAR_WAVE_TRANSITION_ENDPOINT_EASING_RATIO
-        linear_slope = 1 / (1 - easing)
-        if progress < easing:
-            return linear_slope * progress * progress / (2 * easing)
-        if progress > 1 - easing:
-            remaining = 1 - progress
-            return 1 - linear_slope * remaining * remaining / (2 * easing)
-        return linear_slope * (progress - easing / 2)
-
     def profile_at(position: float) -> tuple[float, float]:
         progress = (position - core_start) / (core_end - core_start)
         if middle is None:
             first, second = start, end
             if transition_cell is None:
-                blend_progress = max(0.0, min(1.0, progress))
-                center_blend = width_blend = smoothstep(blend_progress)
+                blend_progress = progress
             else:
                 outer_margin = 1 - LINEAR_WAVE_TRANSITION_SPAN_RATIO
                 blend_progress = (
                     transition_cell + position / advance - outer_margin
                 ) / (2 * LINEAR_WAVE_TRANSITION_SPAN_RATIO)
-                center_blend = linear_with_eased_ends(blend_progress)
-                width_blend = smoothstep(max(0.0, min(1.0, blend_progress)))
+            blend = smoothstep(max(0.0, min(1.0, blend_progress)))
         elif progress <= 0.5:
             first, second = start, middle
-            center_blend = width_blend = smoothstep(progress * 2)
+            blend = smoothstep(progress * 2)
         else:
             first, second = middle, end
-            center_blend = width_blend = smoothstep((progress - 0.5) * 2)
+            blend = smoothstep((progress - 0.5) * 2)
         first_center, first_width = _stroke_profile(first, position)
         second_center, second_width = _stroke_profile(second, position)
         return (
-            first_center + (second_center - first_center) * center_blend,
-            first_width + (second_width - first_width) * width_blend,
+            first_center + (second_center - first_center) * blend,
+            first_width + (second_width - first_width) * blend,
         )
 
     derivative_step = min(0.25, (core_end - core_start) / 1000)
