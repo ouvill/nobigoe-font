@@ -3,6 +3,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 import math
 from io import BytesIO
@@ -31,7 +32,7 @@ from .brush import (
     VerticalEndProfile,
     apply_han_brush_elements,
 )
-from .features import feature_source, merge_features
+from .features import consolidate_vrt2_lookups, feature_source, merge_features
 from .hinting import autohint_latin_glyphs
 from .metadata import rename_font
 from .variable_stix import instantiate_stix_latin_font
@@ -64,6 +65,8 @@ from .punctuation import (
 
 import pathops
 from fontTools.cffLib.CFF2ToCFF import convertCFF2ToCFF
+from fontTools.cffLib.width import optimizeWidths
+from fontTools.misc.psCharStrings import T2WidthExtractor
 from fontTools.misc.transform import Transform
 from fontTools.ttLib import TTFont
 from fontTools.ttLib.scaleUpem import scale_upem
@@ -1557,6 +1560,53 @@ def _normalize_cff_blue_zones(font: TTFont) -> None:
             setattr(private, attribute, normalized)
 
 
+def _synchronize_cff_widths(font: TTFont) -> None:
+    """Match CFF CharString widths to the final OpenType horizontal metrics."""
+
+    cff = font["CFF "].cff
+    top = cff.topDictIndex[0]
+    font_dicts = top.FDArray if hasattr(top, "FDArray") else [top]
+    metrics = font["hmtx"].metrics
+    widths: defaultdict[int, list[int]] = defaultdict(list)
+    charstrings = []
+    default_width = object()
+
+    for glyph_name in top.CharStrings.keys():
+        charstring, font_dict_index = top.CharStrings.getItemAndSelector(glyph_name)
+        if font_dict_index is None:
+            font_dict_index = 0
+        private = font_dicts[font_dict_index].Private
+        charstring.decompile()
+        extractor = T2WidthExtractor(
+            getattr(private, "Subrs", []),
+            cff.GlobalSubrs,
+            private.nominalWidthX,
+            default_width,
+            private=private,
+        )
+        extractor.execute(charstring)
+        if extractor.width is not default_width:
+            if not charstring.program or not isinstance(
+                charstring.program[0], (int, float)
+            ):
+                raise ValueError(
+                    f"CFF width for {glyph_name} is not a leading operand"
+                )
+            charstring.program.pop(0)
+        widths[font_dict_index].append(metrics[glyph_name][0])
+        charstrings.append((glyph_name, charstring, font_dict_index))
+
+    for font_dict_index, values in widths.items():
+        private = font_dicts[font_dict_index].Private
+        private.defaultWidthX, private.nominalWidthX = optimizeWidths(values)
+
+    for glyph_name, charstring, font_dict_index in charstrings:
+        private = font_dicts[font_dict_index].Private
+        width = metrics[glyph_name][0]
+        if width != private.defaultWidthX:
+            charstring.program.insert(0, width - private.nominalWidthX)
+
+
 def build_static_instance(
     variable_source_path: Path,
     latin_source_path: Path | None,
@@ -1618,6 +1668,7 @@ def build_static_instance(
         else None
     )
     _rename_release_font(font, latin_font, latin_profile, identity)
+    _synchronize_cff_widths(font)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path, reorderTables=True)
@@ -2574,6 +2625,7 @@ def build(
             punctuation_marks,
         ),
     )
+    consolidate_vrt2_lookups(font)
     _rename_release_font(font, latin_font, latin_profile, identity)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

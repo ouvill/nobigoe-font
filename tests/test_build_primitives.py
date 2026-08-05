@@ -14,6 +14,8 @@ import pathops
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.fontBuilder import FontBuilder
 from fontTools.misc.transform import Transform
+from fontTools.pens.basePen import NullPen
+from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
 
@@ -22,6 +24,7 @@ from nobigoe_font.features import (
     alternating_wave_rules,
     contextual_extension_rules,
     feature_source,
+    compact_auxiliary_single_substitutions,
     merge_features,
     linear_wave_transition_rules,
     mixed_wave_scan_rules,
@@ -37,6 +40,7 @@ from nobigoe_font.pipeline import (
     _novel_katakana_mappings,
     _native_novel_ccmp_outputs,
     _normalize_cff_blue_zones,
+    _synchronize_cff_widths,
     build,
     SPACING_MARK_INPUTS,
     mark_ligature_rules,
@@ -258,6 +262,37 @@ class StaticInstanceTests(unittest.TestCase):
         self.assertEqual(private.OtherBlues, [-278, -268])
         self.assertEqual(private.FamilyBlues, [-20, 0, 530, 550])
         self.assertEqual(private.FamilyOtherBlues, [-280, -260])
+
+    def test_final_cff_widths_match_horizontal_metrics(self) -> None:
+        builder = FontBuilder(1000, isTTF=False)
+        builder.setupGlyphOrder([".notdef", "base"])
+        charstrings = {}
+        for glyph_name in (".notdef", "base"):
+            pen = T2CharStringPen(500, None)
+            if glyph_name == "base":
+                rectangle_path().draw(pen)
+            charstrings[glyph_name] = pen.getCharString()
+        builder.setupCharacterMap({0x25A1: "base"})
+        builder.setupCFF(
+            "Test-Regular",
+            {"FullName": "Test Regular", "FamilyName": "Test"},
+            charstrings,
+            {},
+        )
+        builder.setupHorizontalMetrics({".notdef": (500, 0), "base": (700, 100)})
+        builder.setupHorizontalHeader(ascent=880, descent=-120)
+        builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
+        builder.setupOS2()
+        builder.setupPost()
+
+        _synchronize_cff_widths(builder.font)
+        output = BytesIO()
+        builder.font.save(output)
+        rebuilt = TTFont(BytesIO(output.getvalue()))
+        charstring = rebuilt["CFF "].cff.topDictIndex[0].CharStrings["base"]
+        charstring.draw(NullPen())
+
+        self.assertEqual(charstring.width, rebuilt["hmtx"]["base"][0])
 
 
 class FontGeometryTests(unittest.TestCase):
@@ -1138,6 +1173,44 @@ class TrueTypeBuildTests(unittest.TestCase):
             feature_single_substitutions(rebuilt, "ss01"),
             {"kana": "kana.alt"},
         )
+
+    def test_contextual_single_substitution_helpers_are_compacted(self) -> None:
+        font = named_true_type_font(
+            [".notdef", "a", "b", "c", "d", "a.alt", "c.alt"],
+            {0x61: "a", 0x62: "b", 0x63: "c", 0x64: "d"},
+        )
+        addOpenTypeFeaturesFromString(
+            font,
+            """
+            languagesystem DFLT dflt;
+            lookup first {
+              sub a' b by a.alt;
+            } first;
+            lookup second {
+              sub c' d by c.alt;
+            } second;
+            feature calt {
+              lookup first;
+              lookup second;
+            } calt;
+            """,
+            tables={"GSUB"},
+        )
+        before = len(font["GSUB"].table.LookupList.Lookup)
+
+        after = compact_auxiliary_single_substitutions(font)
+        output = BytesIO()
+        font.save(output)
+        rebuilt = TTFont(BytesIO(output.getvalue()))
+        mappings = [
+            subtable.mapping
+            for lookup in rebuilt["GSUB"].table.LookupList.Lookup
+            if lookup.LookupType == 1
+            for subtable in lookup.SubTable
+        ]
+
+        self.assertLess(after, before)
+        self.assertIn({"a": "a.alt", "c": "c.alt"}, mappings)
 
     @unittest.skipUnless(shutil.which("hb-shape"), "hb-shape is not installed")
     def test_all_horizontal_extension_symbols_shape_to_calt_parts(self) -> None:

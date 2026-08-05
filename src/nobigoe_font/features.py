@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Iterator, Sequence
+from typing import Any
 
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+from fontTools.otlLib.builder import buildLookup, buildSingleSubstSubtable
 from fontTools.ttLib import TTFont
 
 from .punctuation import punctuation_ligature_rules
@@ -247,10 +249,7 @@ def _symbol_feature_rules(
             contextual_extension_rules(f"{prefix}_vert", base, v_start, v_middle, v_end)
             + vertical_maps
         )
-        vrt2_rules.append(
-            contextual_extension_rules(f"{prefix}_vrt2", base, v_start, v_middle, v_end)
-            + vertical_maps
-        )
+        vrt2_rules.append(vertical_maps)
 
     wave_prefix, wave_base, wave_vertical, wave_names = wave
     horizontal_wave_names = wave_names[:5]
@@ -271,10 +270,7 @@ def _symbol_feature_rules(
         alternating_wave_rules(f"{wave_prefix}_vert", wave_base, vertical_wave_names)
         + wave_vertical_maps
     )
-    vrt2_rules.append(
-        alternating_wave_rules(f"{wave_prefix}_vrt2", wave_base, vertical_wave_names)
-        + wave_vertical_maps
-    )
+    vrt2_rules.append(wave_vertical_maps)
 
     (
         relaxed_wave_prefix,
@@ -316,14 +312,7 @@ def _symbol_feature_rules(
         )
         + relaxed_vertical_maps
     )
-    vrt2_rules.append(
-        phased_wave_rules(
-            f"{relaxed_wave_prefix}_vrt2",
-            relaxed_horizontal_base,
-            relaxed_vertical_parts,
-        )
-        + relaxed_vertical_maps
-    )
+    vrt2_rules.append(relaxed_vertical_maps)
     ss04_rules = repeated_glyph_rules(
         f"{relaxed_wave_prefix}_h_style",
         relaxed_wave_source,
@@ -390,16 +379,7 @@ def _symbol_feature_rules(
         )
         + one_cycle_vertical_maps
     )
-    vrt2_rules.append(
-        contextual_extension_rules(
-            f"{one_cycle_prefix}_vrt2",
-            one_cycle_horizontal_base,
-            one_cycle_vertical_start,
-            one_cycle_vertical_middle,
-            one_cycle_vertical_end,
-        )
-        + one_cycle_vertical_maps
-    )
+    vrt2_rules.append(one_cycle_vertical_maps)
     ss05_rules = repeated_glyph_rules(
         f"{one_cycle_prefix}_h_style",
         one_cycle_source,
@@ -477,13 +457,7 @@ def _symbol_feature_rules(
         )
         + transition_vertical_maps,
     )
-    vrt2_rules.insert(
-        0,
-        mixed_wave_scan_rules(
-            f"{reverse_transition_prefix}_vrt2", *vertical_scan_arguments
-        )
-        + transition_vertical_maps,
-    )
+    vrt2_rules.insert(0, transition_vertical_maps)
     calt_rules.append(
         contextual_extension_rules(
             f"{manga_wave_prefix}_h",
@@ -511,16 +485,7 @@ def _symbol_feature_rules(
         )
         + manga_wave_vertical_maps
     )
-    vrt2_rules.append(
-        contextual_extension_rules(
-            f"{manga_wave_prefix}_vrt2",
-            manga_wave_base,
-            manga_wave_vertical_start,
-            manga_wave_vertical_middle,
-            manga_wave_vertical_end,
-        )
-        + manga_wave_vertical_maps
-    )
+    vrt2_rules.append(manga_wave_vertical_maps)
 
     def append_linear_transition_family_rules(
         transitions: list[tuple[str, list[str]]],
@@ -582,22 +547,18 @@ def _symbol_feature_rules(
                     vertical_transitions,
                 )
             )
-            for rules, suffix in (
-                (vert_rules, "vert"),
-                (vrt2_rules, "vrt2"),
-            ):
-                rules.append(
-                    linear_wave_transition_rules(
-                        f"{family_prefix}_{suffix}",
-                        extension_base,
-                        vertical_linear,
-                        horizontal_base,
-                        vertical_start,
-                        vertical_middles,
-                        vertical_ends,
-                        vertical_transitions,
-                    )
+            vert_rules.append(
+                linear_wave_transition_rules(
+                    f"{family_prefix}_vert",
+                    extension_base,
+                    vertical_linear,
+                    horizontal_base,
+                    vertical_start,
+                    vertical_middles,
+                    vertical_ends,
+                    vertical_transitions,
                 )
+            )
             transition_vertical_maps = "".join(
                 f"  sub {horizontal} by {vertical};\n"
                 for horizontal, vertical in zip(
@@ -803,6 +764,185 @@ def shift_nested_lookup_indices(value: object, amount: int, seen: set[int]) -> N
     elif hasattr(value, "__dict__"):
         for item in vars(value).values():
             shift_nested_lookup_indices(item, amount, seen)
+
+
+def _nested_lookup_records(value: object, seen: set[int]) -> Iterator[Any]:
+    if value is None or isinstance(value, (str, bytes, int, float, bool)):
+        return
+    identity = id(value)
+    if identity in seen:
+        return
+    seen.add(identity)
+
+    if value.__class__.__name__ in {"SubstLookupRecord", "PosLookupRecord"}:
+        yield value
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _nested_lookup_records(item, seen)
+    elif hasattr(value, "__dict__"):
+        for item in vars(value).values():
+            yield from _nested_lookup_records(item, seen)
+
+
+def compact_auxiliary_single_substitutions(font: TTFont) -> int:
+    """Merge compatible contextual helper lookups to stay within Windows limits."""
+
+    table = font["GSUB"].table
+    lookups = table.LookupList.Lookup
+    directly_referenced = {
+        index
+        for record in table.FeatureList.FeatureRecord
+        for index in record.Feature.LookupListIndex
+    }
+    if getattr(table, "FeatureVariations", None) is not None:
+        for variation in table.FeatureVariations.FeatureVariationRecord:
+            substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
+            for substitution in substitutions:
+                directly_referenced.update(substitution.Feature.LookupListIndex)
+    nested_references = {
+        record.LookupListIndex
+        for lookup in lookups
+        for record in _nested_lookup_records(lookup, set())
+    }
+
+    candidates = []
+    for index in sorted(nested_references - directly_referenced):
+        lookup = lookups[index]
+        if lookup.LookupType != 1:
+            continue
+        mapping: dict[str, str] = {}
+        compatible = True
+        for subtable in lookup.SubTable:
+            for source, replacement in subtable.mapping.items():
+                if source in mapping and mapping[source] != replacement:
+                    compatible = False
+                    break
+                mapping[source] = replacement
+            if not compatible:
+                break
+        if compatible:
+            candidates.append(
+                (
+                    index,
+                    lookup.LookupFlag,
+                    getattr(lookup, "MarkFilteringSet", None),
+                    mapping,
+                )
+            )
+
+    groups: list[tuple[int, int, int | None, dict[str, str], list[int]]] = []
+    representative: dict[int, int] = {}
+    for index, flags, mark_filter_set, mapping in candidates:
+        for group in groups:
+            if (
+                group[1] == flags
+                and group[2] == mark_filter_set
+                and all(
+                    source not in group[3] or group[3][source] == replacement
+                    for source, replacement in mapping.items()
+                )
+            ):
+                group[3].update(mapping)
+                group[4].append(index)
+                representative[index] = group[0]
+                break
+        else:
+            groups.append(
+                (index, flags, mark_filter_set, dict(mapping), [index])
+            )
+            representative[index] = index
+
+    groups_by_index = {group[0]: group for group in groups}
+    compacted = []
+    old_to_new: dict[int, int] = {}
+    for index, lookup in enumerate(lookups):
+        if representative.get(index, index) != index:
+            continue
+        if index in groups_by_index:
+            _, flags, mark_filter_set, mapping, _ = groups_by_index[index]
+            lookup = buildLookup(
+                [buildSingleSubstSubtable(mapping)],
+                flags=flags,
+                markFilterSet=mark_filter_set,
+                table="GSUB",
+            )
+        old_to_new[index] = len(compacted)
+        compacted.append(lookup)
+    for index, target in representative.items():
+        old_to_new[index] = old_to_new[target]
+
+    for lookup in compacted:
+        for record in _nested_lookup_records(lookup, set()):
+            record.LookupListIndex = old_to_new[record.LookupListIndex]
+    for record in table.FeatureList.FeatureRecord:
+        record.Feature.LookupListIndex = [
+            old_to_new[index] for index in record.Feature.LookupListIndex
+        ]
+        record.Feature.LookupCount = len(record.Feature.LookupListIndex)
+    if getattr(table, "FeatureVariations", None) is not None:
+        for variation in table.FeatureVariations.FeatureVariationRecord:
+            substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
+            for substitution in substitutions:
+                substitution.Feature.LookupListIndex = [
+                    old_to_new[index]
+                    for index in substitution.Feature.LookupListIndex
+                ]
+                substitution.Feature.LookupCount = len(
+                    substitution.Feature.LookupListIndex
+                )
+
+    table.LookupList.Lookup = compacted
+    table.LookupList.LookupCount = len(compacted)
+    return len(compacted)
+
+
+def consolidate_vrt2_lookups(font: TTFont) -> int:
+    """Reduce every ``vrt2`` feature to one type 1 lookup and one subtable."""
+
+    table = font["GSUB"].table
+    feature_records = [
+        record
+        for record in table.FeatureList.FeatureRecord
+        if record.FeatureTag == "vrt2"
+    ]
+    grouped: dict[tuple[int, ...], list[Any]] = {}
+    for record in feature_records:
+        indices = tuple(record.Feature.LookupListIndex)
+        if not indices:
+            raise ValueError("The vrt2 feature has no lookup")
+        grouped.setdefault(indices, []).append(record.Feature)
+
+    for indices, features in grouped.items():
+        combined: dict[str, str] = {}
+        for index in indices:
+            lookup = table.LookupList.Lookup[index]
+            if lookup.LookupType != 1 or lookup.LookupFlag != 0:
+                raise ValueError("The vrt2 feature must use only unflagged type 1 lookups")
+            mapping: dict[str, str] = {}
+            for subtable in lookup.SubTable:
+                mapping.update(subtable.mapping)
+            for source, replacement in tuple(combined.items()):
+                combined[source] = mapping.get(replacement, replacement)
+            for source, replacement in mapping.items():
+                _ = combined.setdefault(source, replacement)
+
+        replacement = buildLookup(
+            [buildSingleSubstSubtable(combined)],
+            flags=0,
+            table="GSUB",
+        )
+        if len(grouped) == 1:
+            replacement_index = indices[0]
+            table.LookupList.Lookup[replacement_index] = replacement
+        else:
+            replacement_index = len(table.LookupList.Lookup)
+            table.LookupList.Lookup.append(replacement)
+        for feature in features:
+            feature.LookupListIndex = [replacement_index]
+            feature.LookupCount = 1
+
+    table.LookupList.LookupCount = len(table.LookupList.Lookup)
+    return len(grouped)
 
 
 def all_langsys(script_list: object) -> Iterator[object]:
