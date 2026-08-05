@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Iterator, Sequence
+from typing import Any
 
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+from fontTools.otlLib.builder import buildLookup, buildSingleSubstSubtable
 from fontTools.ttLib import TTFont
 
 from .punctuation import punctuation_ligature_rules
@@ -803,6 +805,136 @@ def shift_nested_lookup_indices(value: object, amount: int, seen: set[int]) -> N
     elif hasattr(value, "__dict__"):
         for item in vars(value).values():
             shift_nested_lookup_indices(item, amount, seen)
+
+
+def _nested_lookup_records(value: object, seen: set[int]) -> Iterator[Any]:
+    if value is None or isinstance(value, (str, bytes, int, float, bool)):
+        return
+    identity = id(value)
+    if identity in seen:
+        return
+    seen.add(identity)
+
+    if value.__class__.__name__ in {"SubstLookupRecord", "PosLookupRecord"}:
+        yield value
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _nested_lookup_records(item, seen)
+    elif hasattr(value, "__dict__"):
+        for item in vars(value).values():
+            yield from _nested_lookup_records(item, seen)
+
+
+def compact_auxiliary_single_substitutions(font: TTFont) -> int:
+    """Merge compatible contextual helper lookups to stay within Windows limits."""
+
+    table = font["GSUB"].table
+    lookups = table.LookupList.Lookup
+    directly_referenced = {
+        index
+        for record in table.FeatureList.FeatureRecord
+        for index in record.Feature.LookupListIndex
+    }
+    if getattr(table, "FeatureVariations", None) is not None:
+        for variation in table.FeatureVariations.FeatureVariationRecord:
+            substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
+            for substitution in substitutions:
+                directly_referenced.update(substitution.Feature.LookupListIndex)
+    nested_references = {
+        record.LookupListIndex
+        for lookup in lookups
+        for record in _nested_lookup_records(lookup, set())
+    }
+
+    candidates = []
+    for index in sorted(nested_references - directly_referenced):
+        lookup = lookups[index]
+        if lookup.LookupType != 1:
+            continue
+        mapping: dict[str, str] = {}
+        compatible = True
+        for subtable in lookup.SubTable:
+            for source, replacement in subtable.mapping.items():
+                if source in mapping and mapping[source] != replacement:
+                    compatible = False
+                    break
+                mapping[source] = replacement
+            if not compatible:
+                break
+        if compatible:
+            candidates.append(
+                (
+                    index,
+                    lookup.LookupFlag,
+                    getattr(lookup, "MarkFilteringSet", None),
+                    mapping,
+                )
+            )
+
+    groups: list[tuple[int, int, int | None, dict[str, str], list[int]]] = []
+    representative: dict[int, int] = {}
+    for index, flags, mark_filter_set, mapping in candidates:
+        for group in groups:
+            if (
+                group[1] == flags
+                and group[2] == mark_filter_set
+                and all(
+                    source not in group[3] or group[3][source] == replacement
+                    for source, replacement in mapping.items()
+                )
+            ):
+                group[3].update(mapping)
+                group[4].append(index)
+                representative[index] = group[0]
+                break
+        else:
+            groups.append(
+                (index, flags, mark_filter_set, dict(mapping), [index])
+            )
+            representative[index] = index
+
+    groups_by_index = {group[0]: group for group in groups}
+    compacted = []
+    old_to_new: dict[int, int] = {}
+    for index, lookup in enumerate(lookups):
+        if representative.get(index, index) != index:
+            continue
+        if index in groups_by_index:
+            _, flags, mark_filter_set, mapping, _ = groups_by_index[index]
+            lookup = buildLookup(
+                [buildSingleSubstSubtable(mapping)],
+                flags=flags,
+                markFilterSet=mark_filter_set,
+                table="GSUB",
+            )
+        old_to_new[index] = len(compacted)
+        compacted.append(lookup)
+    for index, target in representative.items():
+        old_to_new[index] = old_to_new[target]
+
+    for lookup in compacted:
+        for record in _nested_lookup_records(lookup, set()):
+            record.LookupListIndex = old_to_new[record.LookupListIndex]
+    for record in table.FeatureList.FeatureRecord:
+        record.Feature.LookupListIndex = [
+            old_to_new[index] for index in record.Feature.LookupListIndex
+        ]
+        record.Feature.LookupCount = len(record.Feature.LookupListIndex)
+    if getattr(table, "FeatureVariations", None) is not None:
+        for variation in table.FeatureVariations.FeatureVariationRecord:
+            substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
+            for substitution in substitutions:
+                substitution.Feature.LookupListIndex = [
+                    old_to_new[index]
+                    for index in substitution.Feature.LookupListIndex
+                ]
+                substitution.Feature.LookupCount = len(
+                    substitution.Feature.LookupListIndex
+                )
+
+    table.LookupList.Lookup = compacted
+    table.LookupList.LookupCount = len(compacted)
+    return len(compacted)
 
 
 def all_langsys(script_list: object) -> Iterator[object]:

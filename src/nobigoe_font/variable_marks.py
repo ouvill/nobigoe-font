@@ -25,7 +25,12 @@ from fontTools.varLib.cff import CFF2CharStringMergePen
 from fontTools.varLib.models import normalizeValue, piecewiseLinearMap
 
 from . import geometry
-from .features import merge_features, punctuation_feature_source, symbol_feature_source
+from .features import (
+    compact_auxiliary_single_substitutions,
+    merge_features,
+    punctuation_feature_source,
+    symbol_feature_source,
+)
 from .marks import (
     CHOON_DAKUTEN_MARK_CENTERS,
     CHOON_DAKUTEN_PAIR,
@@ -1575,6 +1580,7 @@ def build_variable_marks(
     _append_punctuation_mark_composites(font, top, cmap, model, vsindex)
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
+    compact_auxiliary_single_substitutions(font)
     rename_variable_font(font)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path)

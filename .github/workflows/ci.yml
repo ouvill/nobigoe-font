@@ -114,67 +114,6 @@ jobs:
             --base koburi \
             --output /tmp/NobigoeKoburiMincho-Regular.ttf
 
-      - name: Build Windows diagnostic controls
-        run: |
-          uv run python - <<'PY'
-          from copy import deepcopy
-          from pathlib import Path
-
-          from fontTools import subset
-          from fontTools.ttLib import TTFont
-
-          from nobigoe_font.essential import build_essential
-          from nobigoe_font.variable_marks import rename_variable_font
-
-          source_path = Path(".cache/font-sources/NotoSerifJP-VF.otf")
-          generated_path = Path("/tmp/NobigoeVariableMarks-VF.otf")
-
-          source = TTFont(source_path)
-          renamed = TTFont(source_path)
-          rename_variable_font(renamed)
-          renamed.save("/tmp/diagnostic-upstream-renamed.otf")
-          renamed.close()
-          build_essential(
-              source_path,
-              Path("/tmp/diagnostic-upstream-essential.otf"),
-          )
-
-          without_layout = TTFont(generated_path)
-          for tag in ("GDEF", "GPOS", "GSUB"):
-              del without_layout[tag]
-          without_layout.save("/tmp/diagnostic-generated-without-layout.otf")
-          without_layout.close()
-
-          for tag in ("GDEF", "GPOS", "GSUB"):
-              without_table = TTFont(generated_path)
-              del without_table[tag]
-              without_table.save(f"/tmp/diagnostic-generated-without-{tag}.otf")
-              without_table.close()
-
-          essential_path = Path("/tmp/NobigoeEssential-VF.otf")
-          for tag in ("GPOS", "GSUB"):
-              without_table = TTFont(essential_path)
-              del without_table[tag]
-              without_table.save(f"/tmp/diagnostic-essential-without-{tag}.otf")
-              without_table.close()
-
-          source_names = TTFont(generated_path)
-          source_names["name"] = deepcopy(source["name"])
-          source_names.save("/tmp/diagnostic-generated-source-names.otf")
-          source_names.close()
-
-          original_glyphs = TTFont(generated_path)
-          options = subset.Options()
-          subsetter = subset.Subsetter(options=options)
-          subsetter.populate(
-              glyphs=original_glyphs.getGlyphOrder()[: len(source.getGlyphOrder())]
-          )
-          subsetter.subset(original_glyphs)
-          original_glyphs["name"] = deepcopy(source["name"])
-          original_glyphs.save("/tmp/diagnostic-generated-original-glyphs.otf")
-          original_glyphs.close()
-          source.close()
-          PY
 
       - name: Validate representative fonts
         run: |
@@ -238,8 +177,6 @@ jobs:
             /tmp/NobigoeMincho-Regular.otf
             /tmp/NobigoeVariableMarks-VF.otf
             /tmp/NobigoeEssential-VF.otf
-            .cache/font-sources/*.otf
-            /tmp/diagnostic-*.otf
           if-no-files-found: error
 
   font-windows:
