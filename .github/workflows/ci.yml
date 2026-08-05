@@ -274,37 +274,62 @@ jobs:
               if ([DiagnosticFontLoader]::AddFontResourceEx($fullPath, 0x10, [IntPtr]::Zero) -eq 0) {
                   throw "Could not load $path"
               }
+              $collection = [Drawing.Text.PrivateFontCollection]::new()
               try {
-                  $bitmap = [Drawing.Bitmap]::new(1600, 300)
+                  $collection.AddFontFile($fullPath)
+                  $family = $collection.Families |
+                      Where-Object Name -eq "Nobigoe Mincho" |
+                      Select-Object -First 1
+                  if ($null -eq $family) {
+                      throw "Nobigoe Mincho family was not loaded from $path"
+                  }
+                  $bitmap = [Drawing.Bitmap]::new(2000, 500)
                   $graphics = [Drawing.Graphics]::FromImage($bitmap)
-                  $font = [Drawing.Font]::new(
-                      "Nobigoe Mincho",
-                      160,
-                      [Drawing.FontStyle]::Regular,
-                      [Drawing.GraphicsUnit]::Pixel
-                  )
                   try {
                       $graphics.Clear([Drawing.Color]::White)
+                      $graphics.TextRenderingHint =
+                          [Drawing.Text.TextRenderingHint]::ClearTypeGridFit
                       $flags = [Windows.Forms.TextFormatFlags]::NoPadding -bor
                           [Windows.Forms.TextFormatFlags]::NoClipping
-                      [Windows.Forms.TextRenderer]::DrawText(
-                          $graphics,
-                          "あ４永田中本十",
-                          $font,
-                          [Drawing.Point]::new(20, 20),
-                          [Drawing.Color]::Black,
-                          [Drawing.Color]::White,
-                          $flags
-                      )
+                      $row = 0
+                      foreach ($size in @(96, 64, 48, 32)) {
+                          $font = [Drawing.Font]::new(
+                              $family,
+                              $size,
+                              [Drawing.FontStyle]::Regular,
+                              [Drawing.GraphicsUnit]::Pixel
+                          )
+                          try {
+                              [Windows.Forms.TextRenderer]::DrawText(
+                                  $graphics,
+                                  "あ４永田中本十",
+                                  $font,
+                                  [Drawing.Point]::new(20, $row),
+                                  [Drawing.Color]::Black,
+                                  [Drawing.Color]::White,
+                                  $flags
+                              )
+                              $graphics.DrawString(
+                                  "あ４永田中本十",
+                                  $font,
+                                  [Drawing.Brushes]::Black,
+                                  [Drawing.PointF]::new(1000, $row)
+                              )
+                          }
+                          finally {
+                              $font.Dispose()
+                          }
+                          $row += 115
+                      }
                       $bitmap.Save($output, [Drawing.Imaging.ImageFormat]::Png)
                   }
                   finally {
-                      $font.Dispose()
                       $graphics.Dispose()
                       $bitmap.Dispose()
                   }
               }
               finally {
+                  $collection.Dispose()
                   [void][DiagnosticFontLoader]::RemoveFontResourceEx(
                       $fullPath,
                       0x10,
