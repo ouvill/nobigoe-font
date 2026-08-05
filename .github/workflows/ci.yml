@@ -153,7 +153,9 @@ jobs:
           original_glyphs = TTFont(generated_path)
           options = subset.Options()
           subsetter = subset.Subsetter(options=options)
-          subsetter.populate(glyphs=source.getGlyphOrder())
+          subsetter.populate(
+              glyphs=original_glyphs.getGlyphOrder()[: len(source.getGlyphOrder())]
+          )
           subsetter.subset(original_glyphs)
           original_glyphs["name"] = deepcopy(source["name"])
           original_glyphs.save("/tmp/diagnostic-generated-original-glyphs.otf")
