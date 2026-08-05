@@ -303,9 +303,7 @@ class StaticInstanceTests(unittest.TestCase):
 
         recording = RecordingPen()
         font.getGlyphSet()["base"].draw(recording)
-        contour_count = sum(
-            operation == "moveTo" for operation, _ in recording.value
-        )
+        contour_count = sum(operation == "moveTo" for operation, _ in recording.value)
         self.assertEqual(contour_count, 1)
 
     def test_static_cff_pathops_failure_approximates_and_retries(self) -> None:
@@ -323,9 +321,7 @@ class StaticInstanceTests(unittest.TestCase):
             nonlocal attempts
             attempts += 1
             if attempts == 1:
-                raise RemoveOverlapsError(
-                    "Failed to remove overlaps from glyph 'base'"
-                )
+                raise RemoveOverlapsError("Failed to remove overlaps from glyph 'base'")
             removeOverlaps(*args, **kwargs)
 
         with patch("nobigoe_font.pipeline.removeOverlaps", side_effect=fail_once):
@@ -333,9 +329,7 @@ class StaticInstanceTests(unittest.TestCase):
 
         recording = RecordingPen()
         font.getGlyphSet()["base"].draw(recording)
-        contour_count = sum(
-            operation == "moveTo" for operation, _ in recording.value
-        )
+        contour_count = sum(operation == "moveTo" for operation, _ in recording.value)
         self.assertEqual(attempts, 2)
         self.assertEqual(contour_count, 1)
 
@@ -554,10 +548,28 @@ class TrueTypeBuildTests(unittest.TestCase):
             low, high = stroke_band(outline, axis, position)
             return (low + high) / 2, high - low
 
-        self.assertEqual(
-            profile(transitions[0], "horizontal", 0),
-            profile(linear[1], "horizontal", 0),
-        )
+        self.assertEqual(len(transitions), 24)
+        self.assertEqual(transitions[6].bounds[0], linear[0].bounds[0])
+        for lead in transitions[6:8]:
+            lead_profile = profile(lead, "horizontal", 1000)
+            follow_profile = profile(transitions[0], "horizontal", 0)
+            self.assertAlmostEqual(lead_profile[0], follow_profile[0], delta=1)
+            self.assertAlmostEqual(lead_profile[1], follow_profile[1], delta=2)
+        for lead_index, follow_index in ((3, 9), (4, 9), (5, 8)):
+            lead_profile = profile(transitions[lead_index], "horizontal", 1000)
+            follow_profile = profile(transitions[follow_index], "horizontal", 0)
+            self.assertAlmostEqual(lead_profile[0], follow_profile[0], delta=1)
+            self.assertAlmostEqual(lead_profile[1], follow_profile[1], delta=2)
+        for position in (150, 250):
+            lead_profile = profile(transitions[7], "horizontal", position)
+            linear_profile = profile(linear[1], "horizontal", position)
+            self.assertAlmostEqual(lead_profile[0], linear_profile[0], delta=1)
+            self.assertAlmostEqual(lead_profile[1], linear_profile[1], delta=2)
+        for position in (750, 850):
+            follow_profile = profile(transitions[0], "horizontal", position)
+            wave_profile = profile(wave[1], "horizontal", position)
+            self.assertAlmostEqual(follow_profile[0], wave_profile[0], delta=1)
+            self.assertAlmostEqual(follow_profile[1], wave_profile[1], delta=2)
         self.assertEqual(
             profile(transitions[0], "horizontal", 1000),
             profile(wave[1], "horizontal", 1000),
@@ -565,10 +577,6 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertEqual(
             profile(transitions[4], "horizontal", 0),
             profile(wave[1], "horizontal", 0),
-        )
-        self.assertEqual(
-            profile(transitions[4], "horizontal", 1000),
-            profile(linear[1], "horizontal", 1000),
         )
         self.assertEqual(
             profile(transitions[2], "horizontal", 0),
@@ -579,31 +587,48 @@ class TrueTypeBuildTests(unittest.TestCase):
             profile(linear[1], "horizontal", 1000),
         )
         self.assertEqual(
-            profile(transitions[6], "vertical", 880),
-            profile(linear[4], "vertical", 880),
+            profile(transitions[12], "vertical", 880),
+            profile(transitions[18], "vertical", -120),
         )
         self.assertEqual(
-            profile(transitions[6], "vertical", -120),
+            profile(transitions[12], "vertical", -120),
             profile(wave[6], "vertical", -120),
         )
         self.assertEqual(
-            profile(transitions[10], "vertical", 880),
+            profile(transitions[16], "vertical", 880),
             profile(wave[6], "vertical", 880),
         )
         self.assertEqual(
-            profile(transitions[10], "vertical", -120),
-            profile(linear[4], "vertical", -120),
+            profile(transitions[16], "vertical", -120),
+            profile(transitions[21], "vertical", 880),
         )
         self.assertLessEqual(transitions[0].bounds[0], -8)
         self.assertGreaterEqual(transitions[0].bounds[2], 1008)
 
         _, manga = make_manga_wave_parts(source, 1000, 880, model)
         manga_transitions = make_linear_manga_transition_parts(linear, manga, 1000, 880)
-        self.assertEqual(len(manga_transitions), 10)
-        self.assertEqual(
-            profile(manga_transitions[0], "horizontal", 0),
-            profile(linear[1], "horizontal", 0),
-        )
+        self.assertEqual(len(manga_transitions), 18)
+        self.assertEqual(manga_transitions[5].bounds[0], linear[0].bounds[0])
+        for lead in manga_transitions[5:7]:
+            lead_profile = profile(lead, "horizontal", 1000)
+            follow_profile = profile(manga_transitions[0], "horizontal", 0)
+            self.assertAlmostEqual(lead_profile[0], follow_profile[0], delta=1)
+            self.assertAlmostEqual(lead_profile[1], follow_profile[1], delta=2)
+        for lead in manga_transitions[3:5]:
+            lead_profile = profile(lead, "horizontal", 1000)
+            follow_profile = profile(manga_transitions[7], "horizontal", 0)
+            self.assertAlmostEqual(lead_profile[0], follow_profile[0], delta=1)
+            self.assertAlmostEqual(lead_profile[1], follow_profile[1], delta=2)
+        for position in (150, 250):
+            lead_profile = profile(manga_transitions[6], "horizontal", position)
+            linear_profile = profile(linear[1], "horizontal", position)
+            self.assertAlmostEqual(lead_profile[0], linear_profile[0], delta=1)
+            self.assertAlmostEqual(lead_profile[1], linear_profile[1], delta=2)
+        for position in (750, 850):
+            follow_profile = profile(manga_transitions[0], "horizontal", position)
+            manga_profile = profile(manga[1], "horizontal", position)
+            self.assertAlmostEqual(follow_profile[0], manga_profile[0], delta=1)
+            self.assertAlmostEqual(follow_profile[1], manga_profile[1], delta=2)
         self.assertEqual(
             profile(manga_transitions[0], "horizontal", 1000),
             profile(manga[1], "horizontal", 1000),
@@ -613,27 +638,105 @@ class TrueTypeBuildTests(unittest.TestCase):
             profile(manga[1], "horizontal", 0),
         )
         self.assertEqual(
-            profile(manga_transitions[4], "horizontal", 1000),
-            profile(linear[1], "horizontal", 1000),
-        )
-        self.assertEqual(
-            profile(manga_transitions[5], "vertical", 880),
-            profile(linear[4], "vertical", 880),
-        )
-        self.assertEqual(
-            profile(manga_transitions[5], "vertical", -120),
-            profile(manga[7], "vertical", -120),
-        )
-        self.assertEqual(
             profile(manga_transitions[9], "vertical", 880),
-            profile(manga[7], "vertical", 880),
+            profile(manga_transitions[14], "vertical", -120),
         )
         self.assertEqual(
             profile(manga_transitions[9], "vertical", -120),
-            profile(linear[4], "vertical", -120),
+            profile(manga[7], "vertical", -120),
+        )
+        self.assertEqual(
+            profile(manga_transitions[13], "vertical", 880),
+            profile(manga[7], "vertical", 880),
+        )
+        self.assertEqual(
+            profile(manga_transitions[13], "vertical", -120),
+            profile(manga_transitions[16], "vertical", 880),
         )
         self.assertLessEqual(manga_transitions[0].bounds[0], -8)
         self.assertGreaterEqual(manga_transitions[0].bounds[2], 1008)
+
+    def test_linear_wave_transitions_use_seventy_percent_span(self) -> None:
+        horizontal = pathops.Path()
+        pen = horizontal.getPen()
+        pen.moveTo((100, 330))
+        pen.curveTo((105, 285), (130, 300), (180, 300))
+        pen.lineTo((900, 300))
+        pen.lineTo((900, 370))
+        pen.lineTo((180, 370))
+        pen.curveTo((145, 370), (115, 365), (100, 330))
+        pen.closePath()
+        linear = (
+            *make_horizontal_parts(horizontal, 1000),
+            *make_vertical_parts(rectangle_path(), 1000, 880),
+        )
+        source = wave_source_path()
+        model = make_wave_stroke_model(
+            source,
+            1000,
+            ConnectedStrokeWidths(horizontal=80, vertical=70),
+        )
+        wave = make_wave_parts(source, 1000, 880, model)
+        transitions = make_linear_wave_transition_parts(linear, wave, 1000, 880)
+        _, manga = make_manga_wave_parts(source, 1000, 880, model)
+        manga_transitions = make_linear_manga_transition_parts(linear, manga, 1000, 880)
+
+        def region_difference(
+            first: pathops.Path, second: pathops.Path, x_min: int, x_max: int
+        ) -> pathops.Path:
+            clip = pathops.Path()
+            pen = clip.getPen()
+            pen.moveTo((x_min, -4096))
+            pen.lineTo((x_max, -4096))
+            pen.lineTo((x_max, 4096))
+            pen.lineTo((x_min, 4096))
+            pen.closePath()
+            first_clipped = pathops.op(first, clip, pathops.PathOp.INTERSECTION)
+            second_clipped = pathops.op(second, clip, pathops.PathOp.INTERSECTION)
+            return pathops.op(first_clipped, second_clipped, pathops.PathOp.XOR)
+
+        def assert_region_matches(
+            first: pathops.Path, second: pathops.Path, x_min: int, x_max: int
+        ) -> None:
+            self.assertEqual(
+                len(region_difference(first, second, x_min, x_max).verbs), 0
+            )
+
+        assert_region_matches(transitions[6], linear[0], -4096, 292)
+        assert_region_matches(transitions[0], wave[1], 708, 4096)
+        assert_region_matches(manga_transitions[5], linear[0], -4096, 292)
+        assert_region_matches(manga_transitions[0], manga[1], 708, 4096)
+        assert_region_matches(transitions[3], wave[0], -4096, 292)
+        assert_region_matches(transitions[11], linear[2], 708, 4096)
+        assert_region_matches(manga_transitions[3], manga[0], -4096, 292)
+        assert_region_matches(manga_transitions[8], linear[2], 708, 4096)
+        self.assertGreater(
+            len(region_difference(transitions[6], linear[0], 308, 492).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(transitions[0], wave[1], 508, 692).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(manga_transitions[5], linear[0], 308, 492).verbs),
+            0,
+        )
+        self.assertGreater(
+            len(region_difference(manga_transitions[0], manga[1], 508, 692).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(transitions[3], wave[0], 308, 492).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(transitions[11], linear[2], 508, 692).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(manga_transitions[3], manga[0], 308, 492).verbs),
+            0,
+        )
+        self.assertGreater(
+            len(region_difference(manga_transitions[8], linear[2], 508, 692).verbs),
+            0,
+        )
 
     def test_joined_waves_use_constant_period_with_half_wave_offset(self) -> None:
         start, middle, inverted, end, inverted_end = make_wave_parts(
@@ -1740,6 +1843,12 @@ class TrueTypeBuildTests(unittest.TestCase):
             "wave-to-line.start",
             "wave-to-line.a",
             "wave-to-line.b",
+            "line-to-wave.lead-start",
+            "line-to-wave.lead-middle",
+            "wave-to-line.follow-middle-a",
+            "wave-to-line.follow-middle-b",
+            "wave-to-line.follow-end-a",
+            "wave-to-line.follow-end-b",
         ]
         glyph_order = [
             ".notdef",
@@ -1789,6 +1898,54 @@ class TrueTypeBuildTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            forward = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "LW",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            forward_run = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "LLWW",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            reverse = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "WL",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            reverse_run = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "WWLL",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             shaped_relaxed = subprocess.run(
                 [
                     "hb-shape",
@@ -1807,6 +1964,32 @@ class TrueTypeBuildTests(unittest.TestCase):
             ["line.start", "line-wave-line", "line.end"],
         )
         self.assertEqual(
+            [record["g"] for record in json.loads(forward.stdout)],
+            ["line-to-wave.lead-start", "line-to-wave.end"],
+        )
+        self.assertEqual(
+            [record["g"] for record in json.loads(forward_run.stdout)],
+            [
+                "line.start",
+                "line-to-wave.lead-middle",
+                "line-to-wave",
+                "wave.end-b",
+            ],
+        )
+        self.assertEqual(
+            [record["g"] for record in json.loads(reverse.stdout)],
+            ["wave-to-line.start", "wave-to-line.follow-end-b"],
+        )
+        self.assertEqual(
+            [record["g"] for record in json.loads(reverse_run.stdout)],
+            [
+                "wave.start",
+                "wave-to-line.b",
+                "wave-to-line.follow-middle-a",
+                "line.end",
+            ],
+        )
+        self.assertEqual(
             [record["g"] for record in json.loads(shaped_relaxed.stdout)],
             ["line", "wave.relaxed", "wave.relaxed", "line"],
         )
@@ -1821,6 +2004,10 @@ class TrueTypeBuildTests(unittest.TestCase):
             "line-manga-line",
             "manga-to-line.start",
             "manga-to-line",
+            "line-to-manga.lead-start",
+            "line-to-manga.lead-middle",
+            "manga-to-line.follow-middle",
+            "manga-to-line.follow-end",
         ]
         font = named_true_type_font(
             [
@@ -1867,6 +2054,54 @@ class TrueTypeBuildTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            forward = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "LM",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            forward_run = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "LLMM",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            reverse = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "ML",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            reverse_run = subprocess.run(
+                [
+                    "hb-shape",
+                    "--output-format=json",
+                    "--features=calt=1",
+                    str(path),
+                    "MMLL",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             bridge = subprocess.run(
                 [
                     "hb-shape",
@@ -1881,13 +2116,39 @@ class TrueTypeBuildTests(unittest.TestCase):
             )
 
         self.assertEqual(
+            [record["g"] for record in json.loads(forward.stdout)],
+            ["line-to-manga.lead-start", "line-to-manga.end"],
+        )
+        self.assertEqual(
+            [record["g"] for record in json.loads(forward_run.stdout)],
+            [
+                "line.start",
+                "line-to-manga.lead-middle",
+                "line-to-manga",
+                "manga.end",
+            ],
+        )
+        self.assertEqual(
+            [record["g"] for record in json.loads(reverse.stdout)],
+            ["manga-to-line.start", "manga-to-line.follow-end"],
+        )
+        self.assertEqual(
+            [record["g"] for record in json.loads(reverse_run.stdout)],
+            [
+                "manga.start",
+                "manga-to-line",
+                "manga-to-line.follow-middle",
+                "line.end",
+            ],
+        )
+        self.assertEqual(
             [record["g"] for record in json.loads(shaped.stdout)],
             [
                 "line.start",
-                "line.middle",
+                "line-to-manga.lead-middle",
                 "line-to-manga",
                 "manga-to-line",
-                "line.middle",
+                "manga-to-line.follow-middle",
                 "line.end",
             ],
         )
