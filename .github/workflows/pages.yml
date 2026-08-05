@@ -47,6 +47,7 @@ jobs:
           version = os.environ["VERSION"]
           expected = {
               f"NobigoeMincho-v{version}.zip",
+              f"NobigoeEssential-v{version}.zip",
               f"NobigoeKoburiMincho-v{version}.zip",
           }
           release = json.loads(os.environ["RELEASE_JSON"])
@@ -64,7 +65,7 @@ jobs:
           PY
             then
               echo "available=true" >> "$GITHUB_OUTPUT"
-              echo "Found both stable release ZIPs for $tag"
+              echo "Found all stable release ZIPs for $tag"
               exit 0
             fi
           fi
@@ -75,7 +76,7 @@ jobs:
             exit 0
           fi
 
-          echo "::error::Both stable release ZIPs for $tag must exist before deploying Pages"
+          echo "::error::All stable release ZIPs for $tag must exist before deploying Pages"
           exit 1
 
   build:

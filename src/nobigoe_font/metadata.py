@@ -22,6 +22,10 @@ def set_name(font: TTFont, name_id: int, value: str) -> None:
             )
     else:
         name_table.setName(value, name_id, 3, 1, 0x409)
+    if name_id == 6:
+        # A retained Macintosh custom name (for example, a STAT label) makes
+        # validators require the PostScript name on that platform as well.
+        name_table.setName(value, name_id, 1, 0, 0)
 
 
 def set_japanese_name(font: TTFont, name_id: int, value: str) -> None:
