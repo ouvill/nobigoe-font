@@ -4,6 +4,7 @@ import { NAVIGATION, SITE } from "../data/site";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const currentPath = Astro.url.pathname;
 const toPath = (href: string) => (href === "/" ? `${base}/` : `${base}${href}`);
+const downloadPath = `${toPath("/")}#download`;
 const isActive = (href: string) => {
   const target = toPath(href);
   return href === "/" ? currentPath === target : currentPath.startsWith(target);
@@ -36,8 +37,8 @@ const isActive = (href: string) => {
     }
   </nav>
 
-  <a class="header-release" href={SITE.releaseUrl}>
-    <span>ダウンロード</span><span aria-hidden="true">↗</span>
+  <a class="header-release" href={downloadPath}>
+    <span>ダウンロード</span><span aria-hidden="true">↓</span>
   </a>
 
   <details class="mobile-nav">
@@ -53,7 +54,7 @@ const isActive = (href: string) => {
           </a>
         ))
       }
-      <a href={SITE.releaseUrl}>GitHub Releases ↗</a>
+      <a href={downloadPath}>ダウンロード ↓</a>
     </nav>
   </details>
 </header>

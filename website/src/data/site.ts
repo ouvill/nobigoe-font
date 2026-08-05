@@ -1,3 +1,5 @@
+const version = import.meta.env.PUBLIC_FONT_VERSION;
+
 export const SITE = {
   name: "のびごえ明朝",
   companion: "のびごえこぶり明朝",
@@ -10,7 +12,10 @@ export const SITE = {
     socialHandle: "@ouvill",
     socialUrl: "https://twitter.com/ouvill",
   },
-  version: import.meta.env.PUBLIC_FONT_VERSION,
+  version,
+  downloadUrl: `https://github.com/ouvill/nobigoe-font/releases/download/v${version}/NobigoeMincho-v${version}.zip`,
+  koburiDownloadUrl: `https://github.com/ouvill/nobigoe-font/releases/download/v${version}/NobigoeKoburiMincho-v${version}.zip`,
+  essentialDownloadUrl: `https://github.com/ouvill/nobigoe-font/releases/download/v${version}/NobigoeEssential-v${version}.zip`,
   releaseUrl: "https://github.com/ouvill/nobigoe-font/releases",
   repositoryUrl: "https://github.com/ouvill/nobigoe-font",
   supportUrl: "https://github.com/sponsors/ouvill",

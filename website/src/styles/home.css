@@ -23,7 +23,7 @@
 .vertical-copy > p:first-child,
 .explore-section > header > p,
 .explore-card > span,
-.download-copy > p,
+.download-eyebrow,
 .package-list span {
   font-family: var(--sans);
   font-size: 11px;
@@ -78,8 +78,7 @@
   line-height: 2;
 }
 
-.hero-actions,
-.download-actions {
+.hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -958,18 +957,29 @@
 
 .download-section {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(400px, 0.8fr);
+  grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
   color: var(--paper-bright);
   background: var(--moss);
 }
 
 .download-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: clamp(58px, 8vw, 108px) var(--gutter);
 }
 
-.download-copy > p {
+.download-eyebrow {
   margin: 0 0 20px;
   color: rgba(255, 255, 255, 0.62);
+}
+
+.download-intro {
+  max-width: 31em;
+  margin: 30px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  line-height: 2;
 }
 
 .package-list {
@@ -978,10 +988,11 @@
 }
 
 .package-list article {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 38px var(--gutter);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(28px, 4vw, 58px);
+  align-items: center;
+  padding: 36px var(--gutter);
 }
 
 .package-list article + article {
@@ -993,18 +1004,48 @@
 }
 
 .package-list h3 {
-  margin: 8px 0 20px;
+  margin: 8px 0 12px;
   font-size: clamp(25px, 2.5vw, 34px);
   font-weight: 400;
 }
 
-.package-list code {
+.package-copy > p {
+  max-width: 34em;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.package-action {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.package-action code {
   color: rgba(255, 255, 255, 0.58);
   font-family: var(--sans);
   font-size: 10px;
+  white-space: nowrap;
+}
+
+.package-action .button {
+  min-height: 44px;
+  padding: 9px 18px;
 }
 
 @media (max-width: 1050px) {
+  .package-list article {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .package-action {
+    align-items: flex-start;
+  }
+
   .feature-heading,
   .section-heading {
     grid-template-columns: 150px minmax(0, 1fr);
@@ -1301,10 +1342,6 @@
 
   .download-section {
     grid-template-columns: 1fr;
-  }
-
-  .download-actions {
-    display: grid;
   }
 
   .package-list {
