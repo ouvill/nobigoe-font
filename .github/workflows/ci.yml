@@ -176,6 +176,7 @@ jobs:
             /tmp/NobigoeMincho-Regular.otf
             /tmp/NobigoeVariableMarks-VF.otf
             /tmp/NobigoeEssential-VF.otf
+            .cache/font-sources/*.otf
           if-no-files-found: error
 
   font-windows:
@@ -216,8 +217,7 @@ jobs:
           "@
           $rejected = @()
 
-
-          Get-ChildItem fonts -File | ForEach-Object {
+          Get-ChildItem fonts -File -Recurse | ForEach-Object {
               $loaded = [FontLoader]::AddFontResourceEx(
                   $_.FullName,
                   0x10,
