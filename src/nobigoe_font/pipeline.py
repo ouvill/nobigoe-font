@@ -32,7 +32,7 @@ from .brush import (
     VerticalEndProfile,
     apply_han_brush_elements,
 )
-from .features import feature_source, merge_features
+from .features import consolidate_vrt2_lookups, feature_source, merge_features
 from .hinting import autohint_latin_glyphs
 from .metadata import rename_font
 from .variable_stix import instantiate_stix_latin_font
@@ -2625,6 +2625,7 @@ def build(
             punctuation_marks,
         ),
     )
+    consolidate_vrt2_lookups(font)
     _rename_release_font(font, latin_font, latin_profile, identity)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

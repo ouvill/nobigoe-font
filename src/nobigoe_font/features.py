@@ -249,10 +249,7 @@ def _symbol_feature_rules(
             contextual_extension_rules(f"{prefix}_vert", base, v_start, v_middle, v_end)
             + vertical_maps
         )
-        vrt2_rules.append(
-            contextual_extension_rules(f"{prefix}_vrt2", base, v_start, v_middle, v_end)
-            + vertical_maps
-        )
+        vrt2_rules.append(vertical_maps)
 
     wave_prefix, wave_base, wave_vertical, wave_names = wave
     horizontal_wave_names = wave_names[:5]
@@ -273,10 +270,7 @@ def _symbol_feature_rules(
         alternating_wave_rules(f"{wave_prefix}_vert", wave_base, vertical_wave_names)
         + wave_vertical_maps
     )
-    vrt2_rules.append(
-        alternating_wave_rules(f"{wave_prefix}_vrt2", wave_base, vertical_wave_names)
-        + wave_vertical_maps
-    )
+    vrt2_rules.append(wave_vertical_maps)
 
     (
         relaxed_wave_prefix,
@@ -318,14 +312,7 @@ def _symbol_feature_rules(
         )
         + relaxed_vertical_maps
     )
-    vrt2_rules.append(
-        phased_wave_rules(
-            f"{relaxed_wave_prefix}_vrt2",
-            relaxed_horizontal_base,
-            relaxed_vertical_parts,
-        )
-        + relaxed_vertical_maps
-    )
+    vrt2_rules.append(relaxed_vertical_maps)
     ss04_rules = repeated_glyph_rules(
         f"{relaxed_wave_prefix}_h_style",
         relaxed_wave_source,
@@ -392,16 +379,7 @@ def _symbol_feature_rules(
         )
         + one_cycle_vertical_maps
     )
-    vrt2_rules.append(
-        contextual_extension_rules(
-            f"{one_cycle_prefix}_vrt2",
-            one_cycle_horizontal_base,
-            one_cycle_vertical_start,
-            one_cycle_vertical_middle,
-            one_cycle_vertical_end,
-        )
-        + one_cycle_vertical_maps
-    )
+    vrt2_rules.append(one_cycle_vertical_maps)
     ss05_rules = repeated_glyph_rules(
         f"{one_cycle_prefix}_h_style",
         one_cycle_source,
@@ -479,13 +457,7 @@ def _symbol_feature_rules(
         )
         + transition_vertical_maps,
     )
-    vrt2_rules.insert(
-        0,
-        mixed_wave_scan_rules(
-            f"{reverse_transition_prefix}_vrt2", *vertical_scan_arguments
-        )
-        + transition_vertical_maps,
-    )
+    vrt2_rules.insert(0, transition_vertical_maps)
     calt_rules.append(
         contextual_extension_rules(
             f"{manga_wave_prefix}_h",
@@ -513,16 +485,7 @@ def _symbol_feature_rules(
         )
         + manga_wave_vertical_maps
     )
-    vrt2_rules.append(
-        contextual_extension_rules(
-            f"{manga_wave_prefix}_vrt2",
-            manga_wave_base,
-            manga_wave_vertical_start,
-            manga_wave_vertical_middle,
-            manga_wave_vertical_end,
-        )
-        + manga_wave_vertical_maps
-    )
+    vrt2_rules.append(manga_wave_vertical_maps)
 
     def append_linear_transition_family_rules(
         transitions: list[tuple[str, list[str]]],
@@ -584,22 +547,18 @@ def _symbol_feature_rules(
                     vertical_transitions,
                 )
             )
-            for rules, suffix in (
-                (vert_rules, "vert"),
-                (vrt2_rules, "vrt2"),
-            ):
-                rules.append(
-                    linear_wave_transition_rules(
-                        f"{family_prefix}_{suffix}",
-                        extension_base,
-                        vertical_linear,
-                        horizontal_base,
-                        vertical_start,
-                        vertical_middles,
-                        vertical_ends,
-                        vertical_transitions,
-                    )
+            vert_rules.append(
+                linear_wave_transition_rules(
+                    f"{family_prefix}_vert",
+                    extension_base,
+                    vertical_linear,
+                    horizontal_base,
+                    vertical_start,
+                    vertical_middles,
+                    vertical_ends,
+                    vertical_transitions,
                 )
+            )
             transition_vertical_maps = "".join(
                 f"  sub {horizontal} by {vertical};\n"
                 for horizontal, vertical in zip(
@@ -935,6 +894,55 @@ def compact_auxiliary_single_substitutions(font: TTFont) -> int:
     table.LookupList.Lookup = compacted
     table.LookupList.LookupCount = len(compacted)
     return len(compacted)
+
+
+def consolidate_vrt2_lookups(font: TTFont) -> int:
+    """Reduce every ``vrt2`` feature to one type 1 lookup and one subtable."""
+
+    table = font["GSUB"].table
+    feature_records = [
+        record
+        for record in table.FeatureList.FeatureRecord
+        if record.FeatureTag == "vrt2"
+    ]
+    grouped: dict[tuple[int, ...], list[Any]] = {}
+    for record in feature_records:
+        indices = tuple(record.Feature.LookupListIndex)
+        if not indices:
+            raise ValueError("The vrt2 feature has no lookup")
+        grouped.setdefault(indices, []).append(record.Feature)
+
+    for indices, features in grouped.items():
+        combined: dict[str, str] = {}
+        for index in indices:
+            lookup = table.LookupList.Lookup[index]
+            if lookup.LookupType != 1 or lookup.LookupFlag != 0:
+                raise ValueError("The vrt2 feature must use only unflagged type 1 lookups")
+            mapping: dict[str, str] = {}
+            for subtable in lookup.SubTable:
+                mapping.update(subtable.mapping)
+            for source, replacement in tuple(combined.items()):
+                combined[source] = mapping.get(replacement, replacement)
+            for source, replacement in mapping.items():
+                _ = combined.setdefault(source, replacement)
+
+        replacement = buildLookup(
+            [buildSingleSubstSubtable(combined)],
+            flags=0,
+            table="GSUB",
+        )
+        if len(grouped) == 1:
+            replacement_index = indices[0]
+            table.LookupList.Lookup[replacement_index] = replacement
+        else:
+            replacement_index = len(table.LookupList.Lookup)
+            table.LookupList.Lookup.append(replacement)
+        for feature in features:
+            feature.LookupListIndex = [replacement_index]
+            feature.LookupCount = 1
+
+    table.LookupList.LookupCount = len(table.LookupList.Lookup)
+    return len(grouped)
 
 
 def all_langsys(script_list: object) -> Iterator[object]:

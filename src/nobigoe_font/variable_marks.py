@@ -27,6 +27,7 @@ from fontTools.varLib.models import normalizeValue, piecewiseLinearMap
 from . import geometry
 from .features import (
     compact_auxiliary_single_substitutions,
+    consolidate_vrt2_lookups,
     merge_features,
     punctuation_feature_source,
     symbol_feature_source,
@@ -1581,6 +1582,7 @@ def build_variable_marks(
     if original_order != font.getGlyphOrder()[: len(original_order)]:
         raise AssertionError("Existing glyph order changed while adding variable marks")
     compact_auxiliary_single_substitutions(font)
+    consolidate_vrt2_lookups(font)
     rename_variable_font(font)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font.save(output_path)

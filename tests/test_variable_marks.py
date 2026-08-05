@@ -12,7 +12,11 @@ from fontTools.pens.recordingPen import RecordingPen
 from fontTools.ttLib import TTFont
 
 from nobigoe_font import geometry
-from nobigoe_font.features import punctuation_feature_source, symbol_feature_source
+from nobigoe_font.features import (
+    consolidate_vrt2_lookups,
+    punctuation_feature_source,
+    symbol_feature_source,
+)
 from nobigoe_font.operations import feature_ligatures, feature_single_substitutions
 from nobigoe_font.profiles import (
     NOTO_WEIGHT_CLASSES,
@@ -278,6 +282,7 @@ class VariableSymbolTests(unittest.TestCase):
             ),
             tables={"GSUB"},
         )
+        consolidate_vrt2_lookups(font)
 
         feature_tags = {
             record.FeatureTag for record in font["GSUB"].table.FeatureList.FeatureRecord
@@ -308,6 +313,57 @@ class VariableSymbolTests(unittest.TestCase):
                 {name: substitutions[name] for name in expected_vertical},
                 expected_vertical,
             )
+        vrt2_records = [
+            record
+            for record in font["GSUB"].table.FeatureList.FeatureRecord
+            if record.FeatureTag == "vrt2"
+        ]
+        self.assertTrue(vrt2_records)
+        self.assertTrue(
+            all(len(record.Feature.LookupListIndex) == 1 for record in vrt2_records)
+        )
+        vrt2_index = vrt2_records[0].Feature.LookupListIndex[0]
+        vrt2_lookup = font["GSUB"].table.LookupList.Lookup[vrt2_index]
+        self.assertEqual(vrt2_lookup.LookupType, 1)
+        self.assertEqual(vrt2_lookup.LookupFlag, 0)
+        self.assertEqual(len(vrt2_lookup.SubTable), 1)
+
+    def test_vrt2_lookups_are_consolidated_for_windows_cff_loading(self) -> None:
+        font = TTFont()
+        font.setGlyphOrder([".notdef", "a", "b", "c"])
+        addOpenTypeFeaturesFromString(
+            font,
+            """
+            languagesystem DFLT dflt;
+            lookup first {
+                sub a by b;
+            } first;
+            lookup second {
+                sub b by c;
+            } second;
+            feature vrt2 {
+                lookup first;
+                lookup second;
+            } vrt2;
+            """,
+            tables={"GSUB"},
+        )
+
+        consolidate_vrt2_lookups(font)
+
+        record = next(
+            record
+            for record in font["GSUB"].table.FeatureList.FeatureRecord
+            if record.FeatureTag == "vrt2"
+        )
+        self.assertEqual(len(record.Feature.LookupListIndex), 1)
+        lookup = font["GSUB"].table.LookupList.Lookup[
+            record.Feature.LookupListIndex[0]
+        ]
+        self.assertEqual(lookup.LookupType, 1)
+        self.assertEqual(lookup.LookupFlag, 0)
+        self.assertEqual(len(lookup.SubTable), 1)
+        self.assertEqual(lookup.SubTable[0].mapping, {"a": "c", "b": "c"})
 
 
 def _cubic_ellipse(
