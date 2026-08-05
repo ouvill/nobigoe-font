@@ -19,6 +19,7 @@ from fontTools.pens.recordingPen import RecordingPen
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.removeOverlaps import RemoveOverlapsError, removeOverlaps
 
 from nobigoe_font.hinting import autohint_latin_glyphs
 from nobigoe_font.features import (
@@ -109,6 +110,30 @@ def rectangle_path() -> pathops.Path:
     pen.lineTo((100, 500))
     pen.closePath()
     return path
+
+
+def minimal_cff_font(outline: pathops.Path) -> TTFont:
+    builder = FontBuilder(1000, isTTF=False)
+    builder.setupGlyphOrder([".notdef", "base"])
+    charstrings = {}
+    for glyph_name in (".notdef", "base"):
+        pen = T2CharStringPen(500, None)
+        if glyph_name == "base":
+            outline.draw(pen)
+        charstrings[glyph_name] = pen.getCharString()
+    builder.setupCharacterMap({0x25A1: "base"})
+    builder.setupCFF(
+        "Test-Regular",
+        {"FullName": "Test Regular", "FamilyName": "Test"},
+        charstrings,
+        {},
+    )
+    builder.setupHorizontalMetrics({".notdef": (500, 0), "base": (500, 0)})
+    builder.setupHorizontalHeader(ascent=880, descent=-120)
+    builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
+    builder.setupOS2()
+    builder.setupPost()
+    return builder.font
 
 
 def wave_source_path() -> pathops.Path:
@@ -266,8 +291,6 @@ class StaticInstanceTests(unittest.TestCase):
         self.assertEqual(private.FamilyOtherBlues, [-280, -260])
 
     def test_static_cff_overlaps_are_merged_for_windows_rasterization(self) -> None:
-        builder = FontBuilder(1000, isTTF=False)
-        builder.setupGlyphOrder([".notdef", "base"])
         overlapping = rectangle_path()
         pen = overlapping.getPen()
         pen.moveTo((400, 0))
@@ -275,32 +298,45 @@ class StaticInstanceTests(unittest.TestCase):
         pen.lineTo((600, 700))
         pen.lineTo((400, 700))
         pen.closePath()
-        charstrings = {}
-        for glyph_name in (".notdef", "base"):
-            charstring_pen = T2CharStringPen(500, None)
-            if glyph_name == "base":
-                overlapping.draw(charstring_pen)
-            charstrings[glyph_name] = charstring_pen.getCharString()
-        builder.setupCharacterMap({0x25A1: "base"})
-        builder.setupCFF(
-            "Test-Regular",
-            {"FullName": "Test Regular", "FamilyName": "Test"},
-            charstrings,
-            {},
-        )
-        builder.setupHorizontalMetrics({".notdef": (500, 0), "base": (500, 0)})
-        builder.setupHorizontalHeader(ascent=880, descent=-120)
-        builder.setupNameTable({"familyName": "Test", "styleName": "Regular"})
-        builder.setupOS2()
-        builder.setupPost()
-
-        _remove_static_cff_overlaps(builder.font)
+        font = minimal_cff_font(overlapping)
+        _remove_static_cff_overlaps(font)
 
         recording = RecordingPen()
-        builder.font.getGlyphSet()["base"].draw(recording)
+        font.getGlyphSet()["base"].draw(recording)
         contour_count = sum(
             operation == "moveTo" for operation, _ in recording.value
         )
+        self.assertEqual(contour_count, 1)
+
+    def test_static_cff_pathops_failure_approximates_and_retries(self) -> None:
+        overlapping = rectangle_path()
+        pen = overlapping.getPen()
+        pen.moveTo((400.25, 0.25))
+        pen.lineTo((600.25, 0.25))
+        pen.lineTo((600.25, 700.25))
+        pen.lineTo((400.25, 700.25))
+        pen.closePath()
+        font = minimal_cff_font(overlapping)
+        attempts = 0
+
+        def fail_once(*args, **kwargs) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise RemoveOverlapsError(
+                    "Failed to remove overlaps from glyph 'base'"
+                )
+            removeOverlaps(*args, **kwargs)
+
+        with patch("nobigoe_font.pipeline.removeOverlaps", side_effect=fail_once):
+            _remove_static_cff_overlaps(font)
+
+        recording = RecordingPen()
+        font.getGlyphSet()["base"].draw(recording)
+        contour_count = sum(
+            operation == "moveTo" for operation, _ in recording.value
+        )
+        self.assertEqual(attempts, 2)
         self.assertEqual(contour_count, 1)
 
     def test_final_cff_widths_match_horizontal_metrics(self) -> None:

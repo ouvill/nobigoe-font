@@ -68,8 +68,10 @@ from fontTools.cffLib.CFF2ToCFF import convertCFF2ToCFF
 from fontTools.cffLib.width import optimizeWidths
 from fontTools.misc.psCharStrings import T2WidthExtractor
 from fontTools.misc.transform import Transform
+from fontTools.pens.cu2quPen import Cu2QuPen
+from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.ttLib import TTFont
-from fontTools.ttLib.removeOverlaps import removeOverlaps
+from fontTools.ttLib.removeOverlaps import RemoveOverlapsError, removeOverlaps
 from fontTools.ttLib.scaleUpem import scale_upem
 from fontTools.varLib.instancer import instantiateVariableFont
 
@@ -1561,12 +1563,59 @@ def _normalize_cff_blue_zones(font: TTFont) -> None:
             setattr(private, attribute, normalized)
 
 
+def _approximate_cff_glyph_curves(font: TTFont, glyph_name: str) -> None:
+    """Re-express one CFF outline when Skia rejects its cubic intersections."""
+
+    cff = font["CFF "].cff
+    top = cff.topDictIndex[0]
+    charstrings = top.CharStrings
+    old_charstring = charstrings[glyph_name]
+    glyph_set = font.getGlyphSet()
+    pen = T2CharStringPen(
+        font["hmtx"].metrics[glyph_name][0],
+        glyph_set,
+        roundTolerance=0,
+    )
+    glyph_set[glyph_name].draw(
+        Cu2QuPen(pen, max_err=0.5, reverse_direction=False, all_quadratic=True)
+    )
+    charstrings[glyph_name] = pen.getCharString(
+        private=old_charstring.private,
+        globalSubrs=cff.GlobalSubrs,
+    )
+
+
 def _remove_static_cff_overlaps(font: TTFont) -> None:
     """Merge static CFF contours that otherwise show seams in Windows."""
 
     if "CFF " not in font:
         raise ValueError("Static overlap removal requires CFF outlines")
-    removeOverlaps(font, removeHinting=False, ignoreErrors=False)
+
+    remaining = font.getGlyphOrder()
+    approximated: set[str] = set()
+    while remaining:
+        try:
+            removeOverlaps(
+                font,
+                glyphNames=remaining,
+                removeHinting=False,
+                ignoreErrors=False,
+            )
+            return
+        except RemoveOverlapsError as error:
+            failed = next(
+                (
+                    name
+                    for name in remaining
+                    if str(error) == f"Failed to remove overlaps from glyph {name!r}"
+                ),
+                None,
+            )
+            if failed is None or failed in approximated:
+                raise
+            _approximate_cff_glyph_curves(font, failed)
+            approximated.add(failed)
+            remaining = remaining[remaining.index(failed) :]
 
 
 def _synchronize_cff_widths(font: TTFont) -> None:
