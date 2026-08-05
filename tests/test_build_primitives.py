@@ -555,12 +555,12 @@ class TrueTypeBuildTests(unittest.TestCase):
             follow_profile = profile(transitions[0], "horizontal", 0)
             self.assertAlmostEqual(lead_profile[0], follow_profile[0], delta=1)
             self.assertAlmostEqual(lead_profile[1], follow_profile[1], delta=2)
-        for position in (250, 500):
+        for position in (150, 250):
             lead_profile = profile(transitions[7], "horizontal", position)
             linear_profile = profile(linear[1], "horizontal", position)
             self.assertAlmostEqual(lead_profile[0], linear_profile[0], delta=1)
             self.assertAlmostEqual(lead_profile[1], linear_profile[1], delta=2)
-        for position in (500, 750):
+        for position in (750, 850):
             follow_profile = profile(transitions[0], "horizontal", position)
             wave_profile = profile(wave[1], "horizontal", position)
             self.assertAlmostEqual(follow_profile[0], wave_profile[0], delta=1)
@@ -613,12 +613,12 @@ class TrueTypeBuildTests(unittest.TestCase):
             follow_profile = profile(manga_transitions[0], "horizontal", 0)
             self.assertAlmostEqual(lead_profile[0], follow_profile[0], delta=1)
             self.assertAlmostEqual(lead_profile[1], follow_profile[1], delta=2)
-        for position in (250, 500):
+        for position in (150, 250):
             lead_profile = profile(manga_transitions[6], "horizontal", position)
             linear_profile = profile(linear[1], "horizontal", position)
             self.assertAlmostEqual(lead_profile[0], linear_profile[0], delta=1)
             self.assertAlmostEqual(lead_profile[1], linear_profile[1], delta=2)
-        for position in (500, 750):
+        for position in (750, 850):
             follow_profile = profile(manga_transitions[0], "horizontal", position)
             manga_profile = profile(manga[1], "horizontal", position)
             self.assertAlmostEqual(follow_profile[0], manga_profile[0], delta=1)
@@ -654,7 +654,7 @@ class TrueTypeBuildTests(unittest.TestCase):
         self.assertLessEqual(manga_transitions[0].bounds[0], -8)
         self.assertGreaterEqual(manga_transitions[0].bounds[2], 1008)
 
-    def test_linear_to_wave_transition_preserves_both_outer_halves(self) -> None:
+    def test_linear_to_wave_transition_uses_seventy_percent_span(self) -> None:
         horizontal = pathops.Path()
         pen = horizontal.getPen()
         pen.moveTo((100, 330))
@@ -679,9 +679,9 @@ class TrueTypeBuildTests(unittest.TestCase):
         _, manga = make_manga_wave_parts(source, 1000, 880, model)
         manga_transitions = make_linear_manga_transition_parts(linear, manga, 1000, 880)
 
-        def assert_region_matches(
+        def region_difference(
             first: pathops.Path, second: pathops.Path, x_min: int, x_max: int
-        ) -> None:
+        ) -> pathops.Path:
             clip = pathops.Path()
             pen = clip.getPen()
             pen.moveTo((x_min, -4096))
@@ -691,13 +691,32 @@ class TrueTypeBuildTests(unittest.TestCase):
             pen.closePath()
             first_clipped = pathops.op(first, clip, pathops.PathOp.INTERSECTION)
             second_clipped = pathops.op(second, clip, pathops.PathOp.INTERSECTION)
-            difference = pathops.op(first_clipped, second_clipped, pathops.PathOp.XOR)
-            self.assertEqual(len(difference.verbs), 0)
+            return pathops.op(first_clipped, second_clipped, pathops.PathOp.XOR)
 
-        assert_region_matches(transitions[6], linear[0], -4096, 492)
-        assert_region_matches(transitions[0], wave[1], 508, 4096)
-        assert_region_matches(manga_transitions[5], linear[0], -4096, 492)
-        assert_region_matches(manga_transitions[0], manga[1], 508, 4096)
+        def assert_region_matches(
+            first: pathops.Path, second: pathops.Path, x_min: int, x_max: int
+        ) -> None:
+            self.assertEqual(
+                len(region_difference(first, second, x_min, x_max).verbs), 0
+            )
+
+        assert_region_matches(transitions[6], linear[0], -4096, 292)
+        assert_region_matches(transitions[0], wave[1], 708, 4096)
+        assert_region_matches(manga_transitions[5], linear[0], -4096, 292)
+        assert_region_matches(manga_transitions[0], manga[1], 708, 4096)
+        self.assertGreater(
+            len(region_difference(transitions[6], linear[0], 308, 492).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(transitions[0], wave[1], 508, 692).verbs), 0
+        )
+        self.assertGreater(
+            len(region_difference(manga_transitions[5], linear[0], 308, 492).verbs),
+            0,
+        )
+        self.assertGreater(
+            len(region_difference(manga_transitions[0], manga[1], 508, 692).verbs), 0
+        )
 
     def test_joined_waves_use_constant_period_with_half_wave_offset(self) -> None:
         start, middle, inverted, end, inverted_end = make_wave_parts(

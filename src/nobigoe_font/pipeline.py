@@ -85,6 +85,7 @@ WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT = 8
 MANGA_WAVE_GLYPH_COUNT = 11
 WAVE_TERMINAL_EXTENSION_HALF_WAVES = 0.3
 LINEAR_WAVE_TRANSITION_SEGMENTS = 24
+LINEAR_WAVE_TRANSITION_SPAN_RATIO = 0.7
 WAVE_STROKE_MODULATION = 0.3
 NEW_GLYPH_COUNT = 6
 
@@ -580,12 +581,12 @@ def _blend_connected_outlines(
     advance: int,
     *,
     middle: pathops.Path | None = None,
-    blend_offset: float = 0,
+    transition_cell: int | None = None,
 ) -> pathops.Path:
-    if not -1 <= blend_offset <= 1:
-        raise ValueError("Transition blend offset must stay between minus one and one")
-    if middle is not None and blend_offset != 0:
-        raise ValueError("Three-way transitions cannot offset the blend")
+    if transition_cell not in (None, 0, 1):
+        raise ValueError("Transition cell must be zero, one, or None")
+    if middle is not None and transition_cell is not None:
+        raise ValueError("Three-way transitions cannot span two cells")
     outlines = (start, end) if middle is None else (start, middle, end)
     core_start = max(0.0, *(outline.bounds[0] for outline in outlines))
     core_end = min(float(advance), *(outline.bounds[2] for outline in outlines))
@@ -598,15 +599,17 @@ def _blend_connected_outlines(
         return progress * progress * (3 - 2 * progress)
 
     def profile_at(position: float) -> tuple[float, float]:
-        progress = (
-            position / advance
-            if blend_offset != 0
-            else (position - core_start) / (core_end - core_start)
-        )
+        progress = (position - core_start) / (core_end - core_start)
         if middle is None:
             first, second = start, end
-            blend_progress = max(0.0, min(1.0, progress + blend_offset))
-            blend = smoothstep(blend_progress)
+            if transition_cell is None:
+                blend_progress = progress
+            else:
+                outer_margin = 1 - LINEAR_WAVE_TRANSITION_SPAN_RATIO
+                blend_progress = (
+                    transition_cell + position / advance - outer_margin
+                ) / (2 * LINEAR_WAVE_TRANSITION_SPAN_RATIO)
+            blend = smoothstep(max(0.0, min(1.0, blend_progress)))
         elif progress <= 0.5:
             first, second = start, middle
             blend = smoothstep(progress * 2)
@@ -695,7 +698,8 @@ def _splice_connected_transition(
     *,
     keep_start: bool,
 ) -> pathops.Path:
-    split = advance / 2
+    outer_margin = advance * (1 - LINEAR_WAVE_TRANSITION_SPAN_RATIO)
+    split = outer_margin if keep_start else advance - outer_margin
     start_clip = _font_geometry.rectangle(-4096, -4096, split + OVERLAP, 4096)
     end_clip = _font_geometry.rectangle(split - OVERLAP, -4096, 4096, 4096)
     if keep_start:
@@ -774,7 +778,7 @@ def _transition_family_parts(
             linear_middle,
             wave_middles[0],
             advance,
-            blend_offset=0.5,
+            transition_cell=1,
         ),
         advance,
         keep_start=False,
@@ -785,7 +789,7 @@ def _transition_family_parts(
             linear_middle,
             wave_end,
             advance,
-            blend_offset=0.5,
+            transition_cell=1,
         ),
         advance,
         keep_start=False,
@@ -796,7 +800,7 @@ def _transition_family_parts(
             linear_start,
             wave_middles[-1],
             advance,
-            blend_offset=-0.5,
+            transition_cell=0,
         ),
         advance,
         keep_start=True,
@@ -807,7 +811,7 @@ def _transition_family_parts(
             linear_middle,
             wave_middles[-1],
             advance,
-            blend_offset=-0.5,
+            transition_cell=0,
         ),
         advance,
         keep_start=True,
