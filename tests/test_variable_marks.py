@@ -927,6 +927,8 @@ class VariableBuildCliTests(unittest.TestCase):
                     "--face",
                     "2",
                     "--autohint",
+                    "--jobs",
+                    "1",
                 ]
             )
 
@@ -976,9 +978,7 @@ class VariableBuildCliTests(unittest.TestCase):
             ],
         )
 
-    def test_default_build_uses_only_pinned_cff2_punctuation_and_latin_sources(
-        self,
-    ) -> None:
+    def test_release_build_can_limit_novel_validation_weights(self) -> None:
         cached = Path("cache/font.otf")
         with (
             patch(
@@ -997,7 +997,16 @@ class VariableBuildCliTests(unittest.TestCase):
                 "nobigoe_font.variable_cli.pipeline.build_novel_static_instance"
             ) as build_novel,
         ):
-            main([])
+            main(
+                [
+                    "--jobs",
+                    "1",
+                    "--novel-static-weight",
+                    "Regular",
+                    "--novel-static-weight",
+                    "Black",
+                ]
+            )
 
         self.assertEqual(
             [item.args[0] for item in fetch.call_args_list],
@@ -1021,7 +1030,10 @@ class VariableBuildCliTests(unittest.TestCase):
             DEFAULT_NOVEL_OUTPUT_PATH,
         )
         self.assertEqual(len(build_static.call_args_list), len(NOTO_WEIGHT_CLASSES))
-        self.assertEqual(len(build_novel.call_args_list), len(NOTO_WEIGHT_CLASSES))
+        self.assertEqual(
+            [item.args[3].style for item in build_novel.call_args_list],
+            ["Regular", "Black"],
+        )
 
 
 if __name__ == "__main__":
