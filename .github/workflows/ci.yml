@@ -245,7 +245,6 @@ jobs:
               throw "Windows rejected: $($rejected -join ', ')"
           }
 
-
   website:
     name: Website checks
     runs-on: ubuntu-latest
