@@ -125,6 +125,8 @@ jobs:
               "stylistic": ["ss01", "ss02", "ss03", "ss04", "ss05"],
               "contextual": ["calt"],
               "vertical": ["vert", "vrt2"],
+              "vert-only": ["vert"],
+              "vrt2-only": ["vrt2"],
               "contextual-vertical": ["calt", "vert", "vrt2"],
           }
           for label, features in groups.items():
