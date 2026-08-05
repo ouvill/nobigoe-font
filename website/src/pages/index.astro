@@ -1,4 +1,5 @@
 ---
+import marksData from "../../public/marks-data.json";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import ShapedText from "../components/ShapedText.astro";
 import WeightSpecimen from "../components/WeightSpecimen.astro";
@@ -12,6 +13,23 @@ const punctuationRows = [
   ["？？！", "？！？", "！？？"],
   ["！！？", "！？！", "？！！"],
   ["！！？？", "？？！！"],
+];
+const koburiCompatibleMarks = marksData.filter(
+  (mark) => mark.koburiPua && mark.script !== "symbol",
+);
+if (koburiCompatibleMarks.length !== 88) {
+  throw new Error(
+    `Expected 88 Koburi-compatible kana, found ${koburiCompatibleMarks.length}`,
+  );
+}
+const koburiMarkGroups = [
+  koburiCompatibleMarks.filter(
+    (mark) => mark.script === "hiragana" && mark.type === "dakuten",
+  ),
+  koburiCompatibleMarks.filter(
+    (mark) => mark.script === "katakana" && mark.type === "dakuten",
+  ),
+  koburiCompatibleMarks.filter((mark) => mark.type === "handakuten"),
 ];
 ---
 
@@ -31,9 +49,9 @@ const punctuationRows = [
         JPを土台にした一般用途の明朝体です。本文を読みやすく組める文字を揃えながら、長く伸びる記号、濁点・半濁点、感嘆符や疑問符まで、声のような文字表現を加えました。
       </p>
       <div class="hero-actions">
-        <a class="button button--solid" href={`${base}/tester/`}>文章で試す</a>
-        <a class="button button--line" href={SITE.releaseUrl}
-          >無料ダウンロード ↗</a
+        <a class="button button--solid" href={`${base}/#try`}>文字を試す</a>
+        <a class="button button--line" href={`${base}/#download`}
+          >無料ダウンロード ↓</a
         >
       </div>
       <p class="hero-license">
@@ -100,17 +118,13 @@ const punctuationRows = [
     </nav>
   </section>
 
-  <section class="positioning-section" aria-labelledby="positioning-title">
+  <section class="positioning-section" aria-label="書体について">
     <p class="section-index">まず知ってほしいこと</p>
     <div class="positioning-copy">
-      <h2 id="positioning-title">
-        マンガだけでなく<br />ふだんの文章から。
-      </h2>
       <div>
         <p>
-          特徴的な記号は、セリフや擬音の表現にも役立ちます。ただし、のびごえ明朝はマンガ専用書体ではありません。Noto
-          Serif JP由来の和文とLibertinus
-          Serifの欧文を組み合わせ、見出し、本文、ウェブ、印刷物まで広く使える設計です。
+          Noto Serif JP由来の和文とLibertinus
+          Serifの欧文を組み合わせ、見出し、本文、ウェブ、印刷物まで広く使える設計です。特徴的な記号は、セリフや擬音の表現にも役立ちます。
         </p>
         <p>
           必要なときだけ、OpenType機能が声のニュアンスを加えます。普段は端正な明朝体として、表現したい場面では一歩先まで。
@@ -221,14 +235,24 @@ const punctuationRows = [
 
     <div class="marks-showcase">
       <div class="marks-stage">
-        <p class="marks-stage__label">かな ＋ U+3099 / U+309A</p>
-        <p class="marks-stage__glyphs">
-          <ShapedText
-            class="shaped-text"
-            text="あ゙　ぁ゙　ん゙　ア゙　セ゚　ㇷ゚"
-            label="濁点または半濁点が付いた6種類の仮名"
-          />
+        <p class="marks-stage__label">
+          源暎こぶり明朝互換 / 濁点・半濁点付き仮名 88字形
         </p>
+        <div
+          class="marks-stage__glyphs"
+          role="img"
+          aria-label="源暎こぶり明朝互換の濁点・半濁点付き仮名88字形"
+        >
+          {
+            koburiMarkGroups.map((group) => (
+              <div class="marks-stage__glyph-group" aria-hidden="true">
+                {group.map((mark) => (
+                  <span>{mark.glyph}</span>
+                ))}
+              </div>
+            ))
+          }
+        </div>
         <p class="marks-stage__symbols">
           <ShapedText
             class="shaped-text"
@@ -323,9 +347,7 @@ const punctuationRows = [
   >
     <header class="section-heading">
       <p class="section-index">04 / TYPESETTING</p>
-      <h2 id="families-title">
-        表現だけでなく、<br />ふつうの文章も。
-      </h2>
+      <h2 id="families-title">2つの本文書体</h2>
       <p>
         表示用の特殊な字形だけを集めたフォントではありません。用途と読み心地に合わせて、二つの本文書体から選べます。
       </p>
@@ -394,24 +416,54 @@ const punctuationRows = [
     </div>
   </section>
 
-  <section class="explore-section" aria-labelledby="explore-title">
+  <section class="try-section" id="try" aria-labelledby="try-title">
     <header>
-      <p>TRY IT YOURSELF</p>
-      <h2 id="explore-title">自分の言葉で、<br />試せます。</h2>
+      <p>TRY NOBIGOE MINCHO</p>
+      <h2 id="try-title">のびごえ明朝を試す</h2>
     </header>
-    <div class="explore-links">
-      <a class="explore-card" href={`${base}/tester/`}>
-        <span>文章を入力する</span><h3>文字テスター</h3><p>
-          二つの書体、7ウェイト、横組・縦組、約物の2デザインをブラウザで切り替えられます。
-        </p><strong>テスターを開く →</strong>
-      </a>
-      <a class="explore-card" href={`${base}/glyphs/`}>
-        <span>結合字形を探す</span><h3>198字形の一覧</h3><p>
-          濁点・半濁点を付けられる文字を、文字種・書体・ウェイトで絞り込めます。
-        </p><strong>字形一覧を開く →</strong>
-      </a>
+    <div class="try-panel">
+      <div class="try-field">
+        <label for="font-try-input">試したい文章を入力</label>
+        <input
+          id="font-try-input"
+          type="text"
+          maxlength="50"
+          placeholder="待ってーーーー！ 声はどこまでも伸びていく。"
+          autocomplete="off"
+          spellcheck="false"
+          data-font-try-input
+        />
+      </div>
+      <div class="try-preview">
+        <div class="try-preview-meta">
+          <span>PREVIEW / NOBIGOE MINCHO REGULAR</span>
+          <a href={`${base}/glyphs/`}>198字形を見る →</a>
+        </div>
+        <output for="font-try-input" data-font-try-output
+          >待ってーーーー！ 声はどこまでも伸びていく。</output
+        >
+      </div>
     </div>
   </section>
+
+  <script>
+    const input = document.querySelector<HTMLInputElement>(
+      "[data-font-try-input]",
+    );
+    const output = document.querySelector<HTMLOutputElement>(
+      "[data-font-try-output]",
+    );
+
+    if (input && output) {
+      const sample = input.placeholder;
+      const updatePreview = () => {
+        output.textContent = input.value || sample;
+      };
+
+      input.addEventListener("input", updatePreview);
+      updatePreview();
+    }
+  </script>
 
   <section
     class="download-section"
@@ -419,34 +471,59 @@ const punctuationRows = [
     aria-labelledby="download-title"
   >
     <div class="download-copy">
-      <p>OPEN SOURCE / SIL OFL 1.1</p>
+      <p class="download-eyebrow">OPEN SOURCE / SIL OFL 1.1</p>
       <h2 id="download-title">
-        無料で入手。<br />すぐに使えます。
+        3つの書体から、<br />用途に合わせて。
       </h2>
-      <div class="download-actions">
-        <a class="button button--paper" href={SITE.releaseUrl}
-          >GitHub Releasesを開く ↗</a
-        >
-        <a class="button button--paper-line" href={SITE.supportUrl}
-          >開発を支援する ↗</a
-        >
-      </div>
+      <p class="download-intro">
+        本文・見出し向け、小説・長文向け、好きな書体に伸長記号だけを足す版を用意しています。
+      </p>
     </div>
     <div class="package-list">
       <article>
-        <span>7 weights · OpenType/CFF</span><h3>のびごえ明朝</h3><code
-          >NobigoeMincho-v{SITE.version}.zip</code
-        >
+        <div class="package-copy">
+          <span>7 WEIGHTS · OPENTYPE/CFF</span>
+          <h3>のびごえ明朝</h3>
+          <p>
+            本文・見出し・ウェブ・印刷物に。7ウェイトを収録した標準ファミリーです。
+          </p>
+        </div>
+        <div class="package-action">
+          <code>NobigoeMincho-v{SITE.version}.zip</code>
+          <a class="button button--paper" href={SITE.downloadUrl}
+            >ダウンロード ↓</a
+          >
+        </div>
       </article>
       <article>
-        <span>5 characters · Variable OpenType/CFF2</span><h3>
-          のびごえエッセンシャル
-        </h3><code>NobigoeEssential-v{SITE.version}.zip</code>
+        <div class="package-copy">
+          <span>REGULAR · TRUETYPE</span>
+          <h3>のびごえこぶり明朝</h3>
+          <p>
+            小ぶりな仮名を生かした本文向け。小説・長文・縦組をゆったり見せます。
+          </p>
+        </div>
+        <div class="package-action">
+          <code>NobigoeKoburiMincho-v{SITE.version}.zip</code>
+          <a class="button button--paper-line" href={SITE.koburiDownloadUrl}
+            >ダウンロード ↓</a
+          >
+        </div>
       </article>
       <article>
-        <span>Regular · TrueType</span><h3>のびごえこぶり明朝</h3><code
-          >NobigoeKoburiMincho-v{SITE.version}.zip</code
-        >
+        <div class="package-copy">
+          <span>5 CHARACTERS · VARIABLE OPENTYPE/CFF2</span>
+          <h3>のびごえエッセンシャル</h3>
+          <p>
+            「ー」「―」「〜」「～」「〰」だけを含んだ軽量フォントです。他のフォントと組み合わせてご使用ください。
+          </p>
+        </div>
+        <div class="package-action">
+          <code>NobigoeEssential-v{SITE.version}.zip</code>
+          <a class="button button--paper-line" href={SITE.essentialDownloadUrl}
+            >ダウンロード ↓</a
+          >
+        </div>
       </article>
     </div>
   </section>
