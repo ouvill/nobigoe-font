@@ -548,6 +548,28 @@ class TrueTypeBuildTests(unittest.TestCase):
             low, high = stroke_band(outline, axis, position)
             return (low + high) / 2, high - low
 
+        def assert_blended_profile(
+            transition: pathops.Path,
+            first: pathops.Path,
+            second: pathops.Path,
+            position: float,
+            center_blend: float,
+            width_blend: float,
+        ) -> None:
+            actual_center, actual_width = profile(transition, "horizontal", position)
+            first_center, first_width = profile(first, "horizontal", position)
+            second_center, second_width = profile(second, "horizontal", position)
+            self.assertAlmostEqual(
+                actual_center,
+                first_center + (second_center - first_center) * center_blend,
+                delta=2,
+            )
+            self.assertAlmostEqual(
+                actual_width,
+                first_width + (second_width - first_width) * width_blend,
+                delta=2,
+            )
+
         self.assertEqual(len(transitions), 16)
         self.assertEqual(transitions[6].bounds[0], linear[0].bounds[0])
         for lead in transitions[6:8]:
@@ -565,6 +587,8 @@ class TrueTypeBuildTests(unittest.TestCase):
             wave_profile = profile(wave[1], "horizontal", position)
             self.assertAlmostEqual(follow_profile[0], wave_profile[0], delta=1)
             self.assertAlmostEqual(follow_profile[1], wave_profile[1], delta=2)
+        assert_blended_profile(transitions[7], linear[1], wave[2], 650, 0.1875, 0.15625)
+        assert_blended_profile(transitions[0], linear[1], wave[1], 350, 0.8125, 0.84375)
         self.assertEqual(
             profile(transitions[0], "horizontal", 1000),
             profile(wave[1], "horizontal", 1000),
