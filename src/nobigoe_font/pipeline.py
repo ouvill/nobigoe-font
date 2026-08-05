@@ -69,6 +69,7 @@ from fontTools.cffLib.width import optimizeWidths
 from fontTools.misc.psCharStrings import T2WidthExtractor
 from fontTools.misc.transform import Transform
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.removeOverlaps import removeOverlaps
 from fontTools.ttLib.scaleUpem import scale_upem
 from fontTools.varLib.instancer import instantiateVariableFont
 
@@ -1560,6 +1561,14 @@ def _normalize_cff_blue_zones(font: TTFont) -> None:
             setattr(private, attribute, normalized)
 
 
+def _remove_static_cff_overlaps(font: TTFont) -> None:
+    """Merge static CFF contours that otherwise show seams in Windows."""
+
+    if "CFF " not in font:
+        raise ValueError("Static overlap removal requires CFF outlines")
+    removeOverlaps(font, removeHinting=False, ignoreErrors=False)
+
+
 def _synchronize_cff_widths(font: TTFont) -> None:
     """Match CFF CharString widths to the final OpenType horizontal metrics."""
 
@@ -1668,6 +1677,7 @@ def build_static_instance(
         else None
     )
     _rename_release_font(font, latin_font, latin_profile, identity)
+    _remove_static_cff_overlaps(font)
     _synchronize_cff_widths(font)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
