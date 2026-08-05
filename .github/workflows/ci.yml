@@ -107,6 +107,9 @@ jobs:
             --static-output-dir /tmp \
             --static-weight Regular \
             --autohint
+          uv run nobigoe-build-essential \
+            --source /tmp/NobigoeVariableMarks-VF.otf \
+            --output /tmp/NobigoeEssential-VF.otf
           uv run nobigoe-build \
             --base koburi \
             --output /tmp/NobigoeKoburiMincho-Regular.ttf
@@ -128,6 +131,9 @@ jobs:
           ots-sanitize \
             /tmp/NobigoeNovelMincho-VF.otf \
             /tmp/NobigoeNovelMincho-VF-sanitized.otf
+          ots-sanitize \
+            /tmp/NobigoeEssential-VF.otf \
+            /tmp/NobigoeEssential-VF-sanitized.otf
           hb-shape \
             /tmp/NobigoeMincho-Regular.otf \
             "AVATAR あーーー！？" \
@@ -161,6 +167,74 @@ jobs:
             "待ってーーー。" \
             --direction=ttb \
             --features=calt,vert,vrt2 >/dev/null
+
+      - name: Upload Windows load-test fonts
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-load-test-fonts
+          path: |
+            /tmp/NobigoeMincho-Regular.otf
+            /tmp/NobigoeEssential-VF.otf
+          if-no-files-found: error
+
+  font-windows:
+    name: Windows font load test
+    runs-on: windows-latest
+    needs: font-smoke
+    steps:
+      - name: Download representative fonts
+        uses: actions/download-artifact@v7
+        with:
+          name: windows-load-test-fonts
+          path: fonts
+
+      - name: Load fonts with Windows GDI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Add-Type @"
+          using System;
+          using System.Runtime.InteropServices;
+
+          public static class FontLoader
+          {
+              [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+              public static extern int AddFontResourceEx(
+                  string fileName,
+                  uint flags,
+                  IntPtr reserved
+              );
+
+              [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+              public static extern bool RemoveFontResourceEx(
+                  string fileName,
+                  uint flags,
+                  IntPtr reserved
+              );
+          }
+          "@
+
+          Get-ChildItem fonts -File | ForEach-Object {
+              $loaded = [FontLoader]::AddFontResourceEx(
+                  $_.FullName,
+                  0x10,
+                  [IntPtr]::Zero
+              )
+              $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+              if ($loaded -eq 0) {
+                  throw "Windows rejected $($_.Name) (Win32 error $errorCode)"
+              }
+              try {
+                  Write-Host "Windows loaded $($_.Name)"
+              }
+              finally {
+                  [void][FontLoader]::RemoveFontResourceEx(
+                      $_.FullName,
+                      0x10,
+                      [IntPtr]::Zero
+                  )
+              }
+          }
 
   website:
     name: Website checks
