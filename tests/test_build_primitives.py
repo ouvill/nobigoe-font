@@ -219,6 +219,20 @@ class FontMetadataTests(unittest.TestCase):
             places=4,
         )
 
+    def test_rename_font_adds_macintosh_postscript_name(self) -> None:
+        font = minimal_true_type_font()
+        name_table = font["name"]
+        name_table.removeNames(nameID=6, platformID=1)
+        name_table.setName("Weight", 265, 1, 0, 0)
+
+        identity = font_identity("noto", "Regular")
+        rename_font(font, "Copyright", "Notice", identity)
+
+        postscript_name = name_table.getName(6, 1, 0, 0)
+        self.assertIsNotNone(postscript_name)
+        assert postscript_name is not None
+        self.assertEqual(postscript_name.toUnicode(), identity.postscript_name)
+
 
 class StaticInstanceTests(unittest.TestCase):
     def test_crossed_variable_blue_zone_pairs_are_normalized_for_cff(self) -> None:
