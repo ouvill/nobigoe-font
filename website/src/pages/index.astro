@@ -1,4 +1,5 @@
 ---
+import marksData from "../../public/marks-data.json";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import ShapedText from "../components/ShapedText.astro";
 import WeightSpecimen from "../components/WeightSpecimen.astro";
@@ -12,6 +13,23 @@ const punctuationRows = [
   ["？？！", "？！？", "！？？"],
   ["！！？", "！？！", "？！！"],
   ["！！？？", "？？！！"],
+];
+const koburiCompatibleMarks = marksData.filter(
+  (mark) => mark.koburiPua && mark.script !== "symbol",
+);
+if (koburiCompatibleMarks.length !== 88) {
+  throw new Error(
+    `Expected 88 Koburi-compatible kana, found ${koburiCompatibleMarks.length}`,
+  );
+}
+const koburiMarkGroups = [
+  koburiCompatibleMarks.filter(
+    (mark) => mark.script === "hiragana" && mark.type === "dakuten",
+  ),
+  koburiCompatibleMarks.filter(
+    (mark) => mark.script === "katakana" && mark.type === "dakuten",
+  ),
+  koburiCompatibleMarks.filter((mark) => mark.type === "handakuten"),
 ];
 ---
 
@@ -217,14 +235,24 @@ const punctuationRows = [
 
     <div class="marks-showcase">
       <div class="marks-stage">
-        <p class="marks-stage__label">かな ＋ U+3099 / U+309A</p>
-        <p class="marks-stage__glyphs">
-          <ShapedText
-            class="shaped-text"
-            text="あ゙　ぁ゙　ん゙　ア゙　セ゚　ㇷ゚"
-            label="濁点または半濁点が付いた6種類の仮名"
-          />
+        <p class="marks-stage__label">
+          源暎こぶり明朝互換 / 濁点・半濁点付き仮名 88字形
         </p>
+        <div
+          class="marks-stage__glyphs"
+          role="img"
+          aria-label="源暎こぶり明朝互換の濁点・半濁点付き仮名88字形"
+        >
+          {
+            koburiMarkGroups.map((group) => (
+              <div class="marks-stage__glyph-group" aria-hidden="true">
+                {group.map((mark) => (
+                  <span>{mark.glyph}</span>
+                ))}
+              </div>
+            ))
+          }
+        </div>
         <p class="marks-stage__symbols">
           <ShapedText
             class="shaped-text"

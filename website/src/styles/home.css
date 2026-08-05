@@ -479,22 +479,41 @@
   color: rgba(255, 255, 255, 0.56);
 }
 
-.marks-stage__glyphs,
-.marks-stage__symbols {
+.marks-stage__glyphs {
+  display: grid;
   min-width: 0;
+  gap: 22px;
   margin: 0;
-  overflow: hidden;
-  font-size: clamp(48px, 6vw, 84px);
-  white-space: nowrap;
+  padding: 0;
+  font-feature-settings: "ccmp" 1;
+  font-size: clamp(28px, 2.5vw, 38px);
+  line-height: 1;
+}
+
+.marks-stage__glyph-group {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: 12px 6px;
+}
+
+.marks-stage__glyph-group span {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
 }
 
 .marks-stage__symbols {
-  width: 58%;
-  margin-top: 50px;
-  padding-top: 28px;
+  width: 100%;
+  min-width: 0;
+  margin: 34px 0 0;
+  padding-top: 24px;
+  overflow: hidden;
   color: #ffd1c6;
   border-top: 1px solid rgba(255, 255, 255, 0.3);
-  font-size: clamp(46px, 5vw, 70px);
+  font-size: clamp(34px, 4vw, 50px);
+  white-space: nowrap;
 }
 
 .marks-details {
@@ -1232,13 +1251,19 @@
   }
 
   .marks-stage__glyphs {
-    font-size: clamp(42px, 13vw, 52px);
+    gap: 20px;
+    font-size: 30px;
+  }
+
+  .marks-stage__glyph-group {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 12px 6px;
   }
 
   .marks-stage__symbols {
-    width: 76%;
+    width: 100%;
     margin-top: 34px;
-    font-size: clamp(40px, 12vw, 48px);
+    font-size: clamp(34px, 10vw, 42px);
   }
 
   .marks-details {
