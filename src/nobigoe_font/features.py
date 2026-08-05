@@ -104,13 +104,17 @@ def linear_wave_transition_rules(
     transition_names: Sequence[str],
 ) -> str:
     linear_start, linear_middle, linear_end = linear_names
+    core_count = 4 + len(wave_middles)
+    if len(transition_names) != core_count + 2:
+        raise ValueError("Linear transition glyph count does not match phases")
     (
         line_to_wave,
         line_to_wave_end,
         line_wave_line,
         wave_to_line_start,
         *wave_to_line,
-    ) = transition_names
+    ) = transition_names[:core_count]
+    line_to_wave_lead_start, line_to_wave_lead_middle = transition_names[core_count:]
     if len(wave_middles) != len(wave_ends) or len(wave_middles) != len(wave_to_line):
         raise ValueError("Wave transition phases must have matching lengths")
     wave_to_line_rules = "".join(
@@ -120,13 +124,15 @@ def linear_wave_transition_rules(
     reverse_transitions = " ".join((line_wave_line, wave_to_line_start, *wave_to_line))
     return f"""
   lookup {prefix}_line_terminal {{
-    sub {linear_base}' [{wave_base} {wave_start}] by {linear_start};
-    sub {linear_end}' [{wave_base} {wave_start}] by {linear_middle};
+    sub {linear_base}' {wave_base} [{linear_base} {linear_start}] by {linear_start};
+    sub {linear_end}' {wave_base} [{linear_base} {linear_start}] by {linear_middle};
+    sub {linear_base}' [{wave_base} {wave_start}] by {line_to_wave_lead_start};
+    sub {linear_end}' [{wave_base} {wave_start}] by {line_to_wave_lead_middle};
   }} {prefix}_line_terminal;
   lookup {prefix}_line_to_wave {{
     sub [{linear_start} {linear_middle}] {wave_base}' [{linear_base} {linear_start}] by {line_wave_line};
-    sub [{linear_start} {linear_middle}] {wave_base}' by {line_to_wave_end};
-    sub [{linear_start} {linear_middle}] {wave_start}' by {line_to_wave};
+    sub [{line_to_wave_lead_start} {line_to_wave_lead_middle}] {wave_base}' by {line_to_wave_end};
+    sub [{line_to_wave_lead_start} {line_to_wave_lead_middle}] {wave_start}' by {line_to_wave};
   }} {prefix}_line_to_wave;
   lookup {prefix}_wave_terminal {{
     sub {wave_base}' [{linear_base} {linear_start}] by {wave_to_line_start};
@@ -500,7 +506,7 @@ def _symbol_feature_rules(
     ) -> None:
         if len(transitions) != len(extensions):
             raise ValueError("Each linear extension requires transition glyphs")
-        half_count = 4 + len(horizontal_middles)
+        half_count = 6 + len(horizontal_middles)
         if (
             len(horizontal_middles) != len(horizontal_ends)
             or len(vertical_middles) != len(vertical_ends)
@@ -847,9 +853,7 @@ def compact_auxiliary_single_substitutions(font: TTFont) -> int:
                 representative[index] = group[0]
                 break
         else:
-            groups.append(
-                (index, flags, mark_filter_set, dict(mapping), [index])
-            )
+            groups.append((index, flags, mark_filter_set, dict(mapping), [index]))
             representative[index] = index
 
     groups_by_index = {group[0]: group for group in groups}
@@ -884,8 +888,7 @@ def compact_auxiliary_single_substitutions(font: TTFont) -> int:
             substitutions = variation.FeatureTableSubstitution.SubstitutionRecord
             for substitution in substitutions:
                 substitution.Feature.LookupListIndex = [
-                    old_to_new[index]
-                    for index in substitution.Feature.LookupListIndex
+                    old_to_new[index] for index in substitution.Feature.LookupListIndex
                 ]
                 substitution.Feature.LookupCount = len(
                     substitution.Feature.LookupListIndex
@@ -917,7 +920,9 @@ def consolidate_vrt2_lookups(font: TTFont) -> int:
         for index in indices:
             lookup = table.LookupList.Lookup[index]
             if lookup.LookupType != 1 or lookup.LookupFlag != 0:
-                raise ValueError("The vrt2 feature must use only unflagged type 1 lookups")
+                raise ValueError(
+                    "The vrt2 feature must use only unflagged type 1 lookups"
+                )
             mapping: dict[str, str] = {}
             for subtable in lookup.SubTable:
                 mapping.update(subtable.mapping)

@@ -602,6 +602,66 @@ def _pad_degenerate_curves(
     return result
 
 
+def _normalize_cubic_contours(
+    outlines: Sequence[pathops.Path],
+) -> list[pathops.Path]:
+    contour_counts: list[list[int]] = []
+    for outline in outlines:
+        counts: list[int] = []
+        for verb, _ in outline:
+            if verb == pathops.PathVerb.MOVE:
+                counts.append(0)
+            elif verb == pathops.PathVerb.CUBIC:
+                counts[-1] += 1
+            elif verb != pathops.PathVerb.CLOSE:
+                raise ValueError(
+                    f"Spliced variable transition contains unsupported {verb!r}"
+                )
+        contour_counts.append(counts)
+    if len({len(counts) for counts in contour_counts}) != 1:
+        raise ValueError("Spliced variable transition contour counts do not match")
+    maximums = [
+        max(counts[index] for counts in contour_counts)
+        for index in range(len(contour_counts[0]))
+    ]
+
+    normalized = []
+    for outline, counts in zip(outlines, contour_counts, strict=True):
+        result = pathops.Path()
+        pen = result.getPen()
+        contour_index = -1
+        current = None
+        for verb, points in outline:
+            if verb == pathops.PathVerb.MOVE:
+                contour_index += 1
+                current = points[0]
+                pen.moveTo(current)
+            elif verb == pathops.PathVerb.CUBIC:
+                pen.curveTo(*points)
+                current = points[-1]
+            else:
+                if current is None:
+                    raise ValueError("Spliced transition contour has no points")
+                for _ in range(maximums[contour_index] - counts[contour_index]):
+                    pen.curveTo(current, current, current)
+                pen.closePath()
+        normalized.append(result)
+    return normalized
+
+
+def _normalize_spliced_transition_masters(
+    masters: Sequence[tuple[pathops.Path, ...]],
+) -> list[tuple[pathops.Path, ...]]:
+    normalized = [list(master) for master in masters]
+    half_count = len(normalized[0]) // 2
+    indices = (0, 1, half_count - 2, half_count - 1)
+    for index in (*indices, *(index + half_count for index in indices)):
+        outlines = _normalize_cubic_contours([master[index] for master in normalized])
+        for master, outline in zip(normalized, outlines, strict=True):
+            master[index] = outline
+    return [tuple(master) for master in normalized]
+
+
 def _normalize_vertical_parts(
     masters: Sequence[tuple[pathops.Path, pathops.Path, pathops.Path]],
 ) -> list[tuple[pathops.Path, pathops.Path, pathops.Path]]:
@@ -840,6 +900,7 @@ def _append_symbols(
             )
             for weight_index in range(len(_WEIGHTS))
         ]
+        transition_masters = _normalize_spliced_transition_masters(transition_masters)
         _append_glyphs(
             font,
             top,
@@ -943,6 +1004,7 @@ def _append_symbols(
             )
             for weight_index in range(len(_WEIGHTS))
         ]
+        transition_masters = _normalize_spliced_transition_masters(transition_masters)
         _append_glyphs(
             font,
             top,

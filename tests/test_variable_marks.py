@@ -226,14 +226,14 @@ class VariableSymbolTests(unittest.TestCase):
         linear_transitions = [
             (
                 f"{prefix}-transition",
-                [f"{prefix}-transition{index}" for index in range(12)],
+                [f"{prefix}-transition{index}" for index in range(16)],
             )
             for prefix in ("choon", "dash")
         ]
         linear_manga_transitions = [
             (
                 f"{prefix}-manga-transition",
-                [f"{prefix}-manga-transition{index}" for index in range(10)],
+                [f"{prefix}-manga-transition{index}" for index in range(14)],
             )
             for prefix in ("choon", "dash")
         ]
@@ -302,10 +302,10 @@ class VariableSymbolTests(unittest.TestCase):
             "transition3": "transition7",
             "reverse-transition0": "reverse-transition4",
             "reverse-transition3": "reverse-transition7",
-            "choon-transition0": "choon-transition6",
-            "choon-transition5": "choon-transition11",
-            "choon-manga-transition0": "choon-manga-transition5",
-            "choon-manga-transition4": "choon-manga-transition9",
+            "choon-transition0": "choon-transition8",
+            "choon-transition7": "choon-transition15",
+            "choon-manga-transition0": "choon-manga-transition7",
+            "choon-manga-transition6": "choon-manga-transition13",
         }
         for tag in ("vert", "vrt2"):
             substitutions = feature_single_substitutions(font, tag)
@@ -357,9 +357,7 @@ class VariableSymbolTests(unittest.TestCase):
             if record.FeatureTag == "vrt2"
         )
         self.assertEqual(len(record.Feature.LookupListIndex), 1)
-        lookup = font["GSUB"].table.LookupList.Lookup[
-            record.Feature.LookupListIndex[0]
-        ]
+        lookup = font["GSUB"].table.LookupList.Lookup[record.Feature.LookupListIndex[0]]
         self.assertEqual(lookup.LookupType, 1)
         self.assertEqual(lookup.LookupFlag, 0)
         self.assertEqual(len(lookup.SubTable), 1)

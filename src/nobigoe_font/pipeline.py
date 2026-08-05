@@ -78,8 +78,8 @@ from fontTools.varLib.instancer import instantiateVariableFont
 WAVE_GLYPH_COUNT = 10
 RELAXED_WAVE_GLYPH_COUNT = 20
 ONE_CYCLE_WAVE_GLYPH_COUNT = 8
-LINEAR_WAVE_TRANSITION_GLYPH_COUNT = 12
-LINEAR_MANGA_TRANSITION_GLYPH_COUNT = 10
+LINEAR_WAVE_TRANSITION_GLYPH_COUNT = 16
+LINEAR_MANGA_TRANSITION_GLYPH_COUNT = 14
 MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT = 8
 WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT = 8
 MANGA_WAVE_GLYPH_COUNT = 11
@@ -580,7 +580,12 @@ def _blend_connected_outlines(
     advance: int,
     *,
     middle: pathops.Path | None = None,
+    blend_offset: float = 0,
 ) -> pathops.Path:
+    if not -1 <= blend_offset <= 1:
+        raise ValueError("Transition blend offset must stay between minus one and one")
+    if middle is not None and blend_offset != 0:
+        raise ValueError("Three-way transitions cannot offset the blend")
     outlines = (start, end) if middle is None else (start, middle, end)
     core_start = max(0.0, *(outline.bounds[0] for outline in outlines))
     core_end = min(float(advance), *(outline.bounds[2] for outline in outlines))
@@ -593,10 +598,15 @@ def _blend_connected_outlines(
         return progress * progress * (3 - 2 * progress)
 
     def profile_at(position: float) -> tuple[float, float]:
-        progress = (position - core_start) / (core_end - core_start)
+        progress = (
+            position / advance
+            if blend_offset != 0
+            else (position - core_start) / (core_end - core_start)
+        )
         if middle is None:
             first, second = start, end
-            blend = smoothstep(progress)
+            blend_progress = max(0.0, min(1.0, progress + blend_offset))
+            blend = smoothstep(blend_progress)
         elif progress <= 0.5:
             first, second = start, middle
             blend = smoothstep(progress * 2)
@@ -678,20 +688,133 @@ def _blend_connected_outlines(
     return transition
 
 
+def _splice_connected_transition(
+    unchanged: pathops.Path,
+    transition: pathops.Path,
+    advance: int,
+    *,
+    keep_start: bool,
+) -> pathops.Path:
+    split = advance / 2
+    start_clip = _font_geometry.rectangle(-4096, -4096, split + OVERLAP, 4096)
+    end_clip = _font_geometry.rectangle(split - OVERLAP, -4096, 4096, 4096)
+    if keep_start:
+        start = pathops.op(unchanged, start_clip, pathops.PathOp.INTERSECTION)
+        end = pathops.op(transition, end_clip, pathops.PathOp.INTERSECTION)
+    else:
+        start = pathops.op(transition, start_clip, pathops.PathOp.INTERSECTION)
+        end = pathops.op(unchanged, end_clip, pathops.PathOp.INTERSECTION)
+    combined = pathops.Path()
+    combined_pen = combined.getPen()
+    start.draw(combined_pen)
+    end.draw(combined_pen)
+
+    result = pathops.Path()
+    pen = result.getPen()
+    current = None
+    contour_start = None
+    for verb, points in combined:
+        if verb == pathops.PathVerb.MOVE:
+            current = contour_start = points[0]
+            pen.moveTo(current)
+        elif verb == pathops.PathVerb.LINE:
+            if current is None:
+                raise ValueError("Transition contour line has no starting point")
+            target = points[0]
+            first = (
+                current[0] + (target[0] - current[0]) / 3,
+                current[1] + (target[1] - current[1]) / 3,
+            )
+            second = (
+                current[0] + 2 * (target[0] - current[0]) / 3,
+                current[1] + 2 * (target[1] - current[1]) / 3,
+            )
+            pen.curveTo(first, second, target)
+            current = target
+        elif verb == pathops.PathVerb.QUAD:
+            if current is None:
+                raise ValueError("Transition contour curve has no starting point")
+            control, target = points
+            first = (
+                current[0] + 2 * (control[0] - current[0]) / 3,
+                current[1] + 2 * (control[1] - current[1]) / 3,
+            )
+            second = (
+                target[0] + 2 * (control[0] - target[0]) / 3,
+                target[1] + 2 * (control[1] - target[1]) / 3,
+            )
+            pen.curveTo(first, second, target)
+            current = target
+        elif verb == pathops.PathVerb.CUBIC:
+            pen.curveTo(*points)
+            current = points[-1]
+        elif verb == pathops.PathVerb.CLOSE:
+            pen.closePath()
+            current = contour_start
+        else:
+            raise ValueError(f"Unsupported transition contour verb {verb!r}")
+    return result
+
+
 def _vertical_transition_transform(vertical_origin: int) -> Transform:
     return Transform(0, 1, -1, 0, vertical_origin, 0)
 
 
 def _transition_family_parts(
+    linear_start: pathops.Path,
     linear_middle: pathops.Path,
     wave_start: pathops.Path,
     wave_middles: Sequence[pathops.Path],
     wave_end: pathops.Path,
     advance: int,
 ) -> tuple[pathops.Path, ...]:
+    line_to_wave = _splice_connected_transition(
+        wave_middles[0],
+        _blend_connected_outlines(
+            linear_middle,
+            wave_middles[0],
+            advance,
+            blend_offset=0.5,
+        ),
+        advance,
+        keep_start=False,
+    )
+    line_to_wave_end = _splice_connected_transition(
+        wave_end,
+        _blend_connected_outlines(
+            linear_middle,
+            wave_end,
+            advance,
+            blend_offset=0.5,
+        ),
+        advance,
+        keep_start=False,
+    )
+    line_to_wave_lead_start = _splice_connected_transition(
+        linear_start,
+        _blend_connected_outlines(
+            linear_start,
+            wave_middles[-1],
+            advance,
+            blend_offset=-0.5,
+        ),
+        advance,
+        keep_start=True,
+    )
+    line_to_wave_lead_middle = _splice_connected_transition(
+        linear_middle,
+        _blend_connected_outlines(
+            linear_middle,
+            wave_middles[-1],
+            advance,
+            blend_offset=-0.5,
+        ),
+        advance,
+        keep_start=True,
+    )
     return (
-        _blend_connected_outlines(linear_middle, wave_middles[0], advance),
-        _blend_connected_outlines(linear_middle, wave_end, advance),
+        line_to_wave,
+        line_to_wave_end,
         _blend_connected_outlines(
             linear_middle,
             linear_middle,
@@ -703,6 +826,8 @@ def _transition_family_parts(
             _blend_connected_outlines(wave_middle, linear_middle, advance)
             for wave_middle in wave_middles
         ),
+        line_to_wave_lead_start,
+        line_to_wave_lead_middle,
     )
 
 
@@ -716,7 +841,9 @@ def make_linear_wave_transition_parts(
         raise ValueError("Linear transition input must contain six parts")
 
     horizontal_linear = linear_parts[1]
+    horizontal_linear_start = linear_parts[0]
     horizontal = _transition_family_parts(
+        horizontal_linear_start,
         horizontal_linear,
         wave_parts[0],
         wave_parts[1:3],
@@ -725,11 +852,15 @@ def make_linear_wave_transition_parts(
     )
     vertical_transform = _vertical_transition_transform(vertical_origin)
     vertical_linear = _font_geometry.transform_path(linear_parts[4], vertical_transform)
+    vertical_linear_start = _font_geometry.transform_path(
+        linear_parts[3], vertical_transform
+    )
     vertical_family = tuple(
         _font_geometry.transform_path(wave_parts[5 + index], vertical_transform)
         for index in range(5)
     )
     vertical = _transition_family_parts(
+        vertical_linear_start,
         vertical_linear,
         vertical_family[0],
         vertical_family[1:3],
@@ -759,6 +890,7 @@ def make_linear_manga_transition_parts(
         raise ValueError("Manga wave transition input must contain eleven parts")
 
     horizontal = _transition_family_parts(
+        linear_parts[0],
         linear_parts[1],
         manga_parts[0],
         manga_parts[1:2],
@@ -767,11 +899,15 @@ def make_linear_manga_transition_parts(
     )
     vertical_transform = _vertical_transition_transform(vertical_origin)
     vertical_linear = _font_geometry.transform_path(linear_parts[4], vertical_transform)
+    vertical_linear_start = _font_geometry.transform_path(
+        linear_parts[3], vertical_transform
+    )
     vertical_family = tuple(
         _font_geometry.transform_path(manga_parts[index], vertical_transform)
         for index in (6, 7, 8)
     )
     vertical = _transition_family_parts(
+        vertical_linear_start,
         vertical_linear,
         vertical_family[0],
         vertical_family[1:2],
@@ -1647,9 +1783,7 @@ def _synchronize_cff_widths(font: TTFont) -> None:
             if not charstring.program or not isinstance(
                 charstring.program[0], (int, float)
             ):
-                raise ValueError(
-                    f"CFF width for {glyph_name} is not a leading operand"
-                )
+                raise ValueError(f"CFF width for {glyph_name} is not a leading operand")
             charstring.program.pop(0)
         widths[font_dict_index].append(metrics[glyph_name][0])
         charstrings.append((glyph_name, charstring, font_dict_index))
