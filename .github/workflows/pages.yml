@@ -72,7 +72,7 @@ jobs:
 
           echo "available=false" >> "$GITHUB_OUTPUT"
           if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            echo "::notice::Deferring Pages deployment until both stable release ZIPs for $tag are published"
+            echo "::notice::Deferring Pages deployment until all stable release ZIPs for $tag are published"
             exit 0
           fi
 
@@ -149,8 +149,8 @@ jobs:
           destination = Path("/tmp/font-release/fonts")
           destination.mkdir(exist_ok=True)
           archives = sorted(Path("/tmp/font-release").glob("*.zip"))
-          if len(archives) != 2:
-              raise SystemExit(f"Expected two stable release ZIPs, found {len(archives)}")
+          if len(archives) != 3:
+              raise SystemExit(f"Expected three stable release ZIPs, found {len(archives)}")
           for archive in archives:
               with ZipFile(archive) as release:
                   for member in release.infolist():
