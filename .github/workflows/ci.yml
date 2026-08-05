@@ -338,10 +338,10 @@ jobs:
               }
           }
 
+          Render-Font fonts/NobigoeMincho-Regular.otf fixed.png
           Render-Font `
             baseline/NobigoeMincho-v1.039/Fonts/NobigoeMincho-Regular.otf `
             baseline.png
-          Render-Font fonts/NobigoeMincho-Regular.otf fixed.png
 
       - name: Upload Windows intersection diagnostics
         uses: actions/upload-artifact@v6
