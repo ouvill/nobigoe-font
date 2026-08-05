@@ -73,7 +73,9 @@ jobs:
 
       - name: Build stable families and experimental Novel validation fonts
         run: |
-          uv run nobigoe-build-variable --autohint
+          uv run nobigoe-build-variable --autohint --jobs 4 \
+            --novel-static-weight Regular \
+            --novel-static-weight Black
           uv run nobigoe-build-essential
           uv run nobigoe-build --base koburi
 

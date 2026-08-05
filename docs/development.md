@@ -76,7 +76,7 @@ uv run python tools/measure_stix_stems.py
 uv run python tools/measure_stix_stems.py --thin-target japanese
 uv run python tools/measure_stix_stems.py --thin-target noto-latin
 
-# Noto Variableを一度カスタマイズし、Nobigoe・Novelの固定各7ウェイトを生成
+# Noto Variableを一度カスタマイズし、Nobigoe・Novelの固定各7ウェイトを最大4並列で生成
 uv run nobigoe-build-variable
 
 # 上で生成した可変ソースから、5文字だけに対応するエッセンシャル版を生成
@@ -87,6 +87,10 @@ uv run nobigoe-build-variable --autohint
 
 # CI用に可変フォントとRegularだけを生成
 uv run nobigoe-build-variable --static-weight Regular --autohint
+
+# リリース用にNobigoe全7ウェイトと、検証に使うNovelの2ウェイトだけを生成
+uv run nobigoe-build-variable --autohint --jobs 4 \
+  --novel-static-weight Regular --novel-static-weight Black
 
 # STIX欧文の調整済み制作VFを一度生成し、そこから固定7ウェイトを作る
 uv run nobigoe-build \
@@ -194,7 +198,7 @@ done
 
 既定の`nobigoe-build-variable`は、共通カスタマイズ済みCFF2可変フォントを`dist/NobigoeVariableMarks-VF.otf`へ作り、その三次ベジェ輪郭を直接入力として`dist/NobigoeNovelMincho-VF.otf`を派生します。Novel変換は`wght` 200・400・900のpathマスターへ仮名字面と筆端の変形を適用し、標準の200・300・400・500・600・700・900へ補間した輪郭で既存CFF2 VarStoreを置き換えます。独立したかな制作TTFは生成も入力もしません。各可変正本から`dist/NobigoeMincho-<Weight>.otf`と`dist/NobigoeNovelMincho-<Weight>.otf`を実体化した後、可変化されていないLibertinus Serif欧文の取り込み、Novel版の漢字字面調整、リリース用の命名と著作権表示、任意の欧文再ヒントを固定ウェイトだけへ適用します。可変フォントの出力先は`--output`と`--novel-output`、固定ウェイトの出力ディレクトリは`--static-output-dir`で変更できます。`--build-variable-stix OUTPUT`は調整済みSTIX制作VFを明示した場所へ生成し、`--latin-family stix-two-text`は公式STIX可変TTFまたはその制作VFから対象ウェイトの欧文を実体化します。固定取得元は`.cache/font-sources/`へ保存するため、同じソースを使用するビルドでは再ダウンロードやZIPの再展開を行いません。キャッシュ場所は`--cache-dir /path/to/cache`で変更できます。
 
-`--static-weight <Weight>`を指定すると、両可変フォントは通常どおり生成したうえで、NobigoeとNovelの指定固定ウェイトだけを実体化します。省略時は両ファミリーの固定7ウェイトをすべて生成します。
+`--static-weight <Weight>`を指定すると、Nobigoeは指定固定ウェイトだけを実体化し、既定ではNovelも同じウェイトへ追従します。Novelだけを絞る場合は`--novel-static-weight <Weight>`をウェイトごとに繰り返します。省略時は両ファミリーの固定7ウェイトをすべて生成します。固定ウェイトの実体化は利用可能なCPU数に応じて既定で最大4並列になり、`--jobs <N>`で並列数を変更できます。Novel固定版は全漢字輪郭を走査するため先に投入し、短いNobigoe固定版が後続する構成にしています。
 
 `nobigoe-build-essential`は、既定で`dist/NobigoeVariableMarks-VF.otf`を入力し、`ー`、`―`、`〜`、`～`、`〰`だけをUnicodeへ割り当てた`dist/NobigoeEssential-VF.otf`を生成します。`calt`、`ss04`、`ss05`、`vert`、`vrt2`から5文字に到達する字形だけを閉包として保持し、ウェイト軸200–900と7つの名前付きインスタンスを引き継ぎます。入力と出力は`--source`と`--output`で変更できます。
 
