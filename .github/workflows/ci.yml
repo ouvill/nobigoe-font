@@ -145,6 +145,19 @@ jobs:
           without_layout.save("/tmp/diagnostic-generated-without-layout.otf")
           without_layout.close()
 
+          for tag in ("GDEF", "GPOS", "GSUB"):
+              without_table = TTFont(generated_path)
+              del without_table[tag]
+              without_table.save(f"/tmp/diagnostic-generated-without-{tag}.otf")
+              without_table.close()
+
+          essential_path = Path("/tmp/NobigoeEssential-VF.otf")
+          for tag in ("GPOS", "GSUB"):
+              without_table = TTFont(essential_path)
+              del without_table[tag]
+              without_table.save(f"/tmp/diagnostic-essential-without-{tag}.otf")
+              without_table.close()
+
           source_names = TTFont(generated_path)
           source_names["name"] = deepcopy(source["name"])
           source_names.save("/tmp/diagnostic-generated-source-names.otf")
