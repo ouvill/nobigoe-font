@@ -226,14 +226,14 @@ class VariableSymbolTests(unittest.TestCase):
         linear_transitions = [
             (
                 f"{prefix}-transition",
-                [f"{prefix}-transition{index}" for index in range(16)],
+                [f"{prefix}-transition{index}" for index in range(24)],
             )
             for prefix in ("choon", "dash")
         ]
         linear_manga_transitions = [
             (
                 f"{prefix}-manga-transition",
-                [f"{prefix}-manga-transition{index}" for index in range(14)],
+                [f"{prefix}-manga-transition{index}" for index in range(18)],
             )
             for prefix in ("choon", "dash")
         ]
@@ -302,10 +302,10 @@ class VariableSymbolTests(unittest.TestCase):
             "transition3": "transition7",
             "reverse-transition0": "reverse-transition4",
             "reverse-transition3": "reverse-transition7",
-            "choon-transition0": "choon-transition8",
-            "choon-transition7": "choon-transition15",
-            "choon-manga-transition0": "choon-manga-transition7",
-            "choon-manga-transition6": "choon-manga-transition13",
+            "choon-transition0": "choon-transition12",
+            "choon-transition11": "choon-transition23",
+            "choon-manga-transition0": "choon-manga-transition9",
+            "choon-manga-transition8": "choon-manga-transition17",
         }
         for tag in ("vert", "vrt2"):
             substitutions = feature_single_substitutions(font, tag)

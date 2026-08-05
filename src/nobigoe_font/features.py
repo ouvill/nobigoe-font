@@ -105,7 +105,8 @@ def linear_wave_transition_rules(
 ) -> str:
     linear_start, linear_middle, linear_end = linear_names
     core_count = 4 + len(wave_middles)
-    if len(transition_names) != core_count + 2:
+    expected_count = core_count + 2 + 2 * len(wave_middles)
+    if len(transition_names) != expected_count:
         raise ValueError("Linear transition glyph count does not match phases")
     (
         line_to_wave,
@@ -114,14 +115,36 @@ def linear_wave_transition_rules(
         wave_to_line_start,
         *wave_to_line,
     ) = transition_names[:core_count]
-    line_to_wave_lead_start, line_to_wave_lead_middle = transition_names[core_count:]
+    line_to_wave_lead_start, line_to_wave_lead_middle = transition_names[
+        core_count : core_count + 2
+    ]
+    follow_start = core_count + 2
+    follow_end = follow_start + len(wave_middles)
+    wave_to_line_follow_middle = transition_names[follow_start:follow_end]
+    wave_to_line_follow_end = transition_names[follow_end:]
     if len(wave_middles) != len(wave_ends) or len(wave_middles) != len(wave_to_line):
         raise ValueError("Wave transition phases must have matching lengths")
     wave_to_line_rules = "".join(
         f"    sub {wave_end}' [{linear_base} {linear_start}] by {transition};\n"
         for wave_end, transition in zip(wave_ends, wave_to_line, strict=True)
     )
-    reverse_transitions = " ".join((line_wave_line, wave_to_line_start, *wave_to_line))
+    reverse_transitions = (wave_to_line_start, *wave_to_line)
+
+    def follow_rules(index: int, transition: str) -> str:
+        continuation_index = (
+            len(wave_middles) - 1 if index == 0 else index % len(wave_middles)
+        )
+        return (
+            f"    sub {transition} {linear_base}' by "
+            f"{wave_to_line_follow_end[continuation_index]};\n"
+            f"    sub {transition} {linear_start}' by "
+            f"{wave_to_line_follow_middle[continuation_index]};\n"
+        )
+
+    wave_to_line_follow_rules = "".join(
+        follow_rules(index, transition)
+        for index, transition in enumerate(reverse_transitions)
+    )
     return f"""
   lookup {prefix}_line_terminal {{
     sub {linear_base}' {wave_base} [{linear_base} {linear_start}] by {linear_start};
@@ -138,8 +161,8 @@ def linear_wave_transition_rules(
     sub {wave_base}' [{linear_base} {linear_start}] by {wave_to_line_start};
 {wave_to_line_rules}  }} {prefix}_wave_terminal;
   lookup {prefix}_wave_to_line {{
-    sub [{reverse_transitions}] {linear_base}' by {linear_end};
-    sub [{reverse_transitions}] {linear_start}' by {linear_middle};
+{wave_to_line_follow_rules}    sub {line_wave_line} {linear_base}' by {linear_end};
+    sub {line_wave_line} {linear_start}' by {linear_middle};
   }} {prefix}_wave_to_line;
 """
 
@@ -506,7 +529,7 @@ def _symbol_feature_rules(
     ) -> None:
         if len(transitions) != len(extensions):
             raise ValueError("Each linear extension requires transition glyphs")
-        half_count = 6 + len(horizontal_middles)
+        half_count = 6 + 3 * len(horizontal_middles)
         if (
             len(horizontal_middles) != len(horizontal_ends)
             or len(vertical_middles) != len(vertical_ends)

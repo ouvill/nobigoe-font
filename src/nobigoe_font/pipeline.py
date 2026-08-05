@@ -78,8 +78,8 @@ from fontTools.varLib.instancer import instantiateVariableFont
 WAVE_GLYPH_COUNT = 10
 RELAXED_WAVE_GLYPH_COUNT = 20
 ONE_CYCLE_WAVE_GLYPH_COUNT = 8
-LINEAR_WAVE_TRANSITION_GLYPH_COUNT = 16
-LINEAR_MANGA_TRANSITION_GLYPH_COUNT = 14
+LINEAR_WAVE_TRANSITION_GLYPH_COUNT = 24
+LINEAR_MANGA_TRANSITION_GLYPH_COUNT = 18
 MANGA_TO_WAVE_TRANSITION_GLYPH_COUNT = 8
 WAVE_TO_MANGA_TRANSITION_GLYPH_COUNT = 8
 MANGA_WAVE_GLYPH_COUNT = 11
@@ -767,6 +767,7 @@ def _vertical_transition_transform(vertical_origin: int) -> Transform:
 def _transition_family_parts(
     linear_start: pathops.Path,
     linear_middle: pathops.Path,
+    linear_end: pathops.Path,
     wave_start: pathops.Path,
     wave_middles: Sequence[pathops.Path],
     wave_end: pathops.Path,
@@ -816,6 +817,59 @@ def _transition_family_parts(
         advance,
         keep_start=True,
     )
+    wave_to_line_start = _splice_connected_transition(
+        wave_start,
+        _blend_connected_outlines(
+            wave_start,
+            linear_middle,
+            advance,
+            transition_cell=0,
+        ),
+        advance,
+        keep_start=True,
+    )
+    wave_to_line = tuple(
+        _splice_connected_transition(
+            wave_middle,
+            _blend_connected_outlines(
+                wave_middle,
+                linear_middle,
+                advance,
+                transition_cell=0,
+            ),
+            advance,
+            keep_start=True,
+        )
+        for wave_middle in wave_middles
+    )
+    wave_to_line_follow_middle = tuple(
+        _splice_connected_transition(
+            linear_middle,
+            _blend_connected_outlines(
+                wave_middle,
+                linear_middle,
+                advance,
+                transition_cell=1,
+            ),
+            advance,
+            keep_start=False,
+        )
+        for wave_middle in wave_middles
+    )
+    wave_to_line_follow_end = tuple(
+        _splice_connected_transition(
+            linear_end,
+            _blend_connected_outlines(
+                wave_middle,
+                linear_end,
+                advance,
+                transition_cell=1,
+            ),
+            advance,
+            keep_start=False,
+        )
+        for wave_middle in wave_middles
+    )
     return (
         line_to_wave,
         line_to_wave_end,
@@ -825,13 +879,12 @@ def _transition_family_parts(
             advance,
             middle=wave_middles[0],
         ),
-        _blend_connected_outlines(wave_start, linear_middle, advance),
-        *(
-            _blend_connected_outlines(wave_middle, linear_middle, advance)
-            for wave_middle in wave_middles
-        ),
+        wave_to_line_start,
+        *wave_to_line,
         line_to_wave_lead_start,
         line_to_wave_lead_middle,
+        *wave_to_line_follow_middle,
+        *wave_to_line_follow_end,
     )
 
 
@@ -849,6 +902,7 @@ def make_linear_wave_transition_parts(
     horizontal = _transition_family_parts(
         horizontal_linear_start,
         horizontal_linear,
+        linear_parts[2],
         wave_parts[0],
         wave_parts[1:3],
         wave_parts[3],
@@ -866,6 +920,7 @@ def make_linear_wave_transition_parts(
     vertical = _transition_family_parts(
         vertical_linear_start,
         vertical_linear,
+        _font_geometry.transform_path(linear_parts[5], vertical_transform),
         vertical_family[0],
         vertical_family[1:3],
         vertical_family[3],
@@ -896,6 +951,7 @@ def make_linear_manga_transition_parts(
     horizontal = _transition_family_parts(
         linear_parts[0],
         linear_parts[1],
+        linear_parts[2],
         manga_parts[0],
         manga_parts[1:2],
         manga_parts[2],
@@ -913,6 +969,7 @@ def make_linear_manga_transition_parts(
     vertical = _transition_family_parts(
         vertical_linear_start,
         vertical_linear,
+        _font_geometry.transform_path(linear_parts[5], vertical_transform),
         vertical_family[0],
         vertical_family[1:2],
         vertical_family[2],

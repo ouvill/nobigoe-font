@@ -654,7 +654,7 @@ def _normalize_spliced_transition_masters(
 ) -> list[tuple[pathops.Path, ...]]:
     normalized = [list(master) for master in masters]
     half_count = len(normalized[0]) // 2
-    indices = (0, 1, half_count - 2, half_count - 1)
+    indices = tuple(index for index in range(half_count) if index != 2)
     for index in (*indices, *(index + half_count for index in indices)):
         outlines = _normalize_cubic_contours([master[index] for master in normalized])
         for master, outline in zip(normalized, outlines, strict=True):
