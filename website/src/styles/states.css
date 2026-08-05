@@ -1,17 +1,14 @@
 .fonts-loading .weight-table,
 .fonts-loading .vertical-specimen > p,
-.fonts-loading .tester-editor,
 .fonts-loading .glyph-grid {
   opacity: 0;
 }
 
 .fonts-ready .weight-table,
 .fonts-ready .vertical-specimen > p,
-.fonts-ready .tester-editor,
 .fonts-ready .glyph-grid,
 .fonts-failed .weight-table,
 .fonts-failed .vertical-specimen > p,
-.fonts-failed .tester-editor,
 .fonts-failed .glyph-grid {
   opacity: 1;
   transition: opacity 240ms ease;

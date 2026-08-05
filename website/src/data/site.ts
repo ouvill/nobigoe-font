@@ -36,7 +36,6 @@ export const WEIGHTS = [
 
 export const NAVIGATION = [
   { href: "/", label: "紹介" },
-  { href: "/tester/", label: "文字を試す" },
+  { href: "/#try", label: "文字を試す" },
   { href: "/glyphs/", label: "字形一覧" },
-  { href: "/compare/", label: "制作プレビュー" },
 ] as const;

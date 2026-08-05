@@ -30,25 +30,14 @@
   line-height: 1.95;
 }
 
-.page-hero--tester {
-  background: var(--accent-light);
-}
-
 .page-hero--glyphs {
   background: var(--moss-light);
 }
 
-.tester-app,
 .catalog-app {
   padding: clamp(56px, 7vw, 96px) var(--gutter);
 }
 
-.tester-introduction,
-.tester-browser-note,
-.tester-samples,
-.tester-panel,
-.tester-advanced,
-.tester-workspace,
 .catalog-toolbar,
 .catalog-summary,
 .glyph-grid {
@@ -57,68 +46,6 @@
   margin-left: auto;
 }
 
-.tester-introduction {
-  margin-bottom: 34px;
-}
-
-.tester-introduction > p:first-child {
-  margin: 0 0 10px;
-  color: var(--accent);
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.tester-introduction h2 {
-  max-width: 21em;
-  margin: 0;
-  font-size: clamp(30px, 3.4vw, 46px);
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-.tester-introduction > p:last-child {
-  max-width: 45em;
-  margin: 14px 0 0;
-  color: var(--ink-soft);
-  font-size: 15px;
-}
-
-.tester-browser-note {
-  margin-bottom: 24px;
-  padding: 14px 18px;
-  border-left: 3px solid var(--accent);
-  color: var(--ink-soft);
-  background: var(--accent-light);
-  font-family: var(--sans);
-  font-size: 12px;
-  line-height: 1.8;
-}
-
-.tester-browser-note a {
-  color: inherit;
-  font-weight: 700;
-  text-underline-offset: 0.2em;
-}
-
-.tester-samples {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 18px 20px;
-  border: 1px solid var(--line-strong);
-  flex-wrap: wrap;
-  background: var(--paper-bright);
-}
-
-.tester-samples strong {
-  margin-right: 10px;
-  font-family: var(--sans);
-  font-size: 12px;
-}
-
-.tester-samples button,
-.choice-group button,
 .filter-buttons button,
 .mode-toggle {
   min-height: 42px;
@@ -132,25 +59,12 @@
   cursor: pointer;
 }
 
-.tester-samples button:hover,
-.tester-samples button.is-active,
-.choice-group button:hover,
-.choice-group button.is-active,
 .filter-buttons button:hover,
 .filter-buttons button.is-active {
   color: var(--paper-bright);
   background: var(--moss);
 }
 
-.tester-panel {
-  display: grid;
-  grid-template-columns: 1.25fr 0.75fr 1fr;
-  border-right: 1px solid var(--line-strong);
-  border-left: 1px solid var(--line-strong);
-  background: var(--paper-bright);
-}
-
-.control,
 .catalog-toolbar fieldset {
   min-width: 0;
   margin: 0;
@@ -160,12 +74,6 @@
   border-bottom: 1px solid var(--line);
 }
 
-.control:last-child {
-  border-right: 0;
-}
-
-.control legend,
-.control > label,
 .catalog-toolbar legend {
   display: block;
   margin-bottom: 10px;
@@ -175,118 +83,16 @@
   font-weight: 700;
 }
 
-.choice-group,
 .filter-buttons {
   display: flex;
 }
 
-.choice-group button,
 .filter-buttons button {
   flex: 1;
 }
 
-.choice-group button + button,
 .filter-buttons button + button {
   border-left: 0;
-}
-
-.control--size {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-}
-
-.control--size output {
-  font-family: var(--sans);
-  font-size: 12px;
-}
-
-.control--size input {
-  width: 100%;
-  grid-column: 1 / -1;
-  accent-color: var(--accent);
-}
-
-.tester-advanced {
-  border: 1px solid var(--line-strong);
-  border-top: 0;
-  background: var(--paper);
-}
-
-.tester-advanced summary {
-  padding: 16px 20px;
-  font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.tester-advanced > div {
-  display: grid;
-  grid-template-columns: 1fr;
-  border-top: 1px solid var(--line);
-}
-
-.tester-advanced .control {
-  border-bottom: 0;
-}
-
-.tester-advanced .control > p {
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.tester-workspace {
-  position: relative;
-  display: flex;
-  min-height: 540px;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(40px, 6vw, 76px);
-  overflow: auto;
-  color: var(--paper-bright);
-  background: var(--ink);
-}
-
-.tester-workspace[data-family="koburi"] .tester-editor {
-  font-family: "Nobigoe Koburi", var(--serif);
-}
-
-.tester-editor {
-  width: 100%;
-  min-height: 330px;
-  outline: 0;
-  font-feature-settings:
-    "ccmp" 1,
-    "calt" 1;
-  font-size: 64px;
-  letter-spacing: 0;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-.tester-workspace.is-vertical {
-  min-height: 700px;
-}
-
-.tester-workspace.is-vertical .tester-editor {
-  width: 100%;
-  max-height: 560px;
-  font-feature-settings:
-    "ccmp" 1,
-    "calt" 1;
-  writing-mode: vertical-rl;
-}
-
-.tester-hint {
-  position: absolute;
-  right: 22px;
-  bottom: 16px;
-  margin: 0;
-  color: rgba(255, 255, 255, 0.62);
-  font-family: var(--sans);
-  font-size: 10px;
 }
 
 .catalog-app {

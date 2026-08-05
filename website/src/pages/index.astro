@@ -31,7 +31,7 @@ const punctuationRows = [
         JPを土台にした一般用途の明朝体です。本文を読みやすく組める文字を揃えながら、長く伸びる記号、濁点・半濁点、感嘆符や疑問符まで、声のような文字表現を加えました。
       </p>
       <div class="hero-actions">
-        <a class="button button--solid" href={`${base}/tester/`}>文章で試す</a>
+        <a class="button button--solid" href={`${base}/#try`}>文字を試す</a>
         <a class="button button--line" href={`${base}/#download`}
           >無料ダウンロード ↓</a
         >
@@ -100,17 +100,13 @@ const punctuationRows = [
     </nav>
   </section>
 
-  <section class="positioning-section" aria-labelledby="positioning-title">
+  <section class="positioning-section" aria-label="書体について">
     <p class="section-index">まず知ってほしいこと</p>
     <div class="positioning-copy">
-      <h2 id="positioning-title">
-        マンガだけでなく<br />ふだんの文章から。
-      </h2>
       <div>
         <p>
-          特徴的な記号は、セリフや擬音の表現にも役立ちます。ただし、のびごえ明朝はマンガ専用書体ではありません。Noto
-          Serif JP由来の和文とLibertinus
-          Serifの欧文を組み合わせ、見出し、本文、ウェブ、印刷物まで広く使える設計です。
+          Noto Serif JP由来の和文とLibertinus
+          Serifの欧文を組み合わせ、見出し、本文、ウェブ、印刷物まで広く使える設計です。特徴的な記号は、セリフや擬音の表現にも役立ちます。
         </p>
         <p>
           必要なときだけ、OpenType機能が声のニュアンスを加えます。普段は端正な明朝体として、表現したい場面では一歩先まで。
@@ -394,24 +390,54 @@ const punctuationRows = [
     </div>
   </section>
 
-  <section class="explore-section" aria-labelledby="explore-title">
+  <section class="try-section" id="try" aria-labelledby="try-title">
     <header>
-      <p>TRY IT YOURSELF</p>
-      <h2 id="explore-title">自分の言葉で、<br />試せます。</h2>
+      <p>TRY NOBIGOE MINCHO</p>
+      <h2 id="try-title">のびごえ明朝を試す</h2>
     </header>
-    <div class="explore-links">
-      <a class="explore-card" href={`${base}/tester/`}>
-        <span>文章を入力する</span><h3>文字テスター</h3><p>
-          二つの書体、7ウェイト、横組・縦組、約物の2デザインをブラウザで切り替えられます。
-        </p><strong>テスターを開く →</strong>
-      </a>
-      <a class="explore-card" href={`${base}/glyphs/`}>
-        <span>結合字形を探す</span><h3>198字形の一覧</h3><p>
-          濁点・半濁点を付けられる文字を、文字種・書体・ウェイトで絞り込めます。
-        </p><strong>字形一覧を開く →</strong>
-      </a>
+    <div class="try-panel">
+      <div class="try-field">
+        <label for="font-try-input">試したい文章を入力</label>
+        <input
+          id="font-try-input"
+          type="text"
+          maxlength="50"
+          placeholder="待ってーーーー！ 声はどこまでも伸びていく。"
+          autocomplete="off"
+          spellcheck="false"
+          data-font-try-input
+        />
+      </div>
+      <div class="try-preview">
+        <div class="try-preview-meta">
+          <span>PREVIEW / NOBIGOE MINCHO REGULAR</span>
+          <a href={`${base}/glyphs/`}>198字形を見る →</a>
+        </div>
+        <output for="font-try-input" data-font-try-output
+          >待ってーーーー！ 声はどこまでも伸びていく。</output
+        >
+      </div>
     </div>
   </section>
+
+  <script>
+    const input = document.querySelector<HTMLInputElement>(
+      "[data-font-try-input]",
+    );
+    const output = document.querySelector<HTMLOutputElement>(
+      "[data-font-try-output]",
+    );
+
+    if (input && output) {
+      const sample = input.placeholder;
+      const updatePreview = () => {
+        output.textContent = input.value || sample;
+      };
+
+      input.addEventListener("input", updatePreview);
+      updatePreview();
+    }
+  </script>
 
   <section
     class="download-section"

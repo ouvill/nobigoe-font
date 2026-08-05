@@ -270,50 +270,6 @@
     margin-top: 20px;
   }
 
-  .tester-introduction h2 {
-    font-size: 31px;
-  }
-
-  .tester-samples {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .tester-samples strong {
-    margin: 0 0 4px;
-  }
-
-  .tester-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .control,
-  .control:last-child {
-    border-right: 0;
-  }
-
-  .tester-advanced .control + .control {
-    border-top: 1px solid var(--line);
-  }
-
-  .tester-workspace {
-    min-height: 470px;
-    padding: 34px 22px 60px;
-  }
-
-  .tester-editor {
-    min-height: 300px;
-    font-size: 46px;
-  }
-
-  .tester-workspace.is-vertical {
-    min-height: 640px;
-  }
-
-  .tester-workspace.is-vertical .tester-editor {
-    max-height: 510px;
-  }
-
   .catalog-toolbar {
     position: static;
     grid-template-columns: 1fr;

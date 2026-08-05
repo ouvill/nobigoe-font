@@ -217,33 +217,6 @@ jobs:
               encoding="utf-8",
           )
           PY
-          mkdir -p /tmp/novel-web
-          uv run nobigoe-build-variable \
-            --output /tmp/NobigoeVariableMarks-VF.otf \
-            --novel-output /tmp/NobigoeNovelMincho-VF.otf \
-            --static-output-dir /tmp/novel-web
-          uv run pyftsubset /tmp/NobigoeNovelMincho-VF.otf \
-            --output-file=website/src/assets/fonts/NobigoeNovelMincho-VF.woff2 \
-            --flavor=woff2 \
-            --text-file=/tmp/weight-showcase.txt \
-            --layout-features='*' \
-            --name-IDs='*' \
-            --name-languages='*' \
-            --notdef-glyph \
-            --notdef-outline \
-            --recommended-glyphs
-          for weight in ExtraLight Light Regular Medium SemiBold Bold Black; do
-            uv run pyftsubset "/tmp/novel-web/NobigoeNovelMincho-${weight}.otf" \
-              --output-file="website/src/assets/fonts/NobigoeNovelMincho-${weight}-showcase.woff2" \
-              --flavor=woff2 \
-              --text-file=/tmp/weight-showcase.txt \
-              --layout-features='*' \
-              --name-IDs='*' \
-              --name-languages='*' \
-              --notdef-glyph \
-              --notdef-outline \
-              --recommended-glyphs
-          done
           uv run pyftsubset /tmp/font-release/fonts/NobigoeMincho-Regular.otf \
             --output-file=website/src/assets/fonts/NobigoeMincho-Regular.woff2 \
             --flavor=woff2 \
@@ -276,7 +249,6 @@ jobs:
               --notdef-outline \
               --recommended-glyphs
           done
-          uv run python website/tools/generate-latin-candidate-webfonts.py
 
       - name: Build vertical specimen PDF
         working-directory: website
@@ -292,12 +264,9 @@ jobs:
       - name: Verify static site
         run: |
           test -f website/site-dist/index.html
-          test -f website/site-dist/tester/index.html
+          test ! -e website/site-dist/tester
           test -f website/site-dist/glyphs/index.html
-          test -f website/site-dist/compare/index.html
-          test "$(find website/site-dist/_assets -name '*NobigoeNovelMincho-*-showcase*' | wc -l)" -eq 7
-          test "$(find website/site-dist/_assets -name '*NobigoeNovelMincho-VF*' | wc -l)" -eq 1
-          test "$(find website/site-dist/_assets -name '*LatinCandidate*' | wc -l)" -eq 14
+          test ! -e website/site-dist/compare
           test -f website/site-dist/marks-data.json
           test -f website/site-dist/nobigoe-mincho-vertical-specimen.pdf
           test -n "$(find website/site-dist/_assets -name '*.woff2' -print -quit)"
