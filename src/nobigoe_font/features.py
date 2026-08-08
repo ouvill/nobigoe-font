@@ -663,9 +663,9 @@ def symbol_feature_source(
 
 
 def punctuation_feature_source(
-    punctuation_variants: Sequence[tuple[str, tuple[str, str, str, str]]],
+    punctuation_variants: Sequence[tuple[str, tuple[str, str]]],
 ) -> str:
-    """Return GSUB rules for variable original punctuation and its alternates."""
+    """Return GSUB rules for serif punctuation and its rotated alternate."""
 
     names = dict(punctuation_variants)
     ccmp_rules = punctuation_ligature_rules(
@@ -678,23 +678,18 @@ def punctuation_feature_source(
         ],
     )
     alternate_rules = "".join(
-        f"  sub {variants[0]} from [{' '.join(variants[1:])}];\n"
+        f"  sub {variants[0]} from [{variants[1]}];\n"
         for _, variants in punctuation_variants
     )
-    stylistic_rules = [
-        "".join(
-            f"  sub {variants[0]} by {variants[index]};\n"
-            for _, variants in punctuation_variants
-        )
-        for index in range(1, 4)
-    ]
+    stylistic_rules = "".join(
+        f"  sub {variants[0]} by {variants[1]};\n"
+        for _, variants in punctuation_variants
+    )
     return (
         "languagesystem DFLT dflt;\n\n"
         f"feature ccmp {{\n{ccmp_rules}}} ccmp;\n\n"
         f"feature aalt {{\n{alternate_rules}}} aalt;\n\n"
-        f"feature ss01 {{\n{stylistic_rules[0]}}} ss01;\n\n"
-        f"feature ss02 {{\n{stylistic_rules[1]}}} ss02;\n\n"
-        f"feature ss03 {{\n{stylistic_rules[2]}}} ss03;\n"
+        f"feature ss01 {{\n{stylistic_rules}}} ss01;\n"
     )
 
 
@@ -706,7 +701,7 @@ def feature_source(
     one_cycle_wave: tuple[str, str, str, list[str]],
     manga_to_wave_transition: tuple[str, list[str]],
     wave_to_manga_transition: tuple[str, list[str]],
-    punctuation_variants: list[tuple[str, tuple[str, str, str, str]]],
+    punctuation_variants: list[tuple[str, tuple[str, str]]],
     linear_wave_transitions: list[tuple[str, list[str]]],
     linear_manga_transitions: list[tuple[str, list[str]]],
     kana_marks: list[tuple[str, str, str]],

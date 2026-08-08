@@ -7,7 +7,7 @@ from pathlib import Path
 from fontTools import subset
 from fontTools.ttLib import TTFont
 
-from .metadata import set_japanese_name, set_name
+from .metadata import set_horizontal_line_metrics, set_japanese_name, set_name
 from .profiles import NOTO_WEIGHT_CLASSES
 from .version import VERSION, VERSION_NUMBER
 
@@ -48,6 +48,7 @@ def _default_style(font: TTFont) -> str:
 
 
 def _rename_font(font: TTFont) -> None:
+    set_horizontal_line_metrics(font)
     style = _default_style(font)
     postscript_name = f"{ESSENTIAL_POSTSCRIPT_PREFIX}-{style}"
     full_name = f"{ESSENTIAL_FAMILY} {style}"

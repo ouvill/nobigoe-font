@@ -50,7 +50,7 @@ from .marks import (
     load_mark_position_overrides,
     load_punctuation_mark_positions,
 )
-from .metadata import set_japanese_name, set_name
+from .metadata import set_horizontal_line_metrics, set_japanese_name, set_name
 from .operations import (
     add_unicode_mapping,
     allocate_cid_names,
@@ -93,7 +93,6 @@ from .profiles import (
 from .punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
     PUNCTUATION_VARIANT_SEQUENCES,
-    make_original_punctuation_ligature,
     make_variable_shippori_punctuation_ligature,
     rotate_punctuation_outline,
 )
@@ -1041,7 +1040,7 @@ def _append_punctuation(
 ) -> None:
     default_count = len(MANGA_PUNCTUATION_SEQUENCES)
     variant_count = len(PUNCTUATION_VARIANT_SEQUENCES)
-    allocated = allocate_cid_names(font, default_count + 3 * variant_count)
+    allocated = allocate_cid_names(font, default_count + variant_count)
     default_names = dict(
         zip(
             MANGA_PUNCTUATION_SEQUENCES,
@@ -1052,22 +1051,13 @@ def _append_punctuation(
     alternate_names = allocated[default_count:]
     variants = []
     for index, sequence in enumerate(PUNCTUATION_VARIANT_SEQUENCES):
-        default = (
-            cmap[0xFF01 if sequence == "!" else 0xFF1F]
-            if len(sequence) == 1
-            else default_names[sequence]
-        )
-        variants.append(
-            (
-                sequence,
-                (
-                    default,
-                    alternate_names[index],
-                    alternate_names[variant_count + index],
-                    alternate_names[2 * variant_count + index],
-                ),
-            )
-        )
+        if sequence == "!":
+            default = cmap[0xFF01]
+        elif sequence == "?":
+            default = cmap[0xFF1F]
+        else:
+            default = default_names[sequence]
+        variants.append((sequence, (default, alternate_names[index])))
 
     serif_masters = {
         sequence: [
@@ -1078,13 +1068,6 @@ def _append_punctuation(
                 SHIPPORI_STROKE_ADJUSTMENTS[style],
             )
             for style, weight in _STYLES
-        ]
-        for sequence in PUNCTUATION_VARIANT_SEQUENCES
-    }
-    sans_masters = {
-        sequence: [
-            make_original_punctuation_ligature(sequence, weight, sans=True)
-            for weight in _WEIGHTS
         ]
         for sequence in PUNCTUATION_VARIANT_SEQUENCES
     }
@@ -1101,26 +1084,16 @@ def _append_punctuation(
 
     glyphs = []
     for sequence, names in variants:
-        default, rotated, sans, rotated_sans = names
+        default, rotated = names
         if len(sequence) > 1:
             glyphs.append((default, serif_masters[sequence]))
-        glyphs.extend(
+        glyphs.append(
             (
-                (
-                    rotated,
-                    [
-                        rotate_punctuation_outline(outline)
-                        for outline in serif_masters[sequence]
-                    ],
-                ),
-                (sans, sans_masters[sequence]),
-                (
-                    rotated_sans,
-                    [
-                        rotate_punctuation_outline(outline)
-                        for outline in sans_masters[sequence]
-                    ],
-                ),
+                rotated,
+                [
+                    rotate_punctuation_outline(outline)
+                    for outline in serif_masters[sequence]
+                ],
             )
         )
     _append_glyphs(
@@ -1436,6 +1409,7 @@ def rename_variable_font(
     postscript_prefix: str = "NobigoeVariableMarks",
 ) -> None:
     """Apply consistent variable-family names and named-instance PostScript names."""
+    set_horizontal_line_metrics(font)
 
     style = "ExtraLight"
     postscript_name = f"{postscript_prefix}-{style}"

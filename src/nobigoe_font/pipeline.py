@@ -58,8 +58,7 @@ from .punctuation import (
     SHIPPORI_PRECOMPOSED_LIGATURES,
     SHIPPORI_UPRIGHT_EXCLAMATIONS,
     SHIPPORI_UPRIGHT_PUNCTUATION,
-    make_punctuation_ligature,
-    shippori_upright_punctuation_paths,
+    make_fixed_shippori_punctuation_ligature,
     rotate_punctuation_outline,
 )
 
@@ -2030,7 +2029,6 @@ def build(
         raise ValueError(
             "The punctuation source does not contain " + ", ".join(punctuation_missing)
         )
-    upright_punctuation = shippori_upright_punctuation_paths(punctuation_font)
     if punctuation_font["head"].unitsPerEm != font["head"].unitsPerEm:
         raise ValueError(
             "The base and punctuation sources must use the same " "units per em"
@@ -2437,26 +2435,14 @@ def build(
         font["vmtx"].metrics[cmap[0xFF01]][1]
         + _font_geometry.bounds(font, cmap[0xFF01])[3]
     )
-    shippori_punctuation_paths = {
-        "!": upright_punctuation["!"],
-        "?": upright_punctuation["?"],
-        **dict(
-            zip(
-                MANGA_PUNCTUATION_SEQUENCES,
-                (
-                    make_punctuation_ligature(punctuation_font, sequence)
-                    for sequence in MANGA_PUNCTUATION_SEQUENCES
-                ),
-                strict=True,
-            )
-        ),
-    }
     mincho_punctuation_paths = {
-        sequence: _font_geometry.adjust_outline_weight(
-            outline,
+        sequence: make_fixed_shippori_punctuation_ligature(
+            punctuation_font,
+            sequence,
+            identity.weight_class,
             SHIPPORI_STROKE_ADJUSTMENTS[identity.style],
         )
-        for sequence, outline in shippori_punctuation_paths.items()
+        for sequence in PUNCTUATION_VARIANT_SEQUENCES
     }
     upright_exclamation = mincho_punctuation_paths["!"]
     upright_question = mincho_punctuation_paths["?"]
