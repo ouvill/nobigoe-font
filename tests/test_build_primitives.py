@@ -250,6 +250,28 @@ class FontMetadataTests(unittest.TestCase):
             places=4,
         )
 
+    def test_rename_font_sets_compact_horizontal_line_metrics(self) -> None:
+        font = minimal_true_type_font()
+        font["hhea"].ascent = 1151
+        font["hhea"].descent = -286
+        font["hhea"].lineGap = 42
+
+        rename_font(
+            font,
+            "Copyright",
+            "Notice",
+            font_identity("noto", "Regular"),
+        )
+
+        self.assertEqual(
+            (
+                font["hhea"].ascent,
+                font["hhea"].descent,
+                font["hhea"].lineGap,
+            ),
+            (880, -120, 0),
+        )
+
     def test_rename_font_adds_macintosh_postscript_name(self) -> None:
         font = minimal_true_type_font()
         name_table = font["name"]

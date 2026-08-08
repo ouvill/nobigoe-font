@@ -20,6 +20,7 @@ from .profiles import (
     latin_build_profile,
     latin_font_source,
     noto_serif_cff2_variable_source,
+    noto_serif_source,
     shippori_source,
 )
 from .sources import DEFAULT_CACHE_DIR, SourceCache
@@ -33,8 +34,9 @@ DEFAULT_JOBS = min(4, os.process_cpu_count() or 1)
 
 @dataclass(frozen=True)
 class _StaticBuildTask:
-    variable_source: Path
+    source: Path
     latin_source: Path
+    punctuation_source: Path | None
     output: Path
     identity: FontIdentity
     latin_profile: LatinBuildProfile
@@ -43,17 +45,27 @@ class _StaticBuildTask:
 
 
 def _build_static_task(task: _StaticBuildTask) -> None:
-    build_instance = (
-        pipeline.build_novel_static_instance
-        if task.novel
-        else pipeline.build_static_instance
-    )
-    build_instance(
-        task.variable_source,
+    if task.novel:
+        pipeline.build_novel_static_instance(
+            task.source,
+            task.latin_source,
+            task.output,
+            task.identity,
+            task.latin_profile,
+            task.autohint,
+        )
+        return
+    if task.punctuation_source is None:
+        raise AssertionError("Stable static builds require a punctuation source")
+    pipeline.build(
+        task.source,
         task.latin_source,
+        task.punctuation_source,
         task.output,
         task.identity,
         task.latin_profile,
+        0,
+        "noto",
         task.autohint,
     )
 
@@ -68,9 +80,9 @@ def _positive_job_count(value: str) -> int:
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Customize the pinned Noto Serif JP CFF2 variable font with Nobigoe "
-            "glyphs and features, then instance Nobigoe and downstream Novel "
-            "static weights before applying static-only Latin outlines and metadata."
+            "Customize the pinned Noto Serif JP CFF2 variable font for Essential "
+            "and Novel, build stable Nobigoe weights from pinned static Noto fonts, "
+            "then apply static-only Latin outlines and metadata."
         )
     )
     parser.add_argument(
@@ -173,6 +185,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         weight: cache.fetch(shippori_source(style))
         for style, weight in NOTO_WEIGHT_CLASSES.items()
     }
+    fixed_sources = {
+        style: cache.fetch(noto_serif_source(style)) for style in static_styles
+    }
     latin_sources: dict[str, Path] = {}
     for style in NOTO_WEIGHT_CLASSES:
         if style not in requested_styles:
@@ -199,6 +214,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             _StaticBuildTask(
                 args.novel_output,
                 latin_sources[style],
+                None,
                 args.static_output_dir
                 / default_output_path(novel_identity, "noto").name,
                 novel_identity,
@@ -213,8 +229,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         identity = font_identity("noto", style)
         tasks.append(
             _StaticBuildTask(
-                args.output,
+                fixed_sources[style],
                 latin_sources[style],
+                punctuation_sources[NOTO_WEIGHT_CLASSES[style]],
                 args.static_output_dir / default_output_path(identity, "noto").name,
                 identity,
                 latin_build_profile("libertinus", style),

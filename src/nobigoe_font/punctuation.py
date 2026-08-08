@@ -78,333 +78,16 @@ def _master_value(
     return regular + factor * (black - regular)
 
 
-def _original_punctuation_dot(weight: float, *, sans: bool) -> pathops.Path:
-    center_x = 500
-    radius = (
-        _master_value(weight, 37, 43, 70) if sans else _master_value(weight, 35, 41, 61)
-    )
-    bottom = -30
-    center_y = bottom + radius
-    top = bottom + radius * 2
-    control = radius * 0.55228475
-    path = pathops.Path()
-    pen = path.getPen()
-    pen.moveTo((center_x, top))
-    pen.curveTo(
-        (center_x + control, top),
-        (center_x + radius, center_y + control),
-        (center_x + radius, center_y),
-    )
-    pen.curveTo(
-        (center_x + radius, center_y - control),
-        (center_x + control, bottom),
-        (center_x, bottom),
-    )
-    pen.curveTo(
-        (center_x - control, bottom),
-        (center_x - radius, center_y - control),
-        (center_x - radius, center_y),
-    )
-    pen.curveTo(
-        (center_x - radius, center_y + control),
-        (center_x - control, top),
-        (center_x, top),
-    )
-    pen.closePath()
-    return path
 
 
-def _original_exclamation_body(
-    weight: float, *, sans: bool, compression: float = 1.0
-) -> pathops.Path:
-    center_x = 500
-    if sans:
-        top_half = _master_value(weight, 34, 45, 78)
-        terminal_half = _master_value(weight, 20, 28, 54)
-        top_round = _master_value(weight, 20, 26, 40)
-        terminal_round = _master_value(weight, 9, 12, 20)
-        shoulder = 650
-        lower_control = 305
-        stem_bottom = 190
-    else:
-        top_half = _master_value(weight, 36, 48, 82)
-        terminal_half = _master_value(weight, 13, 19, 34)
-        top_round = _master_value(weight, 25, 34, 56)
-        terminal_round = _master_value(weight, 10, 14, 24)
-        shoulder = _master_value(weight, 620, 610, 590)
-        lower_control = _master_value(weight, 340, 350, 365)
-        stem_bottom = _master_value(weight, 160, 170, 200)
-        if compression < 1:
-            stroke_gain = min(1.3, 1 + 0.3 * (1 - compression) / compression)
-            terminal_half *= stroke_gain
-    top = 790
-    path = pathops.Path()
-    pen = path.getPen()
-    pen.moveTo((center_x, top))
-    pen.curveTo(
-        (center_x + top_half * 0.55228475, top),
-        (center_x + top_half, top - top_round * 0.44771525),
-        (center_x + top_half, top - top_round),
-    )
-    pen.curveTo(
-        (center_x + top_half, shoulder),
-        (center_x + terminal_half, lower_control),
-        (center_x + terminal_half, stem_bottom + terminal_round),
-    )
-    pen.curveTo(
-        (center_x + terminal_half, stem_bottom + terminal_round * 0.45),
-        (center_x + terminal_half * 0.55, stem_bottom),
-        (center_x, stem_bottom),
-    )
-    pen.curveTo(
-        (center_x - terminal_half * 0.55, stem_bottom),
-        (center_x - terminal_half, stem_bottom + terminal_round * 0.45),
-        (center_x - terminal_half, stem_bottom + terminal_round),
-    )
-    pen.curveTo(
-        (center_x - terminal_half, lower_control),
-        (center_x - top_half, shoulder),
-        (center_x - top_half, top - top_round),
-    )
-    pen.curveTo(
-        (center_x - top_half, top - top_round * 0.44771525),
-        (center_x - top_half * 0.55228475, top),
-        (center_x, top),
-    )
-    pen.closePath()
-    return path
 
 
-def _original_question_body(
-    weight: float, *, sans: bool, compression: float = 1.0
-) -> pathops.Path:
-    center_x = 500
-    if sans:
-        outer_left = _master_value(weight, 298, 288, 240)
-        outer_right = _master_value(weight, 702, 712, 760)
-        inner_left = _master_value(weight, 348, 356, 380)
-        inner_right = _master_value(weight, 652, 644, 620)
-        inner_top = _master_value(weight, 732, 718, 650)
-        terminal_left = _master_value(weight, 483, 475, 438)
-        terminal_right = _master_value(weight, 517, 525, 562)
-        cap_round = _master_value(weight, 8, 11, 18)
-        terminal_round = cap_round
-        cap_y = 596
-        terminal_bottom = 190
-        outer_left_top_x = 374
-        outer_right_top_x = 632
-        outer_turn_x = 680
-        outer_turn_end_x = 610
-        hook_control_x = 552
-        inner_turn_x = 490
-        inner_turn_mid_x = 544
-        inner_turn_end_x = 596
-        inner_right_shoulder_y = 652
-        inner_left_shoulder_y = 655
-    else:
-        outer_left = _master_value(weight, 302, 296, 250)
-        outer_right = _master_value(weight, 702, 708, 752)
-        inner_left = _master_value(weight, 350, 358, 374)
-        inner_right = _master_value(weight, 646, 638, 607)
-        inner_top = _master_value(weight, 752, 750, 705)
-        terminal_left = _master_value(weight, 485, 477, 455)
-        terminal_right = _master_value(weight, 515, 523, 545)
-        cap_round = _master_value(weight, 18, 28, 48)
-        terminal_round = _master_value(weight, 10, 15, 30)
-        cap_y = _master_value(weight, 596, 600, 610)
-        terminal_bottom = _master_value(weight, 160, 170, 200)
-        outer_left_top_x = _master_value(weight, 374, 368, 340)
-        outer_right_top_x = _master_value(weight, 632, 638, 660)
-        outer_turn_x = _master_value(weight, 680, 690, 720)
-        outer_turn_end_x = _master_value(weight, 610, 618, 642)
-        hook_control_x = _master_value(weight, 552, 558, 580)
-        inner_turn_x = _master_value(weight, 490, 486, 468)
-        inner_turn_mid_x = _master_value(weight, 544, 548, 565)
-        inner_turn_end_x = _master_value(weight, 596, 602, 620)
-        inner_right_shoulder_y = _master_value(weight, 652, 660, 675)
-        inner_left_shoulder_y = _master_value(weight, 655, 663, 678)
-        if compression < 1:
-            stroke_gain = min(1.3, 1 + 0.3 * (1 - compression) / compression)
-            inner_left = outer_left + (inner_left - outer_left) * stroke_gain
-            inner_right = outer_right - (outer_right - inner_right) * stroke_gain
-            terminal_half = (terminal_right - terminal_left) * stroke_gain / 2
-            terminal_left = center_x - terminal_half
-            terminal_right = center_x + terminal_half
-    top = 790
-    terminal_side_y = terminal_bottom + terminal_round * 2
-    path = pathops.Path()
-    pen = path.getPen()
-    pen.moveTo((outer_left, cap_y))
-    pen.curveTo((outer_left, 700), (outer_left_top_x, top), (center_x, top))
-    pen.curveTo((outer_right_top_x, top), (outer_right, 708), (outer_right, 590))
-    pen.curveTo((outer_right, 500), (outer_turn_x, 438), (outer_turn_end_x, 396))
-    pen.curveTo(
-        (hook_control_x, 357),
-        (terminal_right, 290),
-        (terminal_right, terminal_side_y),
-    )
-    pen.curveTo(
-        (terminal_right, terminal_bottom + terminal_round * 0.45),
-        (center_x + (terminal_right - center_x) * 0.55, terminal_bottom),
-        (center_x, terminal_bottom),
-    )
-    pen.curveTo(
-        (center_x - (center_x - terminal_left) * 0.55, terminal_bottom),
-        (terminal_left, terminal_bottom + terminal_round * 0.45),
-        (terminal_left, terminal_side_y),
-    )
-    pen.curveTo(
-        (terminal_left, 306),
-        (inner_turn_x, 382),
-        (inner_turn_mid_x, 425),
-    )
-    pen.curveTo(
-        (inner_turn_end_x, 467),
-        (inner_right, 520),
-        (inner_right, 584),
-    )
-    pen.curveTo(
-        (inner_right, inner_right_shoulder_y),
-        (568, inner_top),
-        (center_x, inner_top),
-    )
-    pen.curveTo(
-        (420, inner_top),
-        (inner_left, inner_left_shoulder_y),
-        (inner_left, cap_y),
-    )
-    pen.curveTo(
-        (inner_left, cap_y - cap_round),
-        (outer_left, cap_y - cap_round),
-        (outer_left, cap_y),
-    )
-    pen.closePath()
-    return path
 
 
-def _original_punctuation_body(
-    mark: str,
-    weight: float,
-    *,
-    sans: bool,
-    compression: float = 1.0,
-) -> pathops.Path:
-    if mark == "!":
-        return _original_exclamation_body(weight, sans=sans, compression=compression)
-    if mark == "?":
-        return _original_question_body(weight, sans=sans, compression=compression)
-    raise ValueError(f"Unknown punctuation mark: {mark!r}")
 
 
-def make_original_punctuation_mark(
-    mark: str, weight: float, *, sans: bool = False
-) -> pathops.Path:
-    """Construct an original, interpolation-compatible full-width mark."""
-
-    path = _original_punctuation_body(mark, weight, sans=sans)
-    path.addPath(_original_punctuation_dot(weight, sans=sans))
-    return path
 
 
-def make_original_punctuation_ligature(
-    sequence: str,
-    weight: float,
-    *,
-    sans: bool = False,
-    advance: int = 1000,
-) -> pathops.Path:
-    """Fit original punctuation components into one full-width cell."""
-
-    if not sequence or any(mark not in "!?" for mark in sequence):
-        raise ValueError(f"Invalid punctuation sequence: {sequence!r}")
-    if len(sequence) == 1:
-        return make_original_punctuation_mark(sequence, weight, sans=sans)
-    if sans:
-        components = [
-            make_original_punctuation_mark(mark, weight, sans=True) for mark in sequence
-        ]
-        metrics = [
-            (outline, outline.bounds[0], outline.bounds[2] - outline.bounds[0])
-            for outline in components
-        ]
-        gap = _master_value(weight, 38, 34, 24)
-        total_width = sum(width for _, _, width in metrics) + gap * (len(metrics) - 1)
-        scale_x = min(1.0, (advance - 56) / total_width)
-        cursor = (advance - total_width * scale_x) / 2
-        combined = pathops.Path()
-        for outline, x_min, width in metrics:
-            combined.addPath(
-                geometry.transform_path(
-                    outline,
-                    Transform(scale_x, 0, 0, 1, cursor - scale_x * x_min, 0),
-                )
-            )
-            cursor += (width + gap) * scale_x
-        return combined
-
-    bodies = [_original_punctuation_body(mark, weight, sans=sans) for mark in sequence]
-    body_lefts = [500 - body.bounds[0] for body in bodies]
-    body_rights = [body.bounds[2] - 500 for body in bodies]
-    dot = _original_punctuation_dot(weight, sans=sans)
-    dot_radius = (dot.bounds[2] - dot.bounds[0]) / 2
-    optical_widths = [184 if mark == "!" else 500 for mark in sequence]
-    body_gap = _master_value(weight, 24, 20, 14)
-    dot_gap = 24
-    available = advance - 56
-
-    def fitted_span(scale_x: float) -> tuple[float, list[float]]:
-        distances = [
-            max(
-                scale_x * (optical_widths[index] + optical_widths[index + 1]) / 2,
-                scale_x * (body_rights[index] + body_lefts[index + 1]) + body_gap,
-                dot_radius * 2 + dot_gap,
-            )
-            for index in range(len(sequence) - 1)
-        ]
-        left_extent = max(scale_x * body_lefts[0], dot_radius)
-        right_extent = max(scale_x * body_rights[-1], dot_radius)
-        span = left_extent + sum(distances) + right_extent
-        return span, distances
-
-    scale_x = 1.0
-    span, distances = fitted_span(scale_x)
-    if span > available:
-        low, high = 0.0, 1.0
-        for _ in range(32):
-            scale_x = (low + high) / 2
-            span, distances = fitted_span(scale_x)
-            if span <= available:
-                low = scale_x
-            else:
-                high = scale_x
-        scale_x = low
-        span, distances = fitted_span(scale_x)
-
-    left_extent = max(scale_x * body_lefts[0], dot_radius)
-    centers = [(advance - span) / 2 + left_extent]
-    centers.extend(
-        centers[0] + sum(distances[: index + 1]) for index in range(len(distances))
-    )
-    if scale_x < 1:
-        bodies = [
-            _original_punctuation_body(mark, weight, sans=False, compression=scale_x)
-            for mark in sequence
-        ]
-    combined = pathops.Path()
-    for body, center in zip(bodies, centers, strict=True):
-        combined.addPath(
-            geometry.transform_path(
-                body,
-                Transform(scale_x, 0, 0, 1, center - scale_x * 500, 0),
-            )
-        )
-        combined.addPath(
-            geometry.transform_path(
-                dot,
-                Transform(1, 0, 0, 1, center - 500, 0),
-            )
-        )
-    return combined
 
 
 def shippori_upright_punctuation_paths(
@@ -903,14 +586,13 @@ def _circle_from_contour_bounds(
     return result
 
 
-def make_variable_shippori_punctuation_ligature(
+def _make_shippori_punctuation_ligature(
     font: TTFont,
     sequence: str,
     weight: float,
     weight_adjustment: float,
+    compatible_marks: frozenset[str],
 ) -> pathops.Path:
-    """Build smooth, interpolation-compatible Shippori punctuation."""
-
     source = (
         shippori_upright_punctuation_paths(font)[sequence]
         if len(sequence) == 1
@@ -934,6 +616,8 @@ def make_variable_shippori_punctuation_ligature(
         centers = tuple((body.bounds[0] + body.bounds[2]) / 2 for body in bodies)
     body_templates = {}
     for mark in dict.fromkeys(sequence):
+        if mark not in compatible_marks:
+            continue
         if weight == 200:
             body_templates[mark] = (
                 _thin_question_body() if mark == "?" else _thin_exclamation_body()
@@ -951,6 +635,10 @@ def make_variable_shippori_punctuation_ligature(
     for mark, source_body, source_dot, center in zip(
         sequence, bodies, dots, centers, strict=True
     ):
+        if mark not in compatible_marks:
+            result.addPath(source_body)
+            result.addPath(source_dot)
+            continue
         body = body_templates[mark]
         body_center = (body.bounds[0] + body.bounds[2]) / 2
         scale_x = 1.0
@@ -979,33 +667,38 @@ def make_variable_shippori_punctuation_ligature(
     return result
 
 
-def make_sans_punctuation_ligature(
-    font: TTFont, sequence: str, advance: int = 1000
+def make_variable_shippori_punctuation_ligature(
+    font: TTFont,
+    sequence: str,
+    weight: float,
+    weight_adjustment: float,
 ) -> pathops.Path:
-    gap = 40
-    cmap = font.getBestCmap()
-    components = [
-        geometry.glyph_path(font, cmap[0xFF01 if mark == "!" else 0xFF1F])
-        for mark in sequence
-    ]
-    component_metrics = [
-        (outline, outline.bounds[0], outline.bounds[2] - outline.bounds[0])
-        for outline in components
-    ]
-    total_width = sum(width for _, _, width in component_metrics)
-    total_width += gap * (len(sequence) - 1)
-    scale = min(1.0, (advance - 40) / total_width)
-    combined = pathops.Path()
-    cursor = (advance - total_width * scale) / 2
-    for outline, x_min, width in component_metrics:
-        combined.addPath(
-            geometry.transform_path(
-                outline,
-                Transform(scale, 0, 0, 1, cursor - scale * x_min, 0),
-            )
-        )
-        cursor += (width + gap) * scale
-    return combined
+    """Build fully interpolation-compatible Shippori punctuation."""
+
+    return _make_shippori_punctuation_ligature(
+        font,
+        sequence,
+        weight,
+        weight_adjustment,
+        frozenset(("!", "?")),
+    )
+
+
+def make_fixed_shippori_punctuation_ligature(
+    font: TTFont,
+    sequence: str,
+    weight: float,
+    weight_adjustment: float,
+) -> pathops.Path:
+    """Apply the variable exclamation design without changing question marks."""
+
+    return _make_shippori_punctuation_ligature(
+        font,
+        sequence,
+        weight,
+        weight_adjustment,
+        frozenset(("!",)),
+    )
 
 
 def rotate_punctuation_outline(outline: pathops.Path) -> pathops.Path:

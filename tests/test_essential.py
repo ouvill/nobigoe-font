@@ -59,7 +59,7 @@ def _source_font(path: Path, omitted_codepoint: int | None = None) -> None:
     builder.setupGlyphOrder(glyph_order)
     builder.setupGlyf({name: TTGlyphPen(None).glyph() for name in glyph_order})
     builder.setupHorizontalMetrics({name: (1000, 0) for name in glyph_order})
-    builder.setupHorizontalHeader(ascent=880, descent=-120)
+    builder.setupHorizontalHeader(ascent=1151, descent=-286, lineGap=42)
     builder.setupCharacterMap(cmap)
     builder.setupNameTable(
         {
@@ -138,6 +138,14 @@ class EssentialBuildTests(unittest.TestCase):
             self.assertIsNotNone(japanese_family)
             assert japanese_family is not None
             self.assertEqual(japanese_family.toUnicode(), ESSENTIAL_JAPANESE_FAMILY)
+            self.assertEqual(
+                (
+                    font["hhea"].ascent,
+                    font["hhea"].descent,
+                    font["hhea"].lineGap,
+                ),
+                (880, -120, 0),
+            )
 
     def test_missing_supported_codepoint_stops_the_build(self) -> None:
         with TemporaryDirectory() as directory:

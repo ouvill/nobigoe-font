@@ -7,6 +7,17 @@ from fontTools.ttLib import TTFont
 from .profiles import FontIdentity
 from .version import VERSION, VERSION_NUMBER
 
+HHEA_ASCENT = 880
+HHEA_DESCENT = -120
+
+
+def set_horizontal_line_metrics(font: TTFont) -> None:
+    """Use the compact one-em horizontal line box shared by Japanese text fonts."""
+
+    font["hhea"].ascent = HHEA_ASCENT
+    font["hhea"].descent = HHEA_DESCENT
+    font["hhea"].lineGap = 0
+
 
 def set_name(font: TTFont, name_id: int, value: str) -> None:
     name_table = font["name"]
@@ -38,6 +49,7 @@ def rename_font(
     font_notice: str,
     identity: FontIdentity,
 ) -> None:
+    set_horizontal_line_metrics(font)
     legacy_style = "Bold" if identity.style == "Bold" else "Regular"
     set_name(font, 0, copyright_notice)
     set_name(font, 1, identity.legacy_family)

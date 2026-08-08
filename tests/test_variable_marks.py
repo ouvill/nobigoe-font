@@ -25,14 +25,15 @@ from nobigoe_font.profiles import (
     latin_build_profile,
     latin_font_source,
     noto_serif_cff2_variable_source,
+    noto_serif_source,
     shippori_source,
 )
 from nobigoe_font.punctuation import (
     MANGA_PUNCTUATION_SEQUENCES,
     PUNCTUATION_VARIANT_SEQUENCES,
-    rotate_punctuation_outline,
-    make_original_punctuation_ligature,
+    make_fixed_shippori_punctuation_ligature,
     make_variable_shippori_punctuation_ligature,
+    rotate_punctuation_outline,
 )
 from nobigoe_font.variable_cli import (
     DEFAULT_NOVEL_OUTPUT_PATH,
@@ -430,43 +431,6 @@ def _shippori_punctuation_fixture() -> dict[str, pathops.Path]:
 
 
 class VariablePunctuationTests(unittest.TestCase):
-    def test_original_masters_keep_topology_and_aligned_height(self) -> None:
-        weights = (200, 300, 400, 500, 600, 700, 900)
-        for sans in (False, True):
-            for sequence in PUNCTUATION_VARIANT_SEQUENCES:
-                with self.subTest(sans=sans, sequence=sequence):
-                    masters = [
-                        make_original_punctuation_ligature(
-                            sequence,
-                            weight,
-                            sans=sans,
-                        )
-                        for weight in weights
-                    ]
-                    signatures = {
-                        (
-                            tuple(master.verbs),
-                            len(master.points),
-                            sum(1 for _ in master.contours),
-                        )
-                        for master in masters
-                    }
-                    self.assertEqual(len(signatures), 1)
-                    for master in masters:
-                        self.assertAlmostEqual(master.bounds[1], -30, places=4)
-                        self.assertAlmostEqual(master.bounds[3], 790, places=4)
-
-    def test_original_serif_ligatures_keep_shared_dots_circular(self) -> None:
-        for weight in (200, 300, 400, 500, 600, 700, 900):
-            for sequence in PUNCTUATION_VARIANT_SEQUENCES:
-                outline = make_original_punctuation_ligature(sequence, weight)
-                contours = list(outline.contours)
-                self.assertEqual(len(contours), len(sequence) * 2)
-                for dot in contours[1::2]:
-                    width = dot.bounds[2] - dot.bounds[0]
-                    height = dot.bounds[3] - dot.bounds[1]
-                    self.assertAlmostEqual(width, height, places=4)
-
     def test_rotated_punctuation_preserves_contours_and_aligns_edges(self) -> None:
         source = geometry.rectangle(450, 160, 550, 790)
         source.addPath(geometry.rectangle(450, -30, 550, 80))
@@ -491,100 +455,36 @@ class VariablePunctuationTests(unittest.TestCase):
         self.assertAlmostEqual(abs(body.area), 100 * 630, places=2)
         self.assertAlmostEqual(abs(dot.area), 100 * 110, places=2)
 
-    def test_rotated_ligature_edges_share_parallel_guides(self) -> None:
-        source = make_original_punctuation_ligature("!!??", 400)
-
-        rotated = rotate_punctuation_outline(source)
-        body_tops = {
-            round(contour.bounds[3], 3)
-            for contour in rotated.contours
-            if contour.bounds[3] >= 140
-        }
-        dot_bottoms = {
-            round(contour.bounds[1], 3)
-            for contour in rotated.contours
-            if contour.bounds[3] < 140
-        }
-
-        self.assertEqual(body_tops, {790})
-        self.assertEqual(dot_bottoms, {-30})
-
-    def test_rotated_mixed_pairs_restore_source_body_gaps(self) -> None:
-        gaps = []
-        for sequence in ("!?", "?!"):
-            source = make_original_punctuation_ligature(sequence, 400)
-            source_bodies = sorted(
-                (contour for contour in source.contours if contour.bounds[3] >= 140),
-                key=lambda contour: contour.bounds[0],
+    def test_fixed_shippori_uses_variable_exclamation_only(self) -> None:
+        sources = _shippori_punctuation_fixture()
+        with patch(
+            "nobigoe_font.punctuation.shippori_upright_punctuation_paths",
+            return_value=sources,
+        ):
+            fixed_exclamation = make_fixed_shippori_punctuation_ligature(
+                Mock(), "!", 400, 0
             )
-            expected = source_bodies[1].bounds[0] - source_bodies[0].bounds[2]
-
-            rotated = rotate_punctuation_outline(source)
-            rotated_bodies = sorted(
-                (contour for contour in rotated.contours if contour.bounds[3] >= 140),
-                key=lambda contour: contour.bounds[0],
+            variable_exclamation = make_variable_shippori_punctuation_ligature(
+                Mock(), "!", 400, 0
             )
-            actual = rotated_bodies[1].bounds[0] - rotated_bodies[0].bounds[2]
-            self.assertAlmostEqual(actual, expected, places=3)
-            gaps.append(actual)
+            fixed_question = make_fixed_shippori_punctuation_ligature(
+                Mock(), "?", 400, 0
+            )
+            variable_question = make_variable_shippori_punctuation_ligature(
+                Mock(), "?", 400, 0
+            )
 
-        self.assertAlmostEqual(gaps[0], gaps[1], delta=4)
+        def recording(outline: pathops.Path):
+            pen = RecordingPen()
+            outline.draw(pen)
+            return pen.value
 
-    def test_rotated_five_exclamations_fit_with_positive_equal_gaps(self) -> None:
-        for sans in (False, True):
-            for weight in (200, 400, 900):
-                source = make_original_punctuation_ligature(
-                    "!!!!!",
-                    weight,
-                    sans=sans,
-                )
-                rotated = rotate_punctuation_outline(source)
-                bodies = sorted(
-                    (
-                        contour
-                        for contour in rotated.contours
-                        if contour.bounds[3] >= 140
-                    ),
-                    key=lambda contour: contour.bounds[0],
-                )
-                gaps = [
-                    following.bounds[0] - previous.bounds[2]
-                    for previous, following in zip(bodies, bodies[1:])
-                ]
-                span = bodies[-1].bounds[2] - bodies[0].bounds[0]
-
-                with self.subTest(sans=sans, weight=weight):
-                    self.assertLessEqual(span, 960.001)
-                    self.assertGreater(min(gaps), 0)
-                    self.assertAlmostEqual(max(gaps), min(gaps), places=3)
-
-    def test_rotated_punctuation_preserves_variable_master_topology(self) -> None:
-        for sans in (False, True):
-            for sequence in PUNCTUATION_VARIANT_SEQUENCES:
-                signatures = set()
-                for weight in (200, 400, 900):
-                    outline = make_original_punctuation_ligature(
-                        sequence,
-                        weight,
-                        sans=sans,
-                    )
-                    designed = rotate_punctuation_outline(outline)
-                    signatures.add(
-                        (
-                            tuple(designed.verbs),
-                            len(designed.points),
-                            sum(1 for _ in designed.contours),
-                        )
-                    )
-                with self.subTest(sans=sans, sequence=sequence):
-                    self.assertEqual(len(signatures), 1)
-
-    def test_five_exclamations_fill_the_optical_cell(self) -> None:
-        for weight in (200, 300, 400, 500, 600, 700, 900):
-            outline = make_original_punctuation_ligature("!!!!!", weight)
-            width = outline.bounds[2] - outline.bounds[0]
-            self.assertGreaterEqual(width, 800)
-            self.assertLessEqual(width, 900)
+        self.assertEqual(
+            recording(fixed_exclamation),
+            recording(variable_exclamation),
+        )
+        self.assertEqual(recording(fixed_question), recording(sources["?"]))
+        self.assertNotEqual(recording(fixed_question), recording(variable_question))
 
     def test_variable_shippori_ligatures_use_smooth_cubic_bodies(self) -> None:
         sources = _shippori_punctuation_fixture()
@@ -835,13 +735,13 @@ class VariablePunctuationTests(unittest.TestCase):
                     for gap in gaps:
                         self.assertAlmostEqual(gap, boundary_gap, places=3)
 
-    def test_original_punctuation_features_compile_to_expected_contracts(
+    def test_serif_punctuation_features_compile_to_expected_contracts(
         self,
     ) -> None:
         variants = [
             (
                 sequence,
-                tuple(f"punctuation{index}_{variant}" for variant in range(4)),
+                (f"punctuation{index}_0", f"punctuation{index}_1"),
             )
             for index, sequence in enumerate(PUNCTUATION_VARIANT_SEQUENCES)
         ]
@@ -859,7 +759,7 @@ class VariablePunctuationTests(unittest.TestCase):
         feature_tags = {
             record.FeatureTag for record in font["GSUB"].table.FeatureList.FeatureRecord
         }
-        self.assertEqual(feature_tags, {"aalt", "ccmp", "ss01", "ss02", "ss03"})
+        self.assertEqual(feature_tags, {"aalt", "ccmp", "ss01"})
         names = dict(variants)
         ligatures = feature_ligatures(font, "ccmp")
         inputs = {"!": names["!"][0], "?": names["?"][0]}
@@ -868,11 +768,12 @@ class VariablePunctuationTests(unittest.TestCase):
             for sequence in MANGA_PUNCTUATION_SEQUENCES
         }
         self.assertEqual(ligatures, expected)
-        for variant, tag in enumerate(("ss01", "ss02", "ss03"), 1):
-            self.assertEqual(
-                feature_single_substitutions(font, tag),
-                {names[sequence][0]: names[sequence][variant] for sequence in names},
-            )
+        self.assertEqual(
+            feature_single_substitutions(font, "ss01"),
+            {names[sequence][0]: names[sequence][1] for sequence in names},
+        )
+        self.assertEqual(feature_single_substitutions(font, "ss02"), {})
+        self.assertEqual(feature_single_substitutions(font, "ss03"), {})
 
 
 class VariableBuildCliTests(unittest.TestCase):
@@ -904,7 +805,7 @@ class VariableBuildCliTests(unittest.TestCase):
                 "nobigoe_font.variable_cli.build_variable_novel"
             ) as build_novel_variable,
             patch(
-                "nobigoe_font.variable_cli.pipeline.build_static_instance"
+                "nobigoe_font.variable_cli.pipeline.build"
             ) as build_static,
             patch(
                 "nobigoe_font.variable_cli.pipeline.build_novel_static_instance"
@@ -934,6 +835,7 @@ class VariableBuildCliTests(unittest.TestCase):
             [item.args[0] for item in fetch.call_args_list],
             [
                 *(shippori_source(style) for style in NOTO_WEIGHT_CLASSES),
+                noto_serif_source("Regular"),
                 latin_font_source("libertinus", "Regular"),
             ],
         )
@@ -952,11 +854,14 @@ class VariableBuildCliTests(unittest.TestCase):
             build_static.call_args_list,
             [
                 call(
-                    Path("custom.otf"),
+                    cached,
+                    cached,
                     cached,
                     Path("static") / default_output_path(identity, "noto").name,
                     identity,
                     latin_build_profile("libertinus", "Regular"),
+                    0,
+                    "noto",
                     True,
                 )
             ],
@@ -989,7 +894,7 @@ class VariableBuildCliTests(unittest.TestCase):
                 "nobigoe_font.variable_cli.build_variable_novel"
             ) as build_novel_variable,
             patch(
-                "nobigoe_font.variable_cli.pipeline.build_static_instance"
+                "nobigoe_font.variable_cli.pipeline.build"
             ) as build_static,
             patch(
                 "nobigoe_font.variable_cli.pipeline.build_novel_static_instance"
@@ -1011,6 +916,7 @@ class VariableBuildCliTests(unittest.TestCase):
             [
                 noto_serif_cff2_variable_source(),
                 *(shippori_source(style) for style in NOTO_WEIGHT_CLASSES),
+                *(noto_serif_source(style) for style in NOTO_WEIGHT_CLASSES),
                 *(
                     latin_font_source("libertinus", style)
                     for style in NOTO_WEIGHT_CLASSES
