@@ -147,13 +147,13 @@ class FontProfileTests(unittest.TestCase):
         self.assertEqual(
             LIBERTINUS_HORIZONTAL_STROKE_ADJUSTMENTS,
             {
-                "ExtraLight": -13,
-                "Light": -9,
-                "Regular": -6,
-                "Medium": 1,
-                "SemiBold": -8,
-                "Bold": -5,
-                "Black": 6,
+                "ExtraLight": -14,
+                "Light": -10,
+                "Regular": -7,
+                "Medium": 0,
+                "SemiBold": -9,
+                "Bold": -6,
+                "Black": 5,
             },
         )
 
