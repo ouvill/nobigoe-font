@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.13"
           enable-cache: true
@@ -75,7 +75,7 @@ jobs:
         uses: actions/checkout@v7.0.1
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.13"
           enable-cache: true
@@ -170,7 +170,7 @@ jobs:
             --features=calt,vert,vrt2 >/dev/null
 
       - name: Upload Windows load-test fonts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: windows-load-test-fonts
           path: |
@@ -185,7 +185,7 @@ jobs:
     needs: font-smoke
     steps:
       - name: Download representative fonts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: windows-load-test-fonts
           path: fonts
